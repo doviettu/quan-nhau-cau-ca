@@ -108,7 +108,31 @@ Cậu Cả nói thành tiếng mọi câu thoại: chào khách, gọi tên ngư
 
 > ⚠️ **Phiên live bị TikTok dừng vì "không có hoạt động gì":** TikTok có thể tự dừng phiên live khi cho rằng không có người dẫn. Giọng Cậu Cả và việc trả lời comment theo thời gian thực giúp phiên live có tương tác thật. Tuy vậy, mình **không xác minh được** TikTok dựa vào đâu để quyết định, và quy định của TikTok yêu cầu chủ kênh chịu trách nhiệm với nội dung do AI tạo ra. Cách chắc chắn nhất là **có bạn ở bên**: bật mic nói chuyện thỉnh thoảng, thêm khung camera nhỏ, và trả lời ngay khi LIVE Studio hỏi bạn còn ở đó không. App **không** giả thao tác của người dẫn để lách TikTok.
 
+## 4a. Live dừng: báo về điện thoại và ngưng gọi Claude
+
+- **App theo dõi phiên live.**
+  - Kết nối bằng @tên: live coi là đang chạy khi TikTok báo phiên live còn mở.
+  - Kết nối qua TikFinity: live coi là đang chạy khi TikFinity chạy và cửa sổ game vẫn nhận được sự kiện.
+  - Ngoài ra, nếu không có sự kiện nào từ người xem thật trong 10 phút (chỉnh được), app cũng coi như live đã dừng.
+- **Khi live dừng quá 30 giây:**
+  - App **ngưng gọi Claude**. Game không gọi nữa, và máy chủ của app cũng chặn mọi lượt gọi.
+  - App gửi thông báo về **điện thoại** qua app **ntfy** và hiện thông báo trên Mac.
+  - Live chạy lại thì app tự gọi Claude tiếp và báo "Live chạy lại".
+- **Cài đặt:** trên bảng điều khiển → **🔔 Báo về điện thoại**.
+  1. Cài app ntfy trên điện thoại (miễn phí, không cần tài khoản).
+  2. Trong ntfy, đăng ký đúng **mã kênh** mà app đã tạo sẵn. Mã kênh này giữ kín như mật khẩu.
+  3. Bấm **Gửi thử** để kiểm tra điện thoại đã nhận được thông báo.
+- **Tin gửi qua ntfy.sh** chỉ gồm trạng thái live, không có thông tin cá nhân.
+- **Giới hạn:** app không nhìn thấy màn hình LIVE Studio, nên không phát hiện được captcha ngay lúc nó hiện ra. App chỉ báo khi phiên live có dấu hiệu dừng. Nhận được thông báo, bạn tự mở máy kiểm tra và giải captcha.
+
 ## 4b. Claude MC và chi phí
+
+**Gọi Claude ít nhất có thể:**
+- Lời chào khách mới (gộp nhiều tên vào một câu), cảm ơn tim, quà, theo dõi, chia sẻ, mốc tim và các câu khuấy động khi quán im đều là **lời soạn sẵn** trong game. Có hơn 60 câu, chia theo tình huống và giờ trong ngày, nên không tốn lượt gọi nào.
+- Claude **chỉ được gọi** khi đang live và có **người xem thật** bình luận trò chuyện hoặc hỏi han, hoặc khi có quà từ 100 xu trở lên.
+  - Các comment là lệnh (`bàn 5`, `dzô`, `hát …`, `xiếc`…) và câu trả lời trò chơi do game tự xử lý.
+  - Khách quen 🏠 và khách ảo không bao giờ làm tốn lượt gọi.
+- Cấu hình Live gọi Claude cách nhau ít nhất 30 giây, tối đa 90 lượt mỗi giờ.
 
 Claude đọc comment, quà, tim và người mới vào, rồi điều khiển Cậu Cả: chào khách, trả lời bình luận, mở sự kiện hoặc trò chơi, mời món nhỏ cho khách.
 

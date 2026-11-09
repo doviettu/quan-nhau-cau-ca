@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { exec, execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import crypto from 'node:crypto';
 import WebSocket, { WebSocketServer } from 'ws';
 import { createClaudeHandler, claudeReady } from '../bridge/claude-bridge.mjs';
 import { TikTokSource, normalizeUser, validUser } from './tiktok.mjs';
@@ -18,6 +19,7 @@ const DEFAULTS = {
   port: 8686,
   tikfinityUrl: 'ws://localhost:21213/',
   tiktok: { username: '', on: false },   // kết nối thẳng TikTok LIVE bằng @tên (không cần TikFinity)
+  notify: { on: true, topic: '', server: 'https://ntfy.sh', idleMin: 10 },   // báo về điện thoại qua app ntfy
   game: { aiOn: true, aiModel: 'claude-haiku-5-5', aiEvery: 20, aiMax: 180, ytKey: '', kMin: 1, kPrio: 30, kMax: 5, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, autoOn: true, autoLuckyMin: 8, bgmYt: false, bgmQuery: '', bgmVol: 35, circusAuto: true, circusEvery: 6, mcVoice: true, mcGap: 40 },
 };
 const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
@@ -26,6 +28,7 @@ function loadConfig() { try { return merge(DEFAULTS, JSON.parse(fs.readFileSync(
 function saveConfig() { fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), { mode: 0o600 }); }
 let config = loadConfig();
 if (config.obs) { delete config.obs; saveConfig(); }
+if (!config.notify.topic) { config.notify.topic = 'caucalive-' + crypto.randomBytes(5).toString('hex'); saveConfig(); }
 if (!fs.existsSync(CONFIG_PATH)) saveConfig();
 
 const PORT = Number(process.env.PORT || config.port || 8686);
@@ -100,19 +103,69 @@ async function body(req) { let raw = ''; for await (const c of req) { raw += c; 
 function sendFile(res, file, type) {
   fs.readFile(file, (err, data) => { if (err) return json(res, 404, { error: 'Không thấy ' + path.basename(file) }); res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' }); res.end(data); });
 }
-const publicConfig = () => ({ game: config.game, claudeReady: claudeReady(), tikfinityUrl: eventsUrl() });
+const publicConfig = () => ({ game: config.game, claudeReady: claudeReady(), tikfinityUrl: eventsUrl(), live: { ok: live.ok, reason: live.reason } });
+
+// ---- báo về điện thoại (ntfy) + thông báo trên Mac ----
+async function notify(title, message, priority = 4) {
+  console.log(`🔔 ${title}: ${message}`);
+  const n = config.notify; if (!n.on) return { ok: false, error: 'Đang tắt báo' };
+  if (process.platform === 'darwin') execFile('osascript', ['-e', `display notification ${JSON.stringify(message)} with title ${JSON.stringify(title)} sound name "Glass"`], () => { });
+  if (!n.topic) return { ok: false, error: 'Chưa có mã kênh ntfy' };
+  try {
+    const r = await fetch(String(n.server || 'https://ntfy.sh').replace(/\/+$/, ''), { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ topic: n.topic, title, message, priority, tags: ['beer'] }), signal: AbortSignal.timeout(10000) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return { ok: true };
+  } catch (e) { console.log('🔔 Không gửi được về điện thoại: ' + (e.message || e)); return { ok: false, error: String(e.message || e) }; }
+}
+
+// ---- theo dõi phiên live: dừng/mất kết nối → báo điện thoại + ngừng gọi Claude ----
+const live = { ok: false, reason: 'chưa kết nối phiên live', since: Date.now(), badSince: 0, everOk: false, alerted: false, lastReal: 0 };
+function liveCheck() {
+  const t = Date.now(); let ok, reason;
+  if (config.tiktok.on) { ok = tiktok.state === 'live'; reason = ok ? '' : (tiktok.error || (tiktok.state === 'connecting' ? 'đang kết nối lại TikTok' : 'mất kết nối TikTok')); }
+  else {
+    probeTikfinity();
+    const fresh = gameState && t - gameStateAt < 10000;
+    ok = tikProbe.ok && !!(fresh && gameState.live);
+    reason = !tikProbe.ok ? 'TikFinity không chạy' : !fresh ? 'cửa sổ game không chạy' : !gameState.live ? 'game mất kết nối TikFinity' : '';
+  }
+  const lastReal = Math.max(live.lastReal, (gameState && gameState.lastReal) || 0);
+  const idleMs = Math.max(3, Number(config.notify.idleMin) || 10) * 60000;
+  if (ok && t - Math.max(lastReal, live.since) > idleMs) { ok = false; reason = `${Math.round(idleMs / 60000)} phút không có sự kiện nào từ người xem`; }
+  if (ok) {
+    live.badSince = 0;
+    if (!live.ok) {
+      live.ok = true; live.reason = ''; live.since = t; live.everOk = true;
+      broadcast({ type: 'live', ok: true });
+      if (live.alerted) { live.alerted = false; notify('▶️ Live chạy lại', 'Phiên live Cậu Cả đã kết nối lại. Claude MC tiếp tục dẫn.', 3); }
+    }
+    return;
+  }
+  live.reason = reason;
+  if (!live.badSince) live.badSince = t;
+  if (live.ok && t - live.badSince >= 30000) {   // chờ 30 giây cho chắc rồi mới coi là dừng
+    live.ok = false; live.since = t;
+    broadcast({ type: 'live', ok: false, reason });
+    if (live.everOk && !live.alerted) { live.alerted = true; notify('⏸ Live Cậu Cả đang dừng', `${reason}. Đã ngưng gọi Claude. Kiểm tra LIVE Studio (captcha, mạng, bị dừng phiên).`, 5); }
+  }
+}
+setInterval(liveCheck, 5000);
 
 // ---- TikTok LIVE trực tiếp: phát sự kiện tới game qua ws://127.0.0.1:PORT/live-events ----
 const tiktok = new TikTokSource();
 const liveWss = new WebSocketServer({ noServer: true });
-tiktok.on('event', ev => { const m = JSON.stringify(ev); for (const c of liveWss.clients) if (c.readyState === 1) c.send(m); });
+tiktok.on('event', ev => { live.lastReal = Date.now(); const m = JSON.stringify(ev); for (const c of liveWss.clients) if (c.readyState === 1) c.send(m); });
 tiktok.on('connected', () => console.log(`📡 Đã kết nối TikTok LIVE @${tiktok.username}`));
 function tiktokApply() { if (config.tiktok.on && config.tiktok.username) tiktok.start(config.tiktok.username); else tiktok.stop(); }
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, BASE); const p = url.pathname;
   try {
-    if (p === '/mc') return claude(req, res);
+    if (p === '/mc') {
+      if (!live.ok && req.method === 'POST') return json(res, 503, { error: { status: 503, message: 'Live đang dừng – app tạm ngưng gọi Claude' } });
+      return claude(req, res);
+    }
     if (req.method === 'GET' && (p === '/' || p === '/index.html')) return sendFile(res, path.join(ROOT, 'index.html'), 'text/html; charset=utf-8');
     if (req.method === 'GET' && p === '/panel') return sendFile(res, path.join(ROOT, 'app', 'panel.html'), 'text/html; charset=utf-8');
     if (req.method === 'GET' && p === '/api/config') return json(res, 200, publicConfig());
@@ -125,6 +178,8 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, {
         claudeReady: claudeReady(), claudeCalls: claude.callsLastHour(), tikfinity: tikProbe.ok, tikfinityUrl: config.tikfinityUrl,
         tiktok: { ...tiktok.status(), on: config.tiktok.on, saved: config.tiktok.username, gameClients: liveWss.clients.size },
+        live: { ok: live.ok, reason: live.reason, since: live.since, lastReal: Math.max(live.lastReal, (gameState && gameState.lastReal) || 0) },
+        notify: { on: config.notify.on, topic: config.notify.topic, idleMin: config.notify.idleMin },
         voice: { mac: process.platform === 'darwin', name: viVoice, checked: voiceChecked, on: config.game.mcVoice !== false },
         game: gameState, gameAge: gameStateAt ? Date.now() - gameStateAt : null, gameClients: controlClients.size,
         gameUrl: gameUrl(), panelUrl: `${BASE}/panel`, config: { game: config.game, tikfinityUrl: config.tikfinityUrl },
@@ -136,7 +191,8 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/state') { gameState = b; gameStateAt = Date.now(); return json(res, 200, { ok: true }); }
     if (p === '/api/cmd') return json(res, 200, { ok: true, delivered: broadcast(b) });
     if (p === '/api/config') {
-      const { game, tikfinityUrl } = b;
+      const { game, tikfinityUrl, notify: nf } = b;
+      if (isObj(nf)) { const o = {}; if (typeof nf.on === 'boolean') o.on = nf.on; if (typeof nf.topic === 'string' && /^[\w-]{1,64}$/.test(nf.topic.trim())) o.topic = nf.topic.trim(); if (Number(nf.idleMin) >= 3) o.idleMin = Math.min(120, Number(nf.idleMin)); config.notify = merge(config.notify, o); }
       if (isObj(game)) config.game = merge(config.game, game);
       if (typeof tikfinityUrl === 'string' && /^wss?:\/\//.test(tikfinityUrl)) config.tikfinityUrl = tikfinityUrl;
       saveConfig(); broadcast({ type: 'config', config: publicConfig() });
@@ -175,6 +231,7 @@ const server = http.createServer(async (req, res) => {
       broadcast({ type: 'config', config: publicConfig() });
       return json(res, 200, { ok: true });
     }
+    if (p === '/api/notify/test') return json(res, 200, await notify('🍻 Cậu Cả Live', 'Thử thông báo: điện thoại đã nhận được báo từ app.', 3));
     if (p === '/api/speak') return json(res, 200, speak(b.text));
     if (p === '/api/window/open') return json(res, 200, openGameWindow());
     json(res, 404, { error: 'Không có' });
