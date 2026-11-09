@@ -396,7 +396,7 @@ kbd{background:rgba(255,255,255,.15);border-radius:5px;padding:0 5px;font-size:1
   </ul>
   <h4>⌨️ Phím tắt (máy tính)</h4>
   <p><kbd>D</kbd> dzô · <kbd>L</kbd> bốc thăm · <kbd>F</kbd> pháo hoa · <kbd>P</kbd> quẩy · <kbd>M</kbd> tắt/bật tiếng · <kbd>H</kbd> ẩn/hiện nút</p>
-  <p style="font-size:11px">Tham số URL cho OBS: <code>?auto=1&amp;ws=ws://localhost:21213/&amp;clean=1&amp;autopilot=1&amp;ai=1</code> · <code>?demo=1</code> (ai=1 dùng key đã lưu trong trình duyệt)</p>
+  <p style="font-size:11px">Tham số URL (khi đưa game lên live): <code>?auto=1&amp;ws=ws://localhost:21213/&amp;clean=1&amp;autopilot=1&amp;ai=1</code> · <code>?demo=1</code> (ai=1 dùng key đã lưu trong trình duyệt)</p>
   <p style="font-size:11px">Không đăng nhập · Không quảng cáo · Không thanh toán · Không gửi dữ liệu đi đâu – mọi thứ chạy trong trình duyệt của bạn.</p>
 </div>
 
@@ -3192,7 +3192,7 @@ function start(demo, openPanel) {
 $('#btnDemo').onclick = () => start(true, false);
 $('#btnLive').onclick = () => start(false, true);
 addEventListener('pointerdown', () => Snd.resume(), { passive: true });
-// tham số URL cho OBS / tự động
+// tham số URL khi đưa game lên live / tự động
 if (params.get('ws')) { $('#wsUrl').value = params.get('ws'); opts.ws = params.get('ws'); }
 if (params.get('safe') === 'tiktok' || (params.get('preset') === 'live' && params.get('safe') !== '0')) document.body.classList.add('tiktok-safe');
 if (params.get('clean') === '1') { opts.clean = true; $('#optClean').checked = true; document.body.classList.add('clean'); }

@@ -45,7 +45,7 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
 <body>
 <header>
   <div style="font-size:30px">🍻</div>
-  <div><h1>Cậu Cả Live</h1><div class="sub">Bảng điều khiển phiên live – game chạy trong OBS, bạn điều khiển ở đây</div></div>
+  <div><h1>Cậu Cả Live</h1><div class="sub">Bảng điều khiển phiên live – game chạy trong cửa sổ riêng, bạn điều khiển ở đây</div></div>
   <span class="live" id="liveTag">CHƯA PHÁT</span>
 </header>
 <main>
@@ -53,34 +53,21 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
     <h2>📋 Trạng thái</h2>
     <div class="st"><span><span class="dot" id="dClaude"></span>Claude MC</span><span class="mut" id="sClaude">…</span></div>
     <div class="st"><span><span class="dot" id="dTik"></span>TikTok Live</span><span class="mut" id="sTik">…</span></div>
-    <div class="st"><span><span class="dot" id="dObs"></span>OBS</span><span class="mut" id="sObs">…</span></div>
-    <div class="st"><span><span class="dot" id="dGame"></span>Game trong OBS</span><span class="mut" id="sGame">…</span></div>
+    <div class="st"><span><span class="dot" id="dGame"></span>Cửa sổ game</span><span class="mut" id="sGame">…</span></div>
     <div class="kv" id="gameKv" style="margin-top:10px"></div>
   </section>
 
   <section class="card">
-    <h2>🎥 OBS & phát live</h2>
+    <h2>📺 Đưa game lên TikTok LIVE Studio</h2>
+    <div class="btns"><button class="pri" id="bOpenWin">🪟 Mở cửa sổ game</button><button id="bReload2">🔄 Tải lại game</button></div>
     <ol class="steps">
-      <li>Mở <b>OBS</b> → <b>Tools → WebSocket Server Settings</b> → bật <b>Enable WebSocket server</b> (cổng 4455). Có mật khẩu thì nhập bên dưới.</li>
-      <li>Bấm <b>Thiết lập cảnh OBS</b>: khung dọc 1080×1920, cảnh “Cậu Cả Live” chạy game, âm thanh game vào OBS.</li>
-      <li>Trong OBS → <b>Settings → Stream</b> dán <b>Server URL</b> và <b>Stream Key</b> lấy từ TikTok LIVE (một lần).</li>
-      <li>Bấm <b>Bắt đầu phát</b>.</li>
+      <li>Bấm <b>Mở cửa sổ game</b>: game mở trong cửa sổ Chrome dọc 540×960, tự phát tiếng. Chỉ mở <b>một</b> cửa sổ.</li>
+      <li>Trong LIVE Studio: <b>Thêm nguồn → Chụp cửa sổ</b>, chọn cửa sổ game, kéo phủ kín khung dọc.</li>
+      <li>Cắt bỏ thanh tiêu đề cửa sổ ở cạnh trên (giữ <b>⌥ Option</b> rồi kéo cạnh trên xuống, nếu LIVE Studio hỗ trợ).</li>
+      <li>Bật <b>âm thanh máy tính</b> trong LIVE Studio để người xem nghe nhạc, karaoke.</li>
+      <li>Đừng thu nhỏ cửa sổ game xuống Dock (để cửa sổ khác che lên thì được).</li>
     </ol>
-    <div class="row"><label>Địa chỉ OBS WebSocket</label><input type="text" id="obsUrl"></div>
-    <div class="row"><label>Mật khẩu OBS WebSocket</label><input type="password" id="obsPass" placeholder="(để trống nếu không đặt)" autocomplete="off"></div>
-    <div class="row"><label>Tên cảnh</label><input type="text" id="obsScene"></div>
-    <div class="row"><label><input type="checkbox" id="obsVertical"> Khung dọc 1080×1920 cho TikTok</label></div>
-    <div class="btns">
-      <button id="bObsSave">💾 Lưu</button>
-      <button id="bObsConnect">🔌 Kết nối</button>
-      <button class="pri" id="bObsSetup">🎬 Thiết lập cảnh OBS</button>
-      <button id="bObsRefresh">🔄 Tải lại game</button>
-    </div>
-    <div class="btns">
-      <button class="ok" id="bStart">🔴 Bắt đầu phát</button>
-      <button id="bStop">⏹ Dừng phát</button>
-    </div>
-    <p class="mut">Dùng TikTok LIVE Studio thay OBS? Thêm nguồn <b>Liên kết / Trang web</b> với địa chỉ:<br><code id="gameUrl"></code> <button id="bCopy" style="padding:3px 8px">📋</button></p>
+    <p class="mut">Địa chỉ game: <code id="gameUrl"></code> <button id="bCopy" style="padding:3px 8px">📋</button></p>
   </section>
 
   <section class="card">
@@ -128,7 +115,7 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
 const $ = s => document.querySelector(s);
 const toast = (m, ms = 2800) => { const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', ms); };
 async function post(p, b = {}) { const r = await fetch(p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }
-async function cmd(c, okMsg) { try { const r = await post('/api/cmd', c); toast(r.delivered ? (okMsg || 'Đã gửi tới game') : '⚠️ Chưa thấy game trong OBS – bấm “Thiết lập cảnh OBS” trước'); } catch (e) { toast('❌ ' + e.message); } }
+async function cmd(c, okMsg) { try { const r = await post('/api/cmd', c); toast(r.delivered ? (okMsg || 'Đã gửi tới game') : '⚠️ Chưa thấy cửa sổ game – bấm “Mở cửa sổ game” trước'); } catch (e) { toast('❌ ' + e.message); } }
 const set = (id, cls, txt) => { $('#d' + id).className = 'dot ' + cls; $('#s' + id).textContent = txt; };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let loaded = false;
@@ -144,10 +131,10 @@ async function refresh() {
     set('Tik', s.tikfinity ? 'ok' : 'bad', s.tikfinity ? 'qua TikFinity' : 'chưa kết nối – nhập @tên ở phần Cấu hình');
     $('#ttStatus').textContent = 'Chưa kết nối trực tiếp' + (s.tikfinity ? ' · đang dùng TikFinity' : '');
   }
-  set('Obs', s.obs.connected ? 'ok' : 'bad', s.obs.connected ? (s.obs.stream.active ? '🔴 đang phát ' + s.obs.stream.timecode.slice(0, 8) : 'đã kết nối') : (s.obs.err || 'chưa kết nối'));
   const fresh = s.gameAge !== null && s.gameAge < 6000;
-  set('Game', fresh ? 'ok' : 'bad', fresh ? (s.game.live ? 'đang nhận Live' : s.game.demo ? 'đang chạy khách ảo' : 'đang chạy, chưa nhận Live') : 'chưa chạy trong OBS');
-  $('#liveTag').className = 'live' + (s.obs.stream.active ? ' on' : ''); $('#liveTag').textContent = s.obs.stream.active ? '● ĐANG PHÁT' : 'CHƯA PHÁT';
+  set('Game', fresh ? 'ok' : 'bad', fresh ? (s.game.live ? 'đang nhận Live' : s.game.demo ? 'đang chạy khách ảo' : 'đang chạy, chưa nhận Live') : 'chưa mở – bấm “Mở cửa sổ game”');
+  const onAir = tt.on && tt.state === 'live';
+  $('#liveTag').className = 'live' + (onAir ? ' on' : ''); $('#liveTag').textContent = onAir ? '● ĐANG LIVE' : 'CHƯA LIVE';
   $('#gameUrl').textContent = s.gameUrl;
   const g = s.game;
   $('#gameKv').innerHTML = fresh && g ? [
@@ -161,8 +148,6 @@ async function refresh() {
   ].map(([k, v]) => `<span class="mut">${k}</span><b>${v}</b>`).join('') : '<span class="mut">Chưa có dữ liệu từ game.</span>';
   if (!loaded) {
     loaded = true; const c = s.config.game;
-    $('#obsUrl').value = s.obs.url; $('#obsScene').value = s.obs.sceneName; $('#obsVertical').checked = !!s.obs.vertical;
-    if (s.obs.hasPassword) $('#obsPass').placeholder = '•••••• (đã lưu)';
     $('#tikUrl').value = s.config.tikfinityUrl;
     if (tt.saved) $('#ttUser').value = '@' + tt.saved;
     for (const k of ['aiModel', 'aiEvery', 'aiMax', 'ytKey', 'kMin', 'kPrio', 'botMin', 'mgEvery', 'autoLuckyMin']) $('#' + k).value = c[k] ?? '';
@@ -170,19 +155,14 @@ async function refresh() {
   }
 }
 setInterval(refresh, 2000); refresh();
-const obsCfg = () => { const o = { url: $('#obsUrl').value.trim(), sceneName: $('#obsScene').value.trim() || 'Cậu Cả Live', vertical: $('#obsVertical').checked }; if ($('#obsPass').value) o.password = $('#obsPass').value; return o; };
-$('#bObsSave').onclick = async () => { try { await post('/api/config', { obs: obsCfg() }); $('#obsPass').value = ''; toast('💾 Đã lưu cấu hình OBS'); } catch (e) { toast('❌ ' + e.message); } };
-$('#bObsConnect').onclick = async () => { try { await post('/api/config', { obs: obsCfg() }); await post('/api/obs/connect'); toast('✅ Đã kết nối OBS'); } catch (e) { toast('❌ ' + e.message, 5000); } };
-$('#bObsSetup').onclick = async () => { try { await post('/api/config', { obs: obsCfg() }); const r = await post('/api/obs/setup'); toast(`🎬 Đã tạo cảnh “${r.sceneName}” ${r.width}×${r.height}` + (r.warnings.length ? ' · ⚠️ ' + r.warnings.join(' ') : ''), 6000); } catch (e) { toast('❌ ' + e.message, 6000); } };
-$('#bObsRefresh').onclick = async () => { try { await post('/api/obs/refresh'); toast('🔄 Đã tải lại game trong OBS'); } catch (e) { toast('❌ ' + e.message); } };
-$('#bStart').onclick = async () => { if (!confirm('Bắt đầu phát live trên OBS?')) return; try { await post('/api/obs/stream', { action: 'start' }); toast('🔴 Đã bắt đầu phát'); } catch (e) { toast('❌ ' + e.message, 6000); } };
-$('#bStop').onclick = async () => { if (!confirm('Dừng phát live?')) return; try { await post('/api/obs/stream', { action: 'stop' }); toast('⏹ Đã dừng phát'); } catch (e) { toast('❌ ' + e.message); } };
 const ttConnect = async () => {
   const u = $('#ttUser').value.trim(); if (!u) { $('#ttUser').focus(); return toast('Nhập tên TikTok, ví dụ @tenban'); }
   try { const r = await post('/api/tiktok/connect', { username: u }); $('#ttUser').value = '@' + r.username; toast('📡 Đang kết nối @' + r.username + '…'); refresh(); } catch (e) { toast('❌ ' + e.message, 5000); }
 };
 $('#bTtConnect').onclick = ttConnect; $('#ttUser').onkeydown = e => e.key === 'Enter' && ttConnect();
 $('#bTtStop').onclick = async () => { try { await post('/api/tiktok/disconnect'); toast('Đã ngắt – quay lại dùng TikFinity'); refresh(); } catch (e) { toast('❌ ' + e.message); } };
+$('#bOpenWin').onclick = async () => { try { const r = await post('/api/window/open'); toast(r.ok ? (r.warning ? '⚠️ ' + r.warning : '🪟 Đã mở cửa sổ game – thêm nguồn “Chụp cửa sổ” trong LIVE Studio') : '❌ ' + r.error, 6000); } catch (e) { toast('❌ ' + e.message); } };
+$('#bReload2').onclick = () => cmd({ type: 'reload' }, '🔄 Đã tải lại game');
 $('#bCopy').onclick = () => navigator.clipboard.writeText($('#gameUrl').textContent).then(() => toast('📋 Đã chép địa chỉ'));
 document.querySelectorAll('[data-ev]').forEach(b => b.onclick = () => cmd({ type: 'event', name: b.dataset.ev }));
 document.querySelectorAll('[data-mg]').forEach(b => b.onclick = () => cmd({ type: 'mg', name: b.dataset.mg }));
