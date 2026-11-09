@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cậu Cả Live – Bảng điều khiển</title>
+<style>
+:root{--bg:#160d14;--card:#241520;--line:rgba(255,196,120,.22);--txt:#fff7ec;--mut:#cdb9a8;--yel:#ffc93c;--red:#e53935;--ok:#43a047;--warn:#fb8c00;--bad:#e53935}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 20% 0,#3a1420,var(--bg) 60%);color:var(--txt);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh}
+header{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(22,13,20,.92);backdrop-filter:blur(8px);z-index:2}
+header h1{margin:0;font-size:20px;color:var(--yel)}
+header .sub{color:var(--mut);font-size:12px}
+.live{margin-left:auto;font-weight:800;padding:4px 10px;border-radius:8px;background:#444}
+.live.on{background:var(--red)}
+main{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;padding:16px 20px 40px;max-width:1300px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.card h2{margin:0 0 10px;font-size:15px;color:var(--yel)}
+.st{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,.08)}
+.st:last-child{border-bottom:none}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;background:#666;vertical-align:middle}
+.dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
+.mut{color:var(--mut);font-size:12px}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);background:rgba(255,255,255,.07);border-radius:10px;padding:8px 12px;font-weight:700}
+button:hover{background:rgba(255,255,255,.13)}
+button.pri{background:linear-gradient(135deg,var(--red),#ff7a2f);border-color:transparent}
+button.ok{background:var(--ok);border-color:transparent}
+button:disabled{opacity:.5;cursor:default}
+input,select{font:inherit;color:#fff;background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0}
+.row{display:flex;gap:8px;align-items:center;margin:6px 0}
+.row label{flex:1;color:var(--mut);font-size:13px}
+.row input[type=text],.row input[type=password]{flex:2}
+.row input[type=number]{width:90px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}
+.kv b{color:#fff}
+code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px;word-break:break-all}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#222;border:1px solid var(--line);padding:10px 16px;border-radius:12px;display:none;max-width:90vw;z-index:5}
+.steps li{margin:4px 0;color:var(--mut)}
+.steps b{color:#fff}
+</style>
+</head>
+<body>
+<header>
+  <div style="font-size:30px">🍻</div>
+  <div><h1>Cậu Cả Live</h1><div class="sub">Bảng điều khiển phiên live – game chạy trong OBS, bạn điều khiển ở đây</div></div>
+  <span class="live" id="liveTag">CHƯA PHÁT</span>
+</header>
+<main>
+  <section class="card">
+    <h2>📋 Trạng thái</h2>
+    <div class="st"><span><span class="dot" id="dClaude"></span>Claude MC</span><span class="mut" id="sClaude">…</span></div>
+    <div class="st"><span><span class="dot" id="dTik"></span>TikFinity (TikTok Live)</span><span class="mut" id="sTik">…</span></div>
+    <div class="st"><span><span class="dot" id="dObs"></span>OBS</span><span class="mut" id="sObs">…</span></div>
+    <div class="st"><span><span class="dot" id="dGame"></span>Game trong OBS</span><span class="mut" id="sGame">…</span></div>
+    <div class="kv" id="gameKv" style="margin-top:10px"></div>
+  </section>
+
+  <section class="card">
+    <h2>🎥 OBS & phát live</h2>
+    <ol class="steps">
+      <li>Mở <b>OBS</b> → <b>Tools → WebSocket Server Settings</b> → bật <b>Enable WebSocket server</b> (cổng 4455). Có mật khẩu thì nhập bên dưới.</li>
+      <li>Bấm <b>Thiết lập cảnh OBS</b>: khung dọc 1080×1920, cảnh “Cậu Cả Live” chạy game, âm thanh game vào OBS.</li>
+      <li>Trong OBS → <b>Settings → Stream</b> dán <b>Server URL</b> và <b>Stream Key</b> lấy từ TikTok LIVE (một lần).</li>
+      <li>Bấm <b>Bắt đầu phát</b>.</li>
+    </ol>
+    <div class="row"><label>Địa chỉ OBS WebSocket</label><input type="text" id="obsUrl"></div>
+    <div class="row"><label>Mật khẩu OBS WebSocket</label><input type="password" id="obsPass" placeholder="(để trống nếu không đặt)" autocomplete="off"></div>
+    <div class="row"><label>Tên cảnh</label><input type="text" id="obsScene"></div>
+    <div class="row"><label><input type="checkbox" id="obsVertical"> Khung dọc 1080×1920 cho TikTok</label></div>
+    <div class="btns">
+      <button id="bObsSave">💾 Lưu</button>
+      <button id="bObsConnect">🔌 Kết nối</button>
+      <button class="pri" id="bObsSetup">🎬 Thiết lập cảnh OBS</button>
+      <button id="bObsRefresh">🔄 Tải lại game</button>
+    </div>
+    <div class="btns">
+      <button class="ok" id="bStart">🔴 Bắt đầu phát</button>
+      <button id="bStop">⏹ Dừng phát</button>
+    </div>
+    <p class="mut">Dùng TikTok LIVE Studio thay OBS? Thêm nguồn <b>Liên kết / Trang web</b> với địa chỉ:<br><code id="gameUrl"></code> <button id="bCopy" style="padding:3px 8px">📋</button></p>
+  </section>
+
+  <section class="card">
+    <h2>🎮 Điều khiển quán</h2>
+    <div class="btns">
+      <button data-ev="dzo">🍻 Cả quán dzô</button><button data-ev="lucky">🎲 Bốc thăm</button>
+      <button data-ev="fire">🎆 Pháo hoa</button><button data-ev="party">🔥 Quẩy</button>
+      <button data-ev="clearDish">🧹 Dọn bàn</button>
+    </div>
+    <div class="btns">
+      <button data-mg="do_vui">🧠 Đố vui</button><button data-mg="doan_so">🔢 Đoán số</button>
+      <button data-mg="nhanh_tay">⚡ Nhanh tay</button><button data-mg="dua_ban">🏁 Đua bàn</button><button data-mg="stop">⏹ Dừng trò</button>
+    </div>
+    <div class="btns"><button id="bSkip">⏭ Qua bài karaoke</button><button id="bAiOn">🤖 Bật Claude MC</button><button id="bAiOff">Tắt Claude MC</button></div>
+    <div class="row"><input type="text" id="sayText" placeholder="Cậu Cả nói… (vd: Cảm ơn cả nhà đã ghé quán!)" style="flex:1"><button class="pri" id="bSay">💬 Nói</button></div>
+    <div class="row"><input type="text" id="songText" placeholder="Thêm bài karaoke: tên bài hoặc link YouTube" style="flex:1"><button id="bSong">🎤 Thêm</button></div>
+    <div class="row"><input type="text" id="testText" placeholder="Thử comment (vd: bàn 5, hát Diễm xưa, đố vui)" style="flex:1"><button id="bTest">🧪 Gửi thử</button></div>
+    <div class="btns"><button id="bDemoOn">👥 Bật khách ảo (tập dượt)</button><button id="bDemoOff">Tắt khách ảo</button><button id="bReload">🔄 Tải lại game</button></div>
+  </section>
+
+  <section class="card">
+    <h2>⚙️ Cấu hình phiên live</h2>
+    <div class="row"><label>TikFinity WebSocket</label><input type="text" id="tikUrl"></div>
+    <div class="row"><label>Model Claude</label><select id="aiModel"><option value="claude-haiku-5-5">Haiku 5.5 – rẻ nhất (~$0.02–0.06/giờ)</option><option value="claude-sonnet-5-5">Sonnet 5.5 (~$0.4–1.2/giờ)</option><option value="claude-opus-5-5">Opus 5.5 (~$0.7–2.3/giờ)</option></select></div>
+    <div class="row"><label><input type="checkbox" id="aiOn"> Tự bật Claude MC khi mở game</label></div>
+    <div class="row"><label>Nhịp Claude (giây)</label><input type="number" id="aiEvery" min="8" max="120"><label>Tối đa lượt/giờ</label><input type="number" id="aiMax" min="10" max="1000"></div>
+    <div class="row"><label>YouTube Data API key</label><input type="password" id="ytKey" placeholder="(tuỳ chọn – để tự tìm bài)" autocomplete="off"></div>
+    <div class="row"><label>Quà tối thiểu chốt bài (xu)</label><input type="number" id="kMin" min="0"><label>Chen hàng (xu)</label><input type="number" id="kPrio" min="1"></div>
+    <div class="row"><label><input type="checkbox" id="botsOn"> Khách quen 🏠, tối thiểu</label><input type="number" id="botMin" min="0" max="50"><label>khách</label></div>
+    <div class="row"><label><input type="checkbox" id="mgAuto"> Trò chơi nhỏ mỗi</label><input type="number" id="mgEvery" min="1" max="30"><label>phút</label></div>
+    <div class="row"><label><input type="checkbox" id="autoOn"> Tự động dẫn live, bốc thăm mỗi</label><input type="number" id="autoLuckyMin" min="2" max="60"><label>phút</label></div>
+    <div class="btns"><button class="pri" id="bSaveCfg">💾 Lưu & áp dụng cho game</button></div>
+    <p class="mut">Claude API key được lưu trong <b>Keychain</b> của Mac (hỏi một lần khi mở app). Đổi key: chạy <code>./start.command --reset-key</code>.</p>
+  </section>
+</main>
+<div id="toast"></div>
+<script>
+const $ = s => document.querySelector(s);
+const toast = (m, ms = 2800) => { const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', ms); };
+async function post(p, b = {}) { const r = await fetch(p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }
+async function cmd(c, okMsg) { try { const r = await post('/api/cmd', c); toast(r.delivered ? (okMsg || 'Đã gửi tới game') : '⚠️ Chưa thấy game trong OBS – bấm “Thiết lập cảnh OBS” trước'); } catch (e) { toast('❌ ' + e.message); } }
+const set = (id, cls, txt) => { $('#d' + id).className = 'dot ' + cls; $('#s' + id).textContent = txt; };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let loaded = false;
+async function refresh() {
+  let s; try { s = await (await fetch('/api/status', { cache: 'no-store' })).json(); } catch { set('Game', 'bad', 'App đã tắt'); return; }
+  set('Claude', s.claudeReady ? 'ok' : 'warn', s.claudeReady ? `sẵn sàng · ${s.claudeCalls} lượt/giờ` : 'chưa có key – Cậu Cả theo kịch bản');
+  set('Tik', s.tikfinity ? 'ok' : 'bad', s.tikfinity ? 'TikFinity đang chạy' : 'chưa thấy TikFinity – mở app TikFinity');
+  set('Obs', s.obs.connected ? 'ok' : 'bad', s.obs.connected ? (s.obs.stream.active ? '🔴 đang phát ' + s.obs.stream.timecode.slice(0, 8) : 'đã kết nối') : (s.obs.err || 'chưa kết nối'));
+  const fresh = s.gameAge !== null && s.gameAge < 6000;
+  set('Game', fresh ? 'ok' : 'bad', fresh ? (s.game.live ? 'đang nhận Live' : s.game.demo ? 'đang chạy khách ảo' : 'đang chạy, chưa nhận Live') : 'chưa chạy trong OBS');
+  $('#liveTag').className = 'live' + (s.obs.stream.active ? ' on' : ''); $('#liveTag').textContent = s.obs.stream.active ? '● ĐANG PHÁT' : 'CHƯA PHÁT';
+  $('#gameUrl').textContent = s.gameUrl;
+  const g = s.game;
+  $('#gameKv').innerHTML = fresh && g ? [
+    ['Khách', `${g.real} thật · ${g.bots} khách quen · ghế ${g.seats}`], ['Không khí', g.vibe + '%' + (g.party ? ' 🔥 đang quẩy' : '')],
+    ['Tim · Doanh thu', `${g.likes} tim · ${Number(g.revenue).toLocaleString('vi-VN')}đ`],
+    ['Top', (g.top || []).map((t, i) => ['👑', '🥈', '🥉'][i] + ' ' + esc(t.name) + ' (' + t.points + ')').join(' · ') || '—'],
+    ['Karaoke', g.karaoke.cur ? '▶ ' + esc(g.karaoke.cur) : 'không ai hát', ],
+    ['Hàng chờ', `${g.karaoke.queue} bài · ${g.karaoke.pending} chờ quà`], ['Trò chơi', g.mg || '—'],
+    ['Claude MC', g.ai.on ? `bật · ${g.ai.calls} lượt/giờ · ~$${g.ai.cost}` + (g.ai.err ? ' · ⚠️ ' + esc(g.ai.err) : '') : 'tắt'],
+    ['Lời gần nhất', esc(g.ai.last || '—')],
+  ].map(([k, v]) => `<span class="mut">${k}</span><b>${v}</b>`).join('') : '<span class="mut">Chưa có dữ liệu từ game.</span>';
+  if (!loaded) {
+    loaded = true; const c = s.config.game;
+    $('#obsUrl').value = s.obs.url; $('#obsScene').value = s.obs.sceneName; $('#obsVertical').checked = !!s.obs.vertical;
+    if (s.obs.hasPassword) $('#obsPass').placeholder = '•••••• (đã lưu)';
+    $('#tikUrl').value = s.config.tikfinityUrl;
+    for (const k of ['aiModel', 'aiEvery', 'aiMax', 'ytKey', 'kMin', 'kPrio', 'botMin', 'mgEvery', 'autoLuckyMin']) $('#' + k).value = c[k] ?? '';
+    for (const k of ['aiOn', 'botsOn', 'mgAuto', 'autoOn']) $('#' + k).checked = !!c[k];
+  }
+}
+setInterval(refresh, 2000); refresh();
+const obsCfg = () => { const o = { url: $('#obsUrl').value.trim(), sceneName: $('#obsScene').value.trim() || 'Cậu Cả Live', vertical: $('#obsVertical').checked }; if ($('#obsPass').value) o.password = $('#obsPass').value; return o; };
+$('#bObsSave').onclick = async () => { try { await post('/api/config', { obs: obsCfg() }); $('#obsPass').value = ''; toast('💾 Đã lưu cấu hình OBS'); } catch (e) { toast('❌ ' + e.message); } };
+$('#bObsConnect').onclick = async () => { try { await post('/api/config', { obs: obsCfg() }); await post('/api/obs/connect'); toast('✅ Đã kết nối OBS'); } catch (e) { toast('❌ ' + e.message, 5000); } };
+$('#bObsSetup').onclick = async () => { try { await post('/api/config', { obs: obsCfg() }); const r = await post('/api/obs/setup'); toast(`🎬 Đã tạo cảnh “${r.sceneName}” ${r.width}×${r.height}` + (r.warnings.length ? ' · ⚠️ ' + r.warnings.join(' ') : ''), 6000); } catch (e) { toast('❌ ' + e.message, 6000); } };
+$('#bObsRefresh').onclick = async () => { try { await post('/api/obs/refresh'); toast('🔄 Đã tải lại game trong OBS'); } catch (e) { toast('❌ ' + e.message); } };
+$('#bStart').onclick = async () => { if (!confirm('Bắt đầu phát live trên OBS?')) return; try { await post('/api/obs/stream', { action: 'start' }); toast('🔴 Đã bắt đầu phát'); } catch (e) { toast('❌ ' + e.message, 6000); } };
+$('#bStop').onclick = async () => { if (!confirm('Dừng phát live?')) return; try { await post('/api/obs/stream', { action: 'stop' }); toast('⏹ Đã dừng phát'); } catch (e) { toast('❌ ' + e.message); } };
+$('#bCopy').onclick = () => navigator.clipboard.writeText($('#gameUrl').textContent).then(() => toast('📋 Đã chép địa chỉ'));
+document.querySelectorAll('[data-ev]').forEach(b => b.onclick = () => cmd({ type: 'event', name: b.dataset.ev }));
+document.querySelectorAll('[data-mg]').forEach(b => b.onclick = () => cmd({ type: 'mg', name: b.dataset.mg }));
+$('#bSkip').onclick = () => cmd({ type: 'skip' });
+$('#bAiOn').onclick = () => cmd({ type: 'ai', on: true }); $('#bAiOff').onclick = () => cmd({ type: 'ai', on: false });
+$('#bDemoOn').onclick = () => cmd({ type: 'demo', on: true }); $('#bDemoOff').onclick = () => cmd({ type: 'demo', on: false });
+$('#bReload').onclick = () => cmd({ type: 'reload' });
+const sendText = (id, type) => { const v = $('#' + id).value.trim(); if (!v) return; cmd(type === 'chat' ? { type, name: 'Chủ quán thử', text: v } : { type, text: v }); $('#' + id).value = ''; };
+$('#bSay').onclick = () => sendText('sayText', 'say'); $('#sayText').onkeydown = e => e.key === 'Enter' && sendText('sayText', 'say');
+$('#bSong').onclick = () => sendText('songText', 'song'); $('#songText').onkeydown = e => e.key === 'Enter' && sendText('songText', 'song');
+$('#bTest').onclick = () => sendText('testText', 'chat'); $('#testText').onkeydown = e => e.key === 'Enter' && sendText('testText', 'chat');
+$('#bSaveCfg').onclick = async () => {
+  const n = id => Number($('#' + id).value);
+  const game = { aiModel: $('#aiModel').value, aiOn: $('#aiOn').checked, aiEvery: n('aiEvery'), aiMax: n('aiMax'), ytKey: $('#ytKey').value.trim(), kMin: n('kMin'), kPrio: n('kPrio'), botsOn: $('#botsOn').checked, botMin: n('botMin'), mgAuto: $('#mgAuto').checked, mgEvery: n('mgEvery'), autoOn: $('#autoOn').checked, autoLuckyMin: n('autoLuckyMin') };
+  try { await post('/api/config', { game, tikfinityUrl: $('#tikUrl').value.trim() }); toast('💾 Đã lưu – game trong OBS cập nhật ngay'); } catch (e) { toast('❌ ' + e.message); }
+};
+</script>
+</body>
+</html>
