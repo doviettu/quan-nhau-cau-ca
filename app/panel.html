@@ -38,6 +38,8 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
 #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#222;border:1px solid var(--line);padding:10px 16px;border-radius:12px;display:none;max-width:90vw;z-index:5}
 .steps li{margin:4px 0;color:var(--mut)}
 .steps b{color:#fff}
+.tt{border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:10px;background:rgba(255,201,60,.06)}
+#ttStatus{margin-top:2px}
 </style>
 </head>
 <body>
@@ -50,7 +52,7 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
   <section class="card">
     <h2>📋 Trạng thái</h2>
     <div class="st"><span><span class="dot" id="dClaude"></span>Claude MC</span><span class="mut" id="sClaude">…</span></div>
-    <div class="st"><span><span class="dot" id="dTik"></span>TikFinity (TikTok Live)</span><span class="mut" id="sTik">…</span></div>
+    <div class="st"><span><span class="dot" id="dTik"></span>TikTok Live</span><span class="mut" id="sTik">…</span></div>
     <div class="st"><span><span class="dot" id="dObs"></span>OBS</span><span class="mut" id="sObs">…</span></div>
     <div class="st"><span><span class="dot" id="dGame"></span>Game trong OBS</span><span class="mut" id="sGame">…</span></div>
     <div class="kv" id="gameKv" style="margin-top:10px"></div>
@@ -101,7 +103,12 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
 
   <section class="card">
     <h2>⚙️ Cấu hình phiên live</h2>
-    <div class="row"><label>TikFinity WebSocket</label><input type="text" id="tikUrl"></div>
+    <div class="tt">
+      <div class="row"><label><b>📡 Kết nối TikTok LIVE</b><br><span class="mut">Nhập tên tài khoản đang live – không cần TikFinity</span></label></div>
+      <div class="row"><input type="text" id="ttUser" placeholder="@tennick" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:2"><button class="pri" id="bTtConnect">Kết nối</button><button id="bTtStop">Ngắt</button></div>
+      <div class="mut" id="ttStatus">Chưa kết nối</div>
+    </div>
+    <div class="row"><label>TikFinity WebSocket <span class="mut">(dùng khi không kết nối trực tiếp)</span></label><input type="text" id="tikUrl"></div>
     <div class="row"><label>Model Claude</label><select id="aiModel"><option value="claude-haiku-5-5">Haiku 5.5 – rẻ nhất (~$0.02–0.06/giờ)</option><option value="claude-sonnet-5-5">Sonnet 5.5 (~$0.4–1.2/giờ)</option><option value="claude-opus-5-5">Opus 5.5 (~$0.7–2.3/giờ)</option></select></div>
     <div class="row"><label><input type="checkbox" id="aiOn"> Tự bật Claude MC khi mở game</label></div>
     <div class="row"><label>Nhịp Claude (giây)</label><input type="number" id="aiEvery" min="8" max="120"><label>Tối đa lượt/giờ</label><input type="number" id="aiMax" min="10" max="1000"></div>
@@ -126,7 +133,15 @@ let loaded = false;
 async function refresh() {
   let s; try { s = await (await fetch('/api/status', { cache: 'no-store' })).json(); } catch { set('Game', 'bad', 'App đã tắt'); return; }
   set('Claude', s.claudeReady ? 'ok' : 'warn', s.claudeReady ? `sẵn sàng · ${s.claudeCalls} lượt/giờ` : 'chưa có key – Cậu Cả theo kịch bản');
-  set('Tik', s.tikfinity ? 'ok' : 'bad', s.tikfinity ? 'TikFinity đang chạy' : 'chưa thấy TikFinity – mở app TikFinity');
+  const tt = s.tiktok || {};
+  if (tt.on) {
+    const label = { live: `🔴 @${tt.username} · ${tt.viewers || 0} người xem`, connecting: `đang kết nối @${tt.username}…`, offline: tt.error, error: tt.error }[tt.state] || tt.state;
+    set('Tik', tt.state === 'live' ? 'ok' : tt.state === 'connecting' || tt.state === 'offline' ? 'warn' : 'bad', label);
+    $('#ttStatus').textContent = (tt.state === 'live' ? '✅ Đã kết nối ' : '') + label + (tt.state === 'live' && !tt.gameClients ? ' · ⚠️ game chưa nhận – bấm “Tải lại game”' : '');
+  } else {
+    set('Tik', s.tikfinity ? 'ok' : 'bad', s.tikfinity ? 'qua TikFinity' : 'chưa kết nối – nhập @tên ở phần Cấu hình');
+    $('#ttStatus').textContent = 'Chưa kết nối trực tiếp' + (s.tikfinity ? ' · đang dùng TikFinity' : '');
+  }
   set('Obs', s.obs.connected ? 'ok' : 'bad', s.obs.connected ? (s.obs.stream.active ? '🔴 đang phát ' + s.obs.stream.timecode.slice(0, 8) : 'đã kết nối') : (s.obs.err || 'chưa kết nối'));
   const fresh = s.gameAge !== null && s.gameAge < 6000;
   set('Game', fresh ? 'ok' : 'bad', fresh ? (s.game.live ? 'đang nhận Live' : s.game.demo ? 'đang chạy khách ảo' : 'đang chạy, chưa nhận Live') : 'chưa chạy trong OBS');
@@ -147,6 +162,7 @@ async function refresh() {
     $('#obsUrl').value = s.obs.url; $('#obsScene').value = s.obs.sceneName; $('#obsVertical').checked = !!s.obs.vertical;
     if (s.obs.hasPassword) $('#obsPass').placeholder = '•••••• (đã lưu)';
     $('#tikUrl').value = s.config.tikfinityUrl;
+    if (tt.saved) $('#ttUser').value = '@' + tt.saved;
     for (const k of ['aiModel', 'aiEvery', 'aiMax', 'ytKey', 'kMin', 'kPrio', 'botMin', 'mgEvery', 'autoLuckyMin']) $('#' + k).value = c[k] ?? '';
     for (const k of ['aiOn', 'botsOn', 'mgAuto', 'autoOn']) $('#' + k).checked = !!c[k];
   }
@@ -159,6 +175,12 @@ $('#bObsSetup').onclick = async () => { try { await post('/api/config', { obs: o
 $('#bObsRefresh').onclick = async () => { try { await post('/api/obs/refresh'); toast('🔄 Đã tải lại game trong OBS'); } catch (e) { toast('❌ ' + e.message); } };
 $('#bStart').onclick = async () => { if (!confirm('Bắt đầu phát live trên OBS?')) return; try { await post('/api/obs/stream', { action: 'start' }); toast('🔴 Đã bắt đầu phát'); } catch (e) { toast('❌ ' + e.message, 6000); } };
 $('#bStop').onclick = async () => { if (!confirm('Dừng phát live?')) return; try { await post('/api/obs/stream', { action: 'stop' }); toast('⏹ Đã dừng phát'); } catch (e) { toast('❌ ' + e.message); } };
+const ttConnect = async () => {
+  const u = $('#ttUser').value.trim(); if (!u) { $('#ttUser').focus(); return toast('Nhập tên TikTok, ví dụ @tenban'); }
+  try { const r = await post('/api/tiktok/connect', { username: u }); $('#ttUser').value = '@' + r.username; toast('📡 Đang kết nối @' + r.username + '…'); refresh(); } catch (e) { toast('❌ ' + e.message, 5000); }
+};
+$('#bTtConnect').onclick = ttConnect; $('#ttUser').onkeydown = e => e.key === 'Enter' && ttConnect();
+$('#bTtStop').onclick = async () => { try { await post('/api/tiktok/disconnect'); toast('Đã ngắt – quay lại dùng TikFinity'); refresh(); } catch (e) { toast('❌ ' + e.message); } };
 $('#bCopy').onclick = () => navigator.clipboard.writeText($('#gameUrl').textContent).then(() => toast('📋 Đã chép địa chỉ'));
 document.querySelectorAll('[data-ev]').forEach(b => b.onclick = () => cmd({ type: 'event', name: b.dataset.ev }));
 document.querySelectorAll('[data-mg]').forEach(b => b.onclick = () => cmd({ type: 'mg', name: b.dataset.mg }));

@@ -16,7 +16,7 @@ Repo gồm:
 ## 1. Chạy bằng app trên Mac (khuyên dùng)
 
 ### Lần đầu
-1. **Cài Node.js 18 trở lên**: `brew install node`, hoặc tải bản LTS tại https://nodejs.org
+1. **Cài Node.js 20 trở lên**: `brew install node`, hoặc tải bản LTS tại https://nodejs.org
 2. **Tải repo về máy**:
    ```bash
    cd ~
@@ -36,7 +36,9 @@ Repo gồm:
 Có thể kéo `Cau Ca Live.app` vào thư mục Applications hoặc Dock; app tự nhớ vị trí thư mục repo.
 
 ### Mỗi buổi live
-1. Mở **TikFinity**, kết nối với tài khoản TikTok đang live (để game nhận comment, tim, quà).
+1. Kết nối TikTok để game nhận comment, tim, quà. Chọn một trong hai cách:
+   - **Kết nối thẳng (không cần TikFinity):** bắt đầu live trên TikTok, rồi trong bảng điều khiển → **⚙️ Cấu hình phiên live** nhập **@tên tài khoản** và bấm **Kết nối**. Dòng *TikTok Live* ở phần Trạng thái hiện 🔴 và số người xem là xong. Nếu bạn bấm trước khi live, app tự thử lại mỗi 30 giây. App nhớ tên, các lần sau tự kết nối.
+   - **Qua TikFinity:** mở TikFinity, kết nối với tài khoản đang live. Nếu đang kết nối thẳng thì bấm **Ngắt** để game quay về dùng TikFinity.
 2. Mở **OBS** (bản 28 trở lên). Lần đầu: vào **Tools → WebSocket Server Settings**, bật **Enable WebSocket server**, ghi lại mật khẩu.
 3. Mở **Cau Ca Live.app**. Trong bảng điều khiển:
    - Nhập mật khẩu OBS rồi bấm **🎬 Thiết lập cảnh OBS**. App tự chuyển khung hình OBS sang dọc 1080×1920, tạo cảnh *"Cậu Cả Live"* chạy game, và đưa âm thanh game vào OBS.
@@ -49,7 +51,11 @@ Có thể kéo `Cau Ca Live.app` vào thư mục Applications hoặc Dock; app t
    - Bật/tắt Claude MC, đổi model, chỉnh số khách quen…: bấm **Lưu & áp dụng**, game trong OBS cập nhật ngay.
 5. Kết thúc: bấm **⏹ Dừng phát**, rồi nhấn **Ctrl+C** trong cửa sổ Terminal để tắt app.
 
-> Dùng **TikTok LIVE Studio** thay OBS? Trong LIVE Studio thêm nguồn **Liên kết / Trang web** với địa chỉ game hiện trong bảng điều khiển (nút 📋 để chép). Các nút lệnh trên bảng điều khiển vẫn hoạt động như bình thường.
+> Dùng **TikTok LIVE Studio** thay OBS? LIVE Studio không nhận địa chỉ trên máy (`localhost`, `127.0.0.1`) ở nguồn *Liên kết*, nên hãy mở game thành một cửa sổ riêng rồi dùng nguồn **Chụp cửa sổ**:
+> ```bash
+> open -na "Google Chrome" --args --app="http://127.0.0.1:8686/?obs=1&auto=1&clean=1&preset=live" --window-size=540,960 --user-data-dir="$HOME/Library/Application Support/CauCaLive/chrome" --autoplay-policy=no-user-gesture-required
+> ```
+> Bật âm thanh máy tính trong LIVE Studio để có tiếng game, và đừng thu nhỏ cửa sổ game. Chỉ chạy **một** bản game (tắt OBS) để không bị tính đôi khách, quà và lượt gọi Claude. Các nút lệnh trên bảng điều khiển vẫn hoạt động như bình thường.
 
 ### Lệnh khởi động (Terminal, trong thư mục `quan-nhau-cau-ca`)
 
@@ -122,7 +128,7 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 
 | Comment | Tác dụng |
 |---|---|
-| (bất kỳ) | Vào quán, kéo ghế ngồi; lời chat hiện trên đầu nhân vật |
+| (bất kỳ) | Vào quán, kéo ghế ngồi, có ly bia trước mặt; lời chat hiện trên đầu nhân vật |
 | `bàn 5` | Ngồi bàn số 5 (dãy ngoài 1–4, dãy trong 5–9) |
 | `bàn riêng` | Giữ một bàn cho hội bạn |
 | `ghép Tên` / `ngồi với Tên` | Ngồi chung bàn với bạn |
@@ -141,7 +147,7 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 | `đố vui`, `đoán số`, `nhanh tay`, `đua bàn` | Mở trò chơi nhỏ |
 | `về nha`, `tính tiền` | Ra về |
 | Thả tim | Đẩy thanh **Không khí**; đủ 100% thì cả quán quẩy |
-| Tặng quà | Nhân viên bưng món ra bàn; quà từ 500 xu bắn pháo hoa |
+| Tặng quà | Nhân viên bưng món ra bàn; tên người tặng hiện trên đầu nhân vật vài giây (bình thường tên được ẩn cho gọn màn hình); quà từ 500 xu bắn pháo hoa |
 
 ## 7. Khắc phục sự cố
 
@@ -152,7 +158,8 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 | OBS báo sai mật khẩu hoặc không phản hồi | Bật WebSocket server trong OBS và nhập đúng mật khẩu trên bảng điều khiển |
 | Không đổi được khung hình 1080×1920 | Dừng phát/ghi hình trong OBS rồi bấm **Thiết lập cảnh** lại |
 | Không có tiếng game trên live | Trong mixer của OBS kiểm tra nguồn *"Cậu Cả – Game"* chưa bị tắt tiếng |
-| Không nhận được comment | Mở TikFinity và kiểm tra địa chỉ WebSocket (thử `ws://127.0.0.1:21213/`) |
+| Không nhận được comment | Kết nối thẳng: kiểm tra đúng **@tên** và tài khoản đang live (dòng *TikTok Live* trong bảng điều khiển báo lỗi cụ thể). Dùng TikFinity: kiểm tra địa chỉ WebSocket (thử `ws://127.0.0.1:21213/`) |
+| *"Dịch vụ ký kết nối đang giới hạn lượt"* | Gói miễn phí của Euler Stream bị giới hạn; app tự thử lại sau 60 giây. Live thường xuyên thì lấy API key tại eulerstream.com rồi chạy app với biến `EULER_API_KEY`, hoặc dùng TikFinity |
 | YouTube báo lỗi 153 | Chạy game qua app hoặc GitHub Pages, không mở file trực tiếp |
 | Claude MC tự tắt | Key sai hoặc hết hạn mức; chạy `./start.command --reset-key` để nhập key mới |
 
@@ -163,5 +170,6 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 - Nội dung chỉ được gửi ra ngoài khi bạn bật tính năng tương ứng:
   - **Claude MC**: tóm tắt diễn biến phòng live được gửi tới Anthropic.
   - **Karaoke YouTube**: tên bài được gửi tới Google để tìm, và video phát qua `youtube-nocookie.com`.
+  - **Kết nối thẳng TikTok**: app dùng thư viện mã nguồn mở `tiktok-live-connector` để đọc phiên live công khai, không đăng nhập TikTok. Thư viện gửi **tên tài khoản** của bạn tới dịch vụ Euler Stream để ký kết nối. Đây là cách đọc không chính thức, TikTok có thể thay đổi bất cứ lúc nào; khi đó hãy dùng TikFinity.
 - Khách quen 🏠 là nhân vật máy, được đánh dấu rõ, và không tạo tim, quà hay thứ hạng giả.
 - Đồ ăn, bia trong quán là **ảo**. Cậu Cả do AI dẫn được dặn không cổ vũ uống rượu bia thật và luôn nói thật mình là MC ảo khi được hỏi.

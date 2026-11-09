@@ -8,15 +8,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { exec } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import WebSocket from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 import { createClaudeHandler, claudeReady } from '../bridge/claude-bridge.mjs';
 import { ObsClient } from './obs.mjs';
+import { TikTokSource, normalizeUser, validUser } from './tiktok.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG_PATH = path.join(ROOT, 'config.json');
 const DEFAULTS = {
   port: 8686,
   tikfinityUrl: 'ws://localhost:21213/',
+  tiktok: { username: '', on: false },   // kết nối thẳng TikTok LIVE bằng @tên (không cần TikFinity)
   obs: { url: 'ws://127.0.0.1:4455', password: '', sceneName: 'Cậu Cả Live', vertical: true, autoConnect: true },
   game: { aiOn: true, aiModel: 'claude-haiku-5-5', aiEvery: 20, aiMax: 180, ytKey: '', kMin: 1, kPrio: 30, kMax: 5, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, autoOn: true, autoLuckyMin: 8 },
 };
@@ -29,7 +31,10 @@ if (!fs.existsSync(CONFIG_PATH)) saveConfig();
 
 const PORT = Number(process.env.PORT || config.port || 8686);
 const BASE = `http://127.0.0.1:${PORT}`;
-const gameUrl = () => `${BASE}/?obs=1&auto=1&clean=1&preset=live&ws=${encodeURIComponent(config.tikfinityUrl)}`;
+const LIVE_WS = `ws://127.0.0.1:${PORT}/live-events`;
+// nguồn sự kiện game dùng: kết nối thẳng TikTok (qua app) hoặc TikFinity
+const eventsUrl = () => config.tiktok.on ? LIVE_WS : config.tikfinityUrl;
+const gameUrl = () => `${BASE}/?obs=1&auto=1&clean=1&preset=live&ws=${encodeURIComponent(eventsUrl())}`;
 const claude = createClaudeHandler({ maxPerHour: Math.max(60, Number(config.game.aiMax) || 180) + 60 });
 const obs = new ObsClient();
 
@@ -65,7 +70,14 @@ async function body(req) { let raw = ''; for await (const c of req) { raw += c; 
 function sendFile(res, file, type) {
   fs.readFile(file, (err, data) => { if (err) return json(res, 404, { error: 'Không thấy ' + path.basename(file) }); res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' }); res.end(data); });
 }
-const publicConfig = () => ({ game: config.game, claudeReady: claudeReady(), tikfinityUrl: config.tikfinityUrl });
+const publicConfig = () => ({ game: config.game, claudeReady: claudeReady(), tikfinityUrl: eventsUrl() });
+
+// ---- TikTok LIVE trực tiếp: phát sự kiện tới game qua ws://127.0.0.1:PORT/live-events ----
+const tiktok = new TikTokSource();
+const liveWss = new WebSocketServer({ noServer: true });
+tiktok.on('event', ev => { const m = JSON.stringify(ev); for (const c of liveWss.clients) if (c.readyState === 1) c.send(m); });
+tiktok.on('connected', () => console.log(`📡 Đã kết nối TikTok LIVE @${tiktok.username}`));
+function tiktokApply() { if (config.tiktok.on && config.tiktok.username) tiktok.start(config.tiktok.username); else tiktok.stop(); }
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, BASE); const p = url.pathname;
@@ -82,6 +94,7 @@ const server = http.createServer(async (req, res) => {
       probeTikfinity();
       return json(res, 200, {
         claudeReady: claudeReady(), claudeCalls: claude.callsLastHour(), tikfinity: tikProbe.ok, tikfinityUrl: config.tikfinityUrl,
+        tiktok: { ...tiktok.status(), on: config.tiktok.on, saved: config.tiktok.username, gameClients: liveWss.clients.size },
         obs: { connected: obs.connected, err: obs.err, stream: obsStream, url: config.obs.url, sceneName: config.obs.sceneName, vertical: config.obs.vertical, hasPassword: !!config.obs.password },
         game: gameState, gameAge: gameStateAt ? Date.now() - gameStateAt : null, gameClients: controlClients.size,
         gameUrl: gameUrl(), panelUrl: `${BASE}/panel`, config: { game: config.game, tikfinityUrl: config.tikfinityUrl },
@@ -100,6 +113,18 @@ const server = http.createServer(async (req, res) => {
       saveConfig(); broadcast({ type: 'config', config: publicConfig() });
       return json(res, 200, { ok: true });
     }
+    if (p === '/api/tiktok/connect') {
+      const u = normalizeUser(b.username);
+      if (!validUser(u)) throw new Error('Nhập đúng tên TikTok, ví dụ @tenban');
+      config.tiktok = { username: u, on: true }; saveConfig(); tiktokApply();
+      broadcast({ type: 'config', config: publicConfig() });
+      return json(res, 200, { ok: true, username: u, ws: LIVE_WS });
+    }
+    if (p === '/api/tiktok/disconnect') {
+      config.tiktok.on = false; saveConfig(); tiktokApply();
+      broadcast({ type: 'config', config: publicConfig() });
+      return json(res, 200, { ok: true });
+    }
     if (p === '/api/obs/connect') { await obsConnect(); return json(res, 200, { ok: true }); }
     if (p === '/api/obs/setup') { await obsConnect(); const r = await obs.setupScene(config.obs, gameUrl()); return json(res, 200, { ok: true, ...r }); }
     if (p === '/api/obs/refresh') { await obsConnect(); await obs.refreshGame(); return json(res, 200, { ok: true }); }
@@ -113,6 +138,11 @@ const server = http.createServer(async (req, res) => {
   } catch (e) { json(res, 500, { error: String(e.message || e) }); }
 });
 
+server.on('upgrade', (req, socket, head) => {
+  const u = new URL(req.url, BASE); const o = req.headers.origin;
+  if (u.pathname !== '/live-events' || (o && o !== BASE && o !== `http://localhost:${PORT}`)) { socket.destroy(); return; }
+  liveWss.handleUpgrade(req, socket, head, ws => liveWss.emit('connection', ws, req));
+});
 server.on('error', e => {
   if (e.code === 'EADDRINUSE') { console.error(`\n⚠️  Cổng ${PORT} đang bận – có thể app đã chạy rồi. Mở ${BASE}/panel hoặc tắt cửa sổ Terminal cũ.\n`); process.exit(1); }
   throw e;
@@ -123,10 +153,12 @@ server.listen(PORT, '127.0.0.1', () => {
    Bảng điều khiển : ${BASE}/panel
    Game cho OBS    : ${gameUrl()}
    Claude MC       : ${claudeReady() ? 'sẵn sàng (key trên máy)' : 'chưa có key – Cậu Cả chạy theo kịch bản có sẵn'}
+   TikTok LIVE     : ${config.tiktok.on ? '@' + config.tiktok.username + ' (kết nối thẳng)' : 'qua TikFinity – hoặc nhập @tên trong bảng điều khiển'}
    Dừng app        : nhấn Ctrl+C trong cửa sổ này
 `);
   if (process.platform === 'darwin' && !process.argv.includes('--no-open')) exec(`open "${BASE}/panel"`);
+  tiktokApply();
   if (config.obs.autoConnect) obsConnect().then(() => console.log('🎥 Đã kết nối OBS')).catch(e => console.log('🎥 OBS: ' + e.message));
 });
-const stop = () => { console.log('\n👋 Đóng quán. Hẹn gặp lại!'); obs.close(); server.close(); process.exit(0); };
+const stop = () => { console.log('\n👋 Đóng quán. Hẹn gặp lại!'); obs.close(); tiktok.stop(); server.close(); process.exit(0); };
 process.on('SIGINT', stop); process.on('SIGTERM', stop);
