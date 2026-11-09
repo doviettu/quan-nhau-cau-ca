@@ -81,7 +81,8 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
       <button data-mg="do_vui">🧠 Đố vui</button><button data-mg="doan_so">🔢 Đoán số</button>
       <button data-mg="nhanh_tay">⚡ Nhanh tay</button><button data-mg="dua_ban">🏁 Đua bàn</button><button data-mg="stop">⏹ Dừng trò</button>
     </div>
-    <div class="btns"><button id="bSkip">⏭ Qua bài karaoke</button><button id="bAiOn">🤖 Bật Claude MC</button><button id="bAiOff">Tắt Claude MC</button></div>
+    <div class="btns"><button data-circus="">🎪 Xiếc ngẫu nhiên</button><button data-circus="mua_lan">🦁 Múa lân</button><button data-circus="phun_lua">🔥 Phun lửa</button><button data-circus="tung_hung">🤹 Tung hứng</button><button data-circus="ca_kheo">🦯 Cà kheo</button><button data-circus="xoay_dia">🍽️ Xoay đĩa</button><button data-circus="stop">⏹ Dừng xiếc</button></div>
+    <div class="btns"><button id="bSkip">⏭ Qua bài karaoke</button><button id="bBgmNext">📻 Nhạc nền: bài khác</button><button id="bAiOn">🤖 Bật Claude MC</button><button id="bAiOff">Tắt Claude MC</button></div>
     <div class="row"><input type="text" id="sayText" placeholder="Cậu Cả nói… (vd: Cảm ơn cả nhà đã ghé quán!)" style="flex:1"><button class="pri" id="bSay">💬 Nói</button></div>
     <div class="row"><input type="text" id="songText" placeholder="Thêm bài karaoke: tên bài hoặc link YouTube" style="flex:1"><button id="bSong">🎤 Thêm</button></div>
     <div class="row"><input type="text" id="testText" placeholder="Thử comment (vd: bàn 5, hát Diễm xưa, đố vui)" style="flex:1"><button id="bTest">🧪 Gửi thử</button></div>
@@ -104,6 +105,10 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
     <div class="mut" id="ytResult"></div>
     <div class="row"><label>Quà tối thiểu chốt bài (xu)</label><input type="number" id="kMin" min="0"><label>Chen hàng (xu)</label><input type="number" id="kPrio" min="1"></div>
     <div class="row"><label><input type="checkbox" id="botsOn"> Khách quen 🏠, tối thiểu</label><input type="number" id="botMin" min="0" max="50"><label>khách</label></div>
+    <div class="row"><label><input type="checkbox" id="circusAuto"> Xiếc đường phố tự ghé mỗi</label><input type="number" id="circusEvery" min="2" max="60"><label>phút</label></div>
+    <div class="row"><label><input type="checkbox" id="bgmYt"> 📻 Nhạc nền remix từ YouTube (dùng YouTube key)</label></div>
+    <div class="row"><label>Từ khoá nhạc nền</label><input type="text" id="bgmQuery" placeholder="nhạc remix vinahouse"><label>Âm lượng</label><input type="number" id="bgmVol" min="0" max="100"></div>
+    <p class="mut" style="margin:2px 0 8px">⚠️ Nhạc trên YouTube thường có bản quyền – TikTok có thể <b>tắt tiếng hoặc dừng</b> phiên live. An toàn nhất là nhạc nền tự tạo của quán hoặc nhạc miễn phí bản quyền có giấy phép phát live.</p>
     <div class="row"><label><input type="checkbox" id="mgAuto"> Trò chơi nhỏ mỗi</label><input type="number" id="mgEvery" min="1" max="30"><label>phút</label></div>
     <div class="row"><label><input type="checkbox" id="autoOn"> Tự động dẫn live, bốc thăm mỗi</label><input type="number" id="autoLuckyMin" min="2" max="60"><label>phút</label></div>
     <div class="btns"><button class="pri" id="bSaveCfg">💾 Lưu & áp dụng cho game</button></div>
@@ -143,6 +148,7 @@ async function refresh() {
     ['Top', (g.top || []).map((t, i) => ['👑', '🥈', '🥉'][i] + ' ' + esc(t.name) + ' (' + t.points + ')').join(' · ') || '—'],
     ['Karaoke', g.karaoke.cur ? '▶ ' + esc(g.karaoke.cur) : 'không ai hát', ],
     ['Hàng chờ', `${g.karaoke.queue} bài · ${g.karaoke.pending} chờ quà`], ['Trò chơi', g.mg || '—'],
+    ['Xiếc', g.circus ? esc(g.circus) : 'sẵn sàng'], ['Nhạc nền', g.bgm ? '📻 ' + esc(g.bgm) : 'nhạc của quán'],
     ['Claude MC', g.ai.on ? `bật · ${g.ai.calls} lượt/giờ · ~$${g.ai.cost}` + (g.ai.err ? ' · ⚠️ ' + esc(g.ai.err) : '') : 'tắt'],
     ['Lời gần nhất', esc(g.ai.last || '—')],
   ].map(([k, v]) => `<span class="mut">${k}</span><b>${v}</b>`).join('') : '<span class="mut">Chưa có dữ liệu từ game.</span>';
@@ -150,8 +156,9 @@ async function refresh() {
     loaded = true; const c = s.config.game;
     $('#tikUrl').value = s.config.tikfinityUrl;
     if (tt.saved) $('#ttUser').value = '@' + tt.saved;
-    for (const k of ['aiModel', 'aiEvery', 'aiMax', 'ytKey', 'kMin', 'kPrio', 'botMin', 'mgEvery', 'autoLuckyMin']) $('#' + k).value = c[k] ?? '';
-    for (const k of ['aiOn', 'botsOn', 'mgAuto', 'autoOn']) $('#' + k).checked = !!c[k];
+    for (const k of ['aiModel', 'aiEvery', 'aiMax', 'ytKey', 'kMin', 'kPrio', 'botMin', 'mgEvery', 'autoLuckyMin', 'bgmQuery', 'bgmVol', 'circusEvery']) $('#' + k).value = c[k] ?? '';
+    for (const k of ['aiOn', 'botsOn', 'mgAuto', 'autoOn', 'bgmYt']) $('#' + k).checked = !!c[k];
+    $('#circusAuto').checked = c.circusAuto !== false;
   }
 }
 setInterval(refresh, 2000); refresh();
@@ -167,6 +174,8 @@ $('#bCopy').onclick = () => navigator.clipboard.writeText($('#gameUrl').textCont
 document.querySelectorAll('[data-ev]').forEach(b => b.onclick = () => cmd({ type: 'event', name: b.dataset.ev }));
 document.querySelectorAll('[data-mg]').forEach(b => b.onclick = () => cmd({ type: 'mg', name: b.dataset.mg }));
 $('#bSkip').onclick = () => cmd({ type: 'skip' });
+$('#bBgmNext').onclick = () => cmd({ type: 'bgm', action: 'next' }, '📻 Chuyển bài nhạc nền');
+document.querySelectorAll('[data-circus]').forEach(b => b.onclick = () => cmd({ type: 'circus', name: b.dataset.circus || null }, b.dataset.circus === 'stop' ? '⏹ Đã dừng xiếc' : '🎪 Mời đoàn xiếc'));
 $('#bAiOn').onclick = () => cmd({ type: 'ai', on: true }); $('#bAiOff').onclick = () => cmd({ type: 'ai', on: false });
 $('#bDemoOn').onclick = () => cmd({ type: 'demo', on: true }); $('#bDemoOff').onclick = () => cmd({ type: 'demo', on: false });
 $('#bReload').onclick = () => cmd({ type: 'reload' });
@@ -176,7 +185,7 @@ $('#bSong').onclick = () => sendText('songText', 'song'); $('#songText').onkeydo
 $('#bTest').onclick = () => sendText('testText', 'chat'); $('#testText').onkeydown = e => e.key === 'Enter' && sendText('testText', 'chat');
 $('#bSaveCfg').onclick = async () => {
   const n = id => Number($('#' + id).value);
-  const game = { aiModel: $('#aiModel').value, aiOn: $('#aiOn').checked, aiEvery: n('aiEvery'), aiMax: n('aiMax'), kMin: n('kMin'), kPrio: n('kPrio'), botsOn: $('#botsOn').checked, botMin: n('botMin'), mgAuto: $('#mgAuto').checked, mgEvery: n('mgEvery'), autoOn: $('#autoOn').checked, autoLuckyMin: n('autoLuckyMin') };
+  const game = { aiModel: $('#aiModel').value, aiOn: $('#aiOn').checked, aiEvery: n('aiEvery'), aiMax: n('aiMax'), kMin: n('kMin'), kPrio: n('kPrio'), botsOn: $('#botsOn').checked, botMin: n('botMin'), mgAuto: $('#mgAuto').checked, mgEvery: n('mgEvery'), autoOn: $('#autoOn').checked, autoLuckyMin: n('autoLuckyMin'), bgmYt: $('#bgmYt').checked, bgmQuery: $('#bgmQuery').value.trim(), bgmVol: n('bgmVol'), circusAuto: $('#circusAuto').checked, circusEvery: n('circusEvery') };
   if ($('#ytKey').value.trim()) game.ytKey = $('#ytKey').value.trim();   // ô trống = giữ key đang có
   try { await post('/api/config', { game, tikfinityUrl: $('#tikUrl').value.trim() }); toast('💾 Đã lưu – game cập nhật ngay'); } catch (e) { toast('❌ ' + e.message); }
 };

@@ -10,6 +10,7 @@ Repo gồm:
 | `Cau Ca Live.app`, `start.command` | App khởi động trên Mac |
 | `app/` | Máy chủ cục bộ: chạy game, cầu nối Claude, kết nối TikTok, bảng điều khiển, mở cửa sổ game cho LIVE Studio |
 | `bridge/` | Cầu nối Claude dùng riêng, khi không chạy app |
+| `docs/tang-luot-xem-va-qua.md` | Nghiên cứu cách tăng lượt xem, tương tác và quà trên TikTok LIVE, kèm các rủi ro vi phạm cần tránh |
 
 ---
 
@@ -90,7 +91,8 @@ Nút **"Áp dụng cấu hình Live"** trong ⚙️ của game, hoặc tham số
 - **Claude MC**: Haiku 5.5, nhịp 20 giây, chi phí khoảng $0,02–0,06 mỗi giờ.
 - **Tự động dẫn live**: bốc thăm, dzô, pháo hoa, dọn bàn.
 - **Khách quen 🏠**: giữ quán luôn có ít nhất 20 người. Đây là nhân vật máy của quán, được đánh dấu rõ; họ không thả tim, không tặng quà, không lên bảng xếp hạng và không thắng trò chơi.
-- **Trò chơi nhỏ**: tự mở mỗi 3 phút. Karaoke chốt bài từ 1 xu.
+- **Trò chơi nhỏ**: tự mở mỗi 3 phút. Đố vui có hơn 130 câu: địa lý, lịch sử, ẩm thực, câu đố mẹo, thành ngữ, khoa học, tính nhanh. Karaoke chốt bài từ 1 xu.
+- **Xiếc đường phố**: khoảng 6 phút một lần có một tiết mục (đổi được trong bảng điều khiển).
 
 ## 4. Claude MC và chi phí
 
@@ -121,7 +123,26 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 - **Không có key**: dùng 🔎 Tìm và 🔗 Dán link trong ⚙️ của game, hoặc ô **Thêm bài** trên bảng điều khiển.
 - **Lên mic**: người xem comment `xin lên mic`, bạn mời họ làm **Khách mời** trên TikTok. Giọng hát đi thẳng vào phòng live.
 
-## 6. Lệnh cho người xem
+## 6. Xiếc đường phố và nhạc nền
+
+**Xiếc đường phố**
+- Một nghệ sĩ đi bộ vào giữa phố, diễn khoảng 20–25 giây. Xe cộ dừng lại xem, khách trong quán vỗ tay.
+- Có 5 tiết mục: 🦁 múa lân (kèm trống), 🔥 phun lửa, 🤹 tung hứng, 🦯 đi cà kheo, 🍽️ xoay đĩa.
+- Cách mời đoàn xiếc:
+  - Người xem comment `xiếc`, hoặc gọi tên tiết mục như `múa lân`, `phun lửa`. Sau mỗi tiết mục, đoàn nghỉ khoảng 2 phút rưỡi.
+  - Chế độ tự động dẫn live tự mời đoàn theo nhịp đã chỉnh.
+  - Claude MC tự mời.
+  - Bạn bấm nút trên bảng điều khiển.
+- Ai tặng quà trong lúc đoàn đang diễn thì nghệ sĩ cảm ơn tên người đó và diễn thêm vài giây.
+
+**Nhạc nền remix từ YouTube** (tuỳ chọn, mặc định tắt)
+- Cách bật: trên bảng điều khiển → ⚙️ Cấu hình, tích **📻 Nhạc nền remix từ YouTube**, rồi chỉnh từ khoá (mặc định *nhạc remix vinahouse*) và âm lượng.
+- Game dùng chung YouTube key với karaoke. Mỗi lần tìm 25 bài và nhớ danh sách trong 12 giờ, nên tốn rất ít hạn mức.
+- Nhạc tự dừng khi có người hát karaoke hoặc lên mic, rồi phát tiếp sau đó. Khi đang phát nhạc YouTube, nhạc nền tự tạo của quán tạm tắt.
+- Trình phát hiện ở góc trên bên trái, kích thước 200×200 theo quy định của YouTube.
+- ⚠️ **Rủi ro bản quyền:** nhạc trên YouTube (nhất là remix) thường có bản quyền, TikTok có thể **tắt tiếng hoặc dừng** phiên live. An toàn nhất là dùng nhạc nền tự tạo sẵn của quán, hoặc nhạc miễn phí bản quyền có giấy phép phát trực tiếp.
+
+## 7. Lệnh cho người xem
 
 | Comment | Tác dụng |
 |---|---|
@@ -142,11 +163,12 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 | `hát` | Hát mộc với nhạc của quán |
 | `xin lên mic` | Xin làm khách mời để hát |
 | `đố vui`, `đoán số`, `nhanh tay`, `đua bàn` | Mở trò chơi nhỏ |
+| `xiếc`, `múa lân`, `phun lửa`, `tung hứng`, `cà kheo`, `xoay đĩa` | Mời đoàn xiếc đường phố; tặng quà lúc đoàn đang diễn để thưởng nghệ sĩ |
 | `về nha`, `tính tiền` | Ra về |
 | Thả tim | Đẩy thanh **Không khí**; đủ 100% thì cả quán quẩy |
 | Tặng quà | Nhân viên bưng món ra bàn; tên người tặng hiện trên đầu nhân vật vài giây (bình thường tên được ẩn cho gọn màn hình); quà từ 500 xu bắn pháo hoa |
 
-## 7. Khắc phục sự cố
+## 8. Khắc phục sự cố
 
 | Hiện tượng | Cách xử lý |
 |---|---|
@@ -160,7 +182,7 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 | YouTube báo lỗi 153 | Chạy game qua app hoặc GitHub Pages, không mở file trực tiếp |
 | Claude MC tự tắt | Key sai hoặc hết hạn mức; chạy `./start.command --reset-key` để nhập key mới |
 
-## 8. Quyền riêng tư và minh bạch
+## 9. Quyền riêng tư và minh bạch
 
 - App chỉ chạy trên máy bạn (`127.0.0.1`) và không có máy chủ trên mạng.
 - Claude API key nằm trong Keychain; cấu hình nằm trong `config.json`.

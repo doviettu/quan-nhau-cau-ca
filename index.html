@@ -73,6 +73,10 @@ body.party .vibeBar i{animation:hue 1s linear infinite}
 .ktvBar button{flex:none;width:30px;height:26px;border-radius:8px;border:none;background:rgba(0,0,0,.3);font-size:14px}
 .ktvBox{position:relative;width:100%;aspect-ratio:16/9;background:#000}
 #ktvPlayer,#ktvPlayer iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+#bgmBox{position:absolute;left:calc(8px + var(--sal));top:calc(118px + var(--sat));width:200px;background:#0d0812;border:1px solid var(--line);border-radius:12px;overflow:hidden;opacity:.92}
+#bgmPlayer{position:relative;width:200px;height:200px}#bgmPlayer iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+#bgmTitle{font-size:11px;font-weight:700;padding:4px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.mgOn #bgmBox{display:none}
 #ktvMsg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:14px;font-size:14px;font-weight:700;background:rgba(10,4,14,.82)}
 #top3 .r{display:flex;justify-content:space-between;gap:6px}
 #top3 .r span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -243,6 +247,7 @@ kbd{background:rgba(255,255,255,.15);border-radius:5px;padding:0 5px;font-size:1
 
   <div id="banner"></div>
   <div id="mg" class="hidden"><div class="mgHead"><span id="mgTitle"></span><span id="mgTime"></span></div><div id="mgBody"></div><div class="mgBar"><i id="mgFill"></i></div></div>
+  <div id="bgmBox" class="hidden"><div id="bgmPlayer"></div><div id="bgmTitle"></div></div>
   <div id="ktv" class="pe hidden">
     <div class="ktvBar"><span id="ktvTitle">🎤</span><button id="ktvSize" title="Thu nhỏ / phóng to">⤢</button><button id="ktvSkip" title="Qua bài">⏭</button></div>
     <div class="ktvBox"><div id="ktvPlayer"></div><div id="ktvMsg" class="hidden"></div></div>
@@ -316,6 +321,7 @@ kbd{background:rgba(255,255,255,.15);border-radius:5px;padding:0 5px;font-size:1
     <button class="btn" data-ev="dzo">🍻 Cả quán dzô</button>
     <button class="btn" data-ev="lucky">🎲 Bốc thăm</button>
     <button class="btn" data-ev="fire">🎆 Pháo hoa</button>
+    <button class="btn" data-ev="circus">🎪 Xiếc đường phố</button>
     <button class="btn" data-ev="party">🔥 Quẩy ngay</button>
     <button class="btn" data-ev="clearDish">🧹 Dọn bàn</button>
     <button class="btn" data-ev="reset">🚪 Dọn quán (mời khách về)</button>
@@ -332,6 +338,10 @@ kbd{background:rgba(255,255,255,.15);border-radius:5px;padding:0 5px;font-size:1
   <div class="row"><label class="lbl">Tối đa mỗi bài (phút)</label><input type="number" id="kMax" min="1" max="20"></div>
   <label class="tg"><input type="checkbox" id="optKSuffix" checked><span></span>Tự thêm chữ “karaoke” khi tìm bài</label>
   <div class="row"><label class="lbl">Âm lượng video</label><input type="range" id="ytVol" min="0" max="100"></div>
+  <label class="tg"><input type="checkbox" id="optBgmYt"><span></span>📻 Nhạc nền remix từ YouTube (dùng key ở trên)</label>
+  <div class="row"><input type="text" id="bgmQuery" placeholder="Từ khoá nhạc nền, vd: nhạc remix vinahouse" spellcheck="false"><button class="btn" id="bgmNext">⏭ Bài khác</button></div>
+  <div class="row"><label class="lbl">Âm lượng nhạc nền</label><input type="range" id="bgmVol" min="0" max="100"></div>
+  <p class="warn" style="font-size:11.5px">⚠️ Nhạc trên YouTube thường có bản quyền: TikTok có thể <b>tắt tiếng hoặc dừng</b> phiên live. An toàn nhất là nhạc nền của quán (tự tạo) hoặc nhạc miễn phí bản quyền có giấy phép phát trực tiếp.</p>
   <div class="row"><input type="text" id="kAdd" placeholder="Chủ quán thêm bài: tên bài hoặc link YouTube"><button class="btn" id="kAddBtn">➕ Thêm</button></div>
   <div id="kqAdmin"></div>
 
@@ -1354,7 +1364,7 @@ const Snd = {
   },
   resume() { if (this.ctx && this.ctx.state !== 'running') this.ctx.resume(); },
   get t() { return this.ctx ? this.ctx.currentTime : 0; },
-  setMusic(on) { if (this.musicG) this.musicG.gain.setTargetAtTime(on && !this.ducked ? 0.3 : 0, this.t, 0.1); },
+  setMusic(on) { if (this.musicG) this.musicG.gain.setTargetAtTime(on && !this.ducked && !(window.BGM_ON && window.BGM_ON()) ? 0.3 : 0, this.t, 0.1); },
   duck(on) { this.ducked = on; this.setMusic(opts.music); },
   setSfx(on) { if (this.sfxG) this.sfxG.gain.setTargetAtTime(on ? 0.8 : 0, this.t, 0.05); },
   env(g, t, a, peak, dec) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + dec); },
@@ -1966,6 +1976,67 @@ const YTK = {
   stop() { try { this.player && this.player.stopVideo && this.player.stopVideo(); } catch { } this.it = null; hideKtv(); },
   setVolume(v) { try { this.player && this.ready && this.player.setVolume(v); } catch { } }
 };
+/* ---------- NHẠC NỀN YOUTUBE (remix) – thay nhạc nền tự chế khi bật ---------- */
+const BGM_DEF_Q = 'nhạc remix vinahouse';
+const BGM = {
+  player: null, ready: false, list: [], i: 0, playing: false, title: '', err: '', loading: false, fails: 0, q: '',
+  want() { return !!opts.bgmYt && !!opts.music && !!String(opts.ytKey || '').trim() && /^https?:$/.test(location.protocol) && gameStarted && !Mic.on && !karaoke.cur; },
+  query() { return String(opts.bgmQuery || '').trim() || BGM_DEF_Q; },
+  async loadList(force) {
+    const q = this.query(), key = String(opts.ytKey || '').trim(), ck = 'ccBgm:' + q;
+    if (!force) { try { const c = JSON.parse(localStorage.getItem(ck) || 'null'); if (c && Date.now() - c.at < 12 * 3600e3 && c.items.length) { this.list = c.items; this.q = q; return; } } catch { } }
+    const u = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&videoDuration=medium&safeSearch=strict&maxResults=25&q=${encodeURIComponent(q)}&key=${encodeURIComponent(key)}`;
+    const r = await fetch(u); const j = await r.json();
+    if (!r.ok) throw new Error((j.error && j.error.message) || ('HTTP ' + r.status));
+    const items = (j.items || []).map(x => ({ id: x.id && x.id.videoId, title: decodeEntities(x.snippet ? x.snippet.title : '') })).filter(x => x.id);
+    if (!items.length) throw new Error('Không tìm thấy bài nào cho "' + q + '"');
+    for (let k = items.length - 1; k > 0; k--) { const m = Math.floor(Math.random() * (k + 1)); [items[k], items[m]] = [items[m], items[k]]; }
+    this.list = items; this.q = q; this.i = 0;
+    try { localStorage.setItem(ck, JSON.stringify({ at: Date.now(), items })); } catch { }
+  },
+  async play() {
+    if (this.loading) return; this.loading = true;
+    try {
+      if (!this.list.length || this.q !== this.query()) await this.loadList();
+      await YTK.load();
+      const it = this.list[this.i % this.list.length]; this.title = it.title; this.err = '';
+      $('#bgmBox').classList.remove('hidden'); $('#bgmTitle').textContent = '📻 ' + it.title;
+      if (this.player && this.ready) { this.player.loadVideoById(it.id); this.player.setVolume(Number(opts.bgmVol ?? 35)); }
+      else {
+        $('#bgmPlayer').innerHTML = '<div id="bgmYT"></div>'; this.ready = false;
+        const pv = { autoplay: 1, playsinline: 1, rel: 0, modestbranding: 1, controls: 0, fs: 0, disablekb: 1 };
+        if (/^https?:$/.test(location.protocol)) pv.origin = location.origin;
+        this.player = new window.YT.Player('bgmYT', {
+          host: 'https://www.youtube-nocookie.com', videoId: it.id, width: '100%', height: '100%', playerVars: pv,
+          events: {
+            onReady: e => { this.ready = true; try { e.target.setVolume(Number(opts.bgmVol ?? 35)); e.target.playVideo(); } catch { } },
+            onStateChange: e => { if (e.data === 1) { this.playing = true; this.fails = 0; Snd.setMusic(opts.music); } if (e.data === 0) this.next(); },
+            onError: () => { this.fails++; if (this.fails < 6) this.next(); else this.fail('Không phát được bài nào (video bị chặn nhúng)'); }
+          }
+        });
+      }
+    } catch (e) { this.fail(String(e && e.message || e)); }
+    this.loading = false;
+  },
+  next() { this.i++; if (this.i >= this.list.length) { this.i = 0; } this.play(); },
+  pause() { if (this.player && this.ready) { try { this.player.pauseVideo(); } catch { } } this.playing = false; $('#bgmBox').classList.add('hidden'); Snd.setMusic(opts.music); },
+  fail(msg) {
+    this.err = msg; this.playing = false; Snd.setMusic(opts.music); $('#bgmBox').classList.add('hidden');
+    if (!this.warned) { this.warned = true; feed('⚠️ Nhạc nền YouTube: ' + esc(trunc(msg, 90)) + ' – dùng nhạc nền của quán', 'sys'); }
+    this.retryAt = now() + 5 * 60000;
+  },
+  setVolume(v) { try { this.player && this.ready && this.player.setVolume(v); } catch { } },
+  tick() {
+    const w = this.want();
+    if (w && !this.playing && !this.loading && (!this.retryAt || now() > this.retryAt)) {
+      this.retryAt = 0;
+      if (this.player && this.ready && this.title && this.q === this.query()) { try { this.player.playVideo(); this.playing = true; $('#bgmBox').classList.remove('hidden'); Snd.setMusic(opts.music); } catch { this.play(); } }
+      else this.play();
+    } else if (!w && (this.playing || !$('#bgmBox').classList.contains('hidden'))) this.pause();
+  }
+};
+window.BGM_ON = () => BGM.playing;
+setInterval(() => BGM.tick(), 1000);
 $('#ktvSize').onclick = () => ktv.classList.toggle('mini');
 $('#ktvSkip').onclick = () => { if (karaoke.cur) { feed('⏭️ Chủ quán cho qua bài', 'sys'); endSing(); } };
 
@@ -2121,6 +2192,7 @@ function updateTraffic(dt, T) {
     const v = traffic[i], p = v.g.position, ahead = Math.sign(v.vz);
     let blocked = false;
     if (!v.walker) for (const a of actors) { if (a.state !== 'walk') continue; const q = a.g.position; if (Math.abs(q.x - p.x) < 0.9) { const dz = (q.z - p.z) * ahead; if (dz > 0 && dz < 2.4) { blocked = true; break; } } }
+    if (!blocked && !v.walker && Circus.cur && Math.abs(STAGE.x - p.x) < 1.5) { const dz = (Circus.cur.p.pos.z - p.z) * ahead; if (dz > 0 && dz < 3.2) blocked = true; }
     if (blocked) { if (!v.honked) { v.honked = true; Snd.honk(); } }
     else p.z += v.vz * dt;
     if (v.kind === 'bike') {
@@ -2253,7 +2325,7 @@ function onChat(uid, name, text) {
   speak(`${name} nói: ${text}`);
   const mgWin = MG.onChat(g, text);
   const t = norm(text), lo = text.normalize('NFC').toLowerCase();
-  if (mgWin || viewerStartMG(g, t)) return;
+  if (mgWin || viewerStartMG(g, t) || circusAsk(g, t)) return;
   let m;
   // --- chọn chỗ ngồi ---
   if ((m = lo.match(RE_TABLE))) goTable(g, parseInt(m[1], 10));
@@ -2302,7 +2374,7 @@ function onGift(uid, name, giftName, count, diamonds) {
   const item = mapGift(giftName, diamonds); const big = count >= 2; const total = diamonds * count;
   g.showTag(12);
   g.points += total * 10; g.giftsN += count; addVibe(6 + total * 1.5);
-  songGift(g, total); MG.score(g, total * 2);
+  songGift(g, total); MG.score(g, total * 2); Circus.tip(g, total);
   G.revenue += item.price * (big ? 2 : 1) * (count > 2 ? Math.ceil(count / 2) : 1);
   feed(`🎁 <b>${esc(name)}</b> tặng ${esc(giftVi(giftName))} x${count} → <b>${item.dish}${big ? ' (món lớn)' : ''}</b>`, 'gift');
   flashMenu(item.id);
@@ -2602,6 +2674,7 @@ function runEvent(ev) {
     case 'dzo': massToast('🍻 Cậu Cả hô: Cả quán dzô!'); break;
     case 'lucky': luckyDraw(); break;
     case 'fire': fireworksShow(7); Snd.cheer(2); break;
+    case 'circus': if (!Circus.cur) Circus.start(null, 'host'); break;
     case 'party': if (G.partyT <= 0) { G.vibe = 100; startParty(); } break;
     case 'clearDish': clearAllDishes(); feed('🧹 Nhân viên dọn bàn sạch sẽ', 'sys'); break;
     case 'reset': [...guests.values()].forEach(g => g.leave()); clearAllDishes(); G.vibe = 0; G.revenue = 0; G.totalLikes = 0; G.nextLikeMs = G.likeStep; feed('🚪 Cậu Cả dọn quán, mở bàn mới!', 'sys'); break;
@@ -2637,6 +2710,12 @@ for (const [id, key] of [['ytKey', 'ytKey'], ['kMin', 'kMin'], ['kPrio', 'kPrio'
   if (el.type === 'range') el.addEventListener('input', () => { opts[key] = Number(el.value); if (key === 'ytVol') YTK.setVolume(opts.ytVol); else Mic.apply(); });
 }
 bindToggle('optKSuffix', 'kSuffix');
+Object.assign(opts, Object.assign({ bgmYt: false, bgmQuery: '', bgmVol: 35, circusAuto: true, circusEvery: 6 }, opts));
+bindToggle('optBgmYt', 'bgmYt', () => BGM.tick());
+$('#bgmQuery').value = opts.bgmQuery || ''; $('#bgmQuery').placeholder = 'Từ khoá nhạc nền (mặc định: ' + BGM_DEF_Q + ')';
+$('#bgmQuery').addEventListener('change', e => { opts.bgmQuery = e.target.value.trim(); saveOpts(); if (BGM.playing) BGM.play(); });
+$('#bgmVol').value = opts.bgmVol; $('#bgmVol').addEventListener('input', e => { opts.bgmVol = Number(e.target.value); saveOpts(); BGM.setVolume(opts.bgmVol); });
+$('#bgmNext').onclick = () => BGM.next();
 bindToggle('optMicMon', 'micMon', () => Mic.apply());
 $('#micBtn').onclick = async () => {
   if (Mic.on) { Mic.stop(); $('#micBtn').textContent = '🎙️ Bật mic chấm điểm'; $('#micLevel').style.width = '0'; return; }
@@ -2697,6 +2776,119 @@ const TRIVIA = [
   ['Thành phố nào được gọi là thành phố hoa phượng đỏ?', ['hai phong']], ['Sông nào chảy qua 6 nước, đổ ra biển ở miền Tây?', ['me kong', 'mekong', 'cuu long']],
   ['Cái gì càng lau càng ướt?', ['khan', 'cai khan', 'khan lau']], ['Món nước nổi tiếng nhất Việt Nam, có bánh phở và nước dùng bò?', ['pho', 'pho bo']],
 ];
+// thêm câu đố (đáp án đầu tiên có dấu để hiện lên; tránh đáp án trùng lời nói thường như "bàn 4", "100%", "cảm ơn")
+TRIVIA.push(
+  // địa lý
+  ['Con sông dài nhất chảy qua Việt Nam, đổ ra biển bằng 9 cửa, tên là gì?', ['Mê Kông', 'mekong', 'cuu long', 'song cuu long']],
+  ['Thành phố nào được gọi là "thành phố ngàn hoa"?', ['Đà Lạt', 'dalat']],
+  ['Cố đô của triều Nguyễn là thành phố nào?', ['Huế', 'co do hue']],
+  ['Hồ Gươm ở Hà Nội còn có tên gọi khác là hồ gì?', ['Hoàn Kiếm']],
+  ['Đảo lớn nhất Việt Nam là đảo nào?', ['Phú Quốc']],
+  ['Cầu Rồng phun lửa cuối tuần nằm ở thành phố nào?', ['Đà Nẵng', 'danang']],
+  ['Chợ Bến Thành nằm ở thành phố nào?', ['Sài Gòn', 'ho chi minh', 'tphcm', 'tp hcm', 'hcm']],
+  ['Mũi đất cực Nam của Việt Nam là mũi gì?', ['Cà Mau', 'mui ca mau']],
+  ['Thác nước nổi tiếng ở Cao Bằng, nằm trên biên giới Việt – Trung, tên là gì?', ['Bản Giốc', 'ban doc']],
+  ['Con đèo được mệnh danh "thiên hạ đệ nhất hùng quan" giữa Huế và Đà Nẵng là đèo gì?', ['Hải Vân']],
+  ['Động Phong Nha nằm trong vườn quốc gia nào?', ['Phong Nha – Kẻ Bàng', 'phong nha', 'phong nha ke bang']],
+  ['Thủ đô của Nhật Bản là thành phố nào?', ['Tokyo', 'to-ky-o', 'dong kinh']],
+  ['Thủ đô của Thái Lan là thành phố nào?', ['Bangkok', 'bang kok', 'bang coc']],
+  ['Thủ đô của Hàn Quốc là thành phố nào?', ['Seoul', 'xo un', 'han thanh']],
+  ['Thủ đô của Trung Quốc là thành phố nào?', ['Bắc Kinh', 'beijing']],
+  ['Thủ đô của Lào là thành phố nào?', ['Viêng Chăn', 'vientiane', 'vieng chan']],
+  ['Thủ đô của Campuchia là thành phố nào?', ['Phnôm Pênh', 'phnom penh', 'phnompenh', 'nam vang']],
+  ['Thủ đô của Úc (Australia) là thành phố nào? (không phải Sydney đâu nha)', ['Canberra', 'can be ra']],
+  ['Thủ đô của nước Anh là thành phố nào?', ['London', 'luan don']],
+  ['Tháp Eiffel nằm ở thành phố nào?', ['Paris', 'pa ri']],
+  ['Kim tự tháp Giza nổi tiếng nằm ở nước nào?', ['Ai Cập', 'egypt']],
+  ['Đất nước nào có bản đồ hình chiếc ủng?', ['nước Ý', 'italia', 'italy']],
+  ['Châu lục nào rộng nhất thế giới?', ['châu Á', 'chau a']],
+  ['Đại dương nào rộng nhất thế giới?', ['Thái Bình Dương']],
+  ['Sa mạc lớn nhất châu Phi tên là gì?', ['Sahara', 'xa ha ra']],
+  // lịch sử – văn hoá
+  ['Ai là người đọc bản Tuyên ngôn độc lập năm 1945?', ['Hồ Chí Minh', 'bac ho', 'chu tich ho chi minh']],
+  ['Vị vua nào dời đô ra Thăng Long năm 1010?', ['Lý Thái Tổ', 'ly cong uan']],
+  ['Ai chỉ huy trận Bạch Đằng năm 938 đánh tan quân Nam Hán?', ['Ngô Quyền']],
+  ['Hai Bà Trưng gồm Trưng Trắc và ai?', ['Trưng Nhị']],
+  ['Vua Quang Trung tên thật là gì?', ['Nguyễn Huệ']],
+  ['Ai là tác giả Truyện Kiều?', ['Nguyễn Du']],
+  ['Nữ sĩ nào được mệnh danh "Bà chúa thơ Nôm"?', ['Hồ Xuân Hương']],
+  ['Bánh trôi, bánh chay thường ăn vào Tết gì (mùng 3 tháng 3 âm lịch)?', ['Hàn Thực', 'tet han thuc']],
+  ['Con giáp nào đứng đầu 12 con giáp?', ['Chuột', 'con chuot']],
+  ['Năm 2026 là năm con gì?', ['Ngựa', 'con ngua', 'binh ngo']],
+  ['Con giáp đứng cuối cùng trong 12 con giáp là con gì?', ['Heo', 'con heo', 'con lon']],
+  ['Loài hoa thường được xem là biểu tượng của Việt Nam, mọc trong đầm lầy là hoa gì?', ['Sen', 'hoa sen']],
+  ['Nhạc cụ truyền thống Việt Nam chỉ có một dây là đàn gì?', ['Đàn bầu', 'dan bau', 'doc huyen cam', 'dan doc huyen']],
+  ['Trang phục truyền thống của phụ nữ Việt Nam là gì?', ['Áo dài', 'ao dai']],
+  ['Loại hình múa rối biểu diễn trên mặt nước là múa rối gì?', ['Rối nước', 'roi nuoc', 'mua roi nuoc']],
+  ['Dân ca quan họ là đặc sản của vùng đất nào?', ['Bắc Ninh', 'kinh bac']],
+  ['Tượng rùa đội bia tiến sĩ nằm ở di tích nào tại Hà Nội?', ['Văn Miếu', 'van mieu', 'quoc tu giam', 'van mieu quoc tu giam']],
+  // ẩm thực
+  ['Món bún nổi tiếng nhất xứ Huế là bún gì?', ['Bún bò', 'bun bo', 'bun bo hue']],
+  ['Nước mắm Phú Quốc nổi tiếng được làm chủ yếu từ cá gì?', ['Cá cơm', 'ca com']],
+  ['Trái cây nào được gọi là "vua các loại trái cây", vỏ đầy gai, mùi rất nồng?', ['Sầu riêng', 'sau rieng']],
+  ['Quả gì vỏ hồng có tai xanh, ruột trắng hoặc đỏ lấm tấm hạt đen?', ['Thanh long', 'thanh long']],
+  ['Cà phê trứng nổi tiếng ra đời ở thành phố nào?', ['Hà Nội', 'ha noi', 'hanoi']],
+  ['Trứng vịt lộn thường ăn kèm với loại rau nào?', ['Rau răm', 'rau ram']],
+  ['Bột năng được làm từ củ gì?', ['Khoai mì', 'khoai mi', 'khoai my', 'cu san', 'cu khoai mi']],
+  ['Món bánh nào có tên giống tiếng kêu khi đổ bột vào chảo nóng?', ['Bánh xèo', 'banh xeo']],
+  ['Hột vịt muối được làm từ trứng của con gì?', ['Vịt', 'con vit', 'trung vit']],
+  // câu đố mẹo
+  ['Cái gì có cổ mà không có đầu?', ['Cái áo', 'ao', 'ao so mi']],
+  ['Cái gì đầy lỗ nhưng vẫn giữ được nước?', ['Bọt biển', 'bot bien', 'mieng bot bien']],
+  ['Con gì càng to càng nhỏ?', ['Con cua', 'cua bien']],
+  ['Cái gì đi lên mà không bao giờ đi xuống?', ['Tuổi', 'tuoi', 'tuoi tac']],
+  ['Cái gì có răng mà không bao giờ cắn?', ['Cái lược', 'cai luoc', 'luoc chai dau']],
+  ['Con gì đầu dê mình ốc?', ['Con dốc', 'con doc']],
+  ['Cái gì luôn ở phía trước mà ta không bao giờ nhìn thấy?', ['Tương lai', 'tuong lai']],
+  ['Bỏ ngoài nướng trong, ăn ngoài bỏ trong là gì?', ['Bắp', 'bap', 'bap ngo', 'trai bap', 'ngo']],
+  ['Trên cành có 10 con chim, thợ săn bắn rơi 1 con, trên cành còn mấy con?', ['0', 'khong con', 'ko con', 'k con']],
+  ['Tháng nào trong năm ngắn nhất?', ['Tháng 2', 'thang 2', 'thang hai']],
+  ['Con gì ăn lửa với nước than, chạy trên đường ray?', ['Tàu hoả', 'tau hoa', 'con tau', 'xe lua', 'tau lua']],
+  ['Cái gì mà đi thì nằm, đứng cũng nằm, nhưng nằm lại đứng?', ['Bàn chân', 'ban chan']],
+  ['Cái gì bạn cho người khác rồi mà vẫn còn giữ nguyên?', ['Lời hứa', 'loi hua', 'nu cuoi', 'kien thuc']],
+  // thành ngữ, tục ngữ
+  ['Điền vào chỗ trống: "Ăn quả nhớ kẻ ..."', ['trồng cây', 'trong cay']],
+  ['Điền vào chỗ trống: "Uống nước nhớ ..."', ['nguồn', 'nguon']],
+  ['Điền vào chỗ trống: "Có công mài sắt, có ngày nên ..."', ['kim', 'cay kim']],
+  ['Điền vào chỗ trống: "Lá lành đùm lá ..."', ['rách', 'rach']],
+  ['Điền vào chỗ trống: "Đi một ngày đàng, học một sàng ..."', ['khôn', 'khon']],
+  ['Điền vào chỗ trống: "Tốt gỗ hơn tốt nước ..."', ['sơn', 'nuoc son']],
+  ['Điền vào chỗ trống: "Thương người như thể thương ..."', ['thân', 'than', 'than minh']],
+  ['Điền vào chỗ trống: "Ăn trông nồi, ngồi trông ..."', ['hướng', 'huong']],
+  ['Điền vào chỗ trống: "Cái khó ló cái ..."', ['khôn', 'khon']],
+  // động vật – khoa học
+  ['Con vật nào cao nhất thế giới?', ['Hươu cao cổ', 'huou cao co']],
+  ['Loài chim nào to nhất, không biết bay nhưng chạy rất nhanh?', ['Đà điểu', 'da dieu']],
+  ['Con vật nào nổi tiếng biết đổi màu da theo môi trường?', ['Tắc kè hoa', 'tac ke', 'tac ke hoa']],
+  ['Con vật nào được gọi là "chúa sơn lâm"?', ['Con hổ', 'con cop', 'cop', 'ong ba muoi']],
+  ['Động vật có vú nào biết bay?', ['Con dơi', 'con doi']],
+  ['Loài vật lớn nhất trên Trái Đất là gì?', ['Cá voi xanh', 'ca voi', 'ca voi xanh']],
+  ['Hành tinh nào gần Mặt Trời nhất?', ['Sao Thuỷ', 'sao thuy', 'thuy tinh', 'mercury']],
+  ['Hành tinh nào lớn nhất hệ Mặt Trời?', ['Sao Mộc', 'sao moc', 'moc tinh', 'jupiter']],
+  ['Hành tinh nào được gọi là "hành tinh đỏ"?', ['Sao Hoả', 'sao hoa', 'hoa tinh', 'mars']],
+  ['Công thức hoá học của nước là gì?', ['H2O']],
+  ['Cây xanh nhả ra khí gì khi quang hợp?', ['Oxy', 'oxi', 'o2', 'khi oxy', 'khi oxi']],
+  ['Kim loại nào ở thể lỏng ở nhiệt độ phòng?', ['Thuỷ ngân', 'thuy ngan']],
+  ['Người trưởng thành có đủ răng khôn thì có bao nhiêu chiếc răng?', ['32', 'ba muoi hai']],
+  ['Mặt Trăng quay quanh hành tinh nào?', ['Trái Đất', 'trai dat', 'dia cau']],
+  ['Ong làm ra thứ gì ngọt?', ['Mật ong', 'mat ong']],
+  // tính nhanh
+  ['Tính nhanh: 15 + 27 = ?', ['42', 'bon muoi hai']],
+  ['Tính nhanh: 9 × 8 = ?', ['72', 'bay muoi hai']],
+  ['Tính nhanh: 12 × 12 = ?', ['144']],
+  ['Một giờ có bao nhiêu giây?', ['3600', '3.600']],
+  ['Một ngày có bao nhiêu giờ?', ['24', 'hai muoi bon', 'hai bon']],
+  ['Năm nhuận có bao nhiêu ngày?', ['366']],
+  ['Tính nhanh: một nửa của 50 rồi cộng thêm 10 bằng mấy?', ['35', 'ba muoi lam', 'ba lam']],
+  ['Tính nhanh: 1000 – 1 = ?', ['999']],
+  ['Bảng chữ cái tiếng Việt có bao nhiêu chữ cái?', ['29', 'hai muoi chin']],
+  // thể thao – âm nhạc
+  ['Môn thể thao nào được gọi là "môn thể thao vua"?', ['Bóng đá', 'bong da', 'da banh']],
+  ['Môn võ Việt Nam có tên quốc tế bắt đầu bằng chữ V, phổ biến ở nhiều nước là môn gì?', ['Vovinam', 'viet vo dao']],
+  ['Bài hát "Nối vòng tay lớn" là sáng tác của nhạc sĩ nào?', ['Trịnh Công Sơn', 'trinh cong son']],
+  ['Ai là tác giả bài Tiến quân ca, Quốc ca Việt Nam?', ['Văn Cao', 'van cao']],
+  ['Môn thể thao nào dùng vợt và quả cầu có lông vũ?', ['Cầu lông', 'cau long']]
+);
 const TYPE_WORDS = ['BIA HƠI', 'MỰC NƯỚNG', 'CẬU CẢ', 'VỈA HÈ', 'LẨU THÁI', 'TRÀ ĐÁ', 'ỐC LUỘC', 'DZÔ DZÔ', 'GHẾ NHỰA', 'ĐẬU PHỘNG'];
 const MG_INFO = { do_vui: ['🧠 ĐỐ VUI', 40], doan_so: ['🔢 ĐOÁN SỐ 1–100', 75], nhanh_tay: ['⚡ NHANH TAY', 25], dua_ban: ['🏁 ĐUA BÀN', 60] };
 const mgNorm = s => norm(s).replace(/[^\p{L}\p{N}\/\s-]/gu, ' ').replace(/\s+/g, ' ').trim();
@@ -2791,6 +2983,171 @@ function viewerStartMG(g, t) {
   return false;
 }
 
+// ---- XIẾC ĐƯỜNG PHỐ: nghệ sĩ dạo ghé diễn giữa phố, xe dừng lại xem ----
+const flames = new Pool(dotTex, 110, THREE.AdditiveBlending);
+const CIRCUS_ACTS = {
+  tung_hung: { name: '🤹 Tung hứng', dur: 22, look: { shirt: '#8e24aa', stripe: '#fdd835', pants: '#212121', hair: 5, glasses: false }, who: 'Anh Tèo', intro: 'tung hứng 5 trái banh' },
+  phun_lua: { name: '🔥 Phun lửa', dur: 20, look: { singlet: true, pants: '#b71c1c', hair: 0, mustache: true }, who: 'Chú Hổ', intro: 'phun lửa – mọi người lùi xa ra nha' },
+  ca_kheo: { name: '🦯 Đi cà kheo', dur: 22, look: { shirt: '#1e88e5', stripe: '#ffffff', pants: '#ff7043', hair: 3, cap: '#e53935' }, who: 'Cô Út', intro: 'đi cà kheo cao gần 2 mét' },
+  xoay_dia: { name: '🍽️ Xoay đĩa', dur: 22, look: { shirt: '#00897b', stripe: '#ffffff', pants: '#212121', hair: 1 }, who: 'Bé Na', intro: 'xoay đĩa trên que' },
+  mua_lan: { name: '🦁 Múa lân', dur: 24, look: { shirt: '#d32f2f', stripe: '#fdd835', pants: '#fdd835', hair: 0 }, who: 'Đoàn lân Cậu Cả', intro: 'múa lân chúc quán làm ăn phát tài' },
+};
+const CIRCUS_KEYS = { tung_hung: /tung hung/, phun_lua: /phun lua|lua/, ca_kheo: /ca kheo/, xoay_dia: /xoay dia|dia/, mua_lan: /mua lan|lan/ };
+const RE_CIRCUS = /(^|\s)(xiec|xem xiec|goi xiec|moi xiec|xiec duong pho|mua lan|phun lua|tung hung|ca kheo|xoay dia)(\s|$|!|\?)/;
+const STAGE = { x: -0.5, z: -2 };   // giữa đường, lệch phải màn hình – không bị khung tin che
+const CAM_FACE = Math.atan2(0.86, 0.44);   // quay mặt về phía máy quay (bên kia đường)
+const Circus = {
+  cur: null, last: -1e9, cd: 150, tips: 0,
+  ready() { return !this.cur && now() - this.last > this.cd * 1000; },
+  wait() { return Math.max(0, Math.ceil((this.cd * 1000 - (now() - this.last)) / 1000)); },
+  start(kind, by, g) {
+    if (this.cur) return false;
+    if (!CIRCUS_ACTS[kind]) kind = pick(Object.keys(CIRCUS_ACTS));
+    const A = CIRCUS_ACTS[kind];
+    const look = Object.assign(lookFor('circus:' + kind), A.look, { scale: 1.3, blush: true });
+    const p = new Actor(look, { speed: 1.7 }); p.circus = true; p.bubbleStyle = { bg: '#fff3c4' };
+    const fromBack = Math.random() < 0.5;
+    p.g.position.set(STAGE.x + rand(-0.1, 0.1), 0, fromBack ? BACK_Z - 3 : FRONT_Z + 3);
+    actors.push(p);
+    const c = this.cur = { kind, A, p, t: 0, phase: 'walk', by, props: [], acc: 0, beat: 0, nextFire: 1.2, cheerAcc: 0, back: fromBack, tipped: new Set() };
+    this.tips = 0;
+    this.buildProps(c);
+    p.walkTo([{ x: STAGE.x, z: STAGE.z }], () => this.perform(c));
+    const who = g ? ` theo lời mời của <b>${esc(g.name)}</b>` : '';
+    feed(`🎪 Xiếc đường phố tới quán${who}: <b>${A.name}</b>`, 'sys');
+    banner(`🎪 XIẾC ĐƯỜNG PHỐ · ${A.name}`, 'purple', 3200);
+    ownerSay(`Cả nhà ơi, ${A.who} tới ${A.intro}! Thả tim, tặng quà thưởng nghệ sĩ nha!`, true);
+    return true;
+  },
+  buildProps(c) {
+    const p = c.p, a = p.av, mk = (geo, parent, pos) => { const m = new THREE.Mesh(geo, vcMat); m.position.set(...pos); parent.add(m); c.props.push(m); return m; };
+    if (c.kind === 'tung_hung') {
+      c.balls = ['#ff5252', '#ffd740', '#40c4ff', '#69f0ae', '#ff80ab'].map(col => mk(merge([SP(0.1, col, [0, 0, 0], null, 10, 8)]), p.g, [0, 1, 0.3]));
+    } else if (c.kind === 'phun_lua') {
+      mk(merge([CY(0.025, 0.03, 0.42, '#6d4c41', [0, 0, 0], null, 6), CY(0.04, 0.04, 0.06, '#424242', [0, 0.22, 0], null, 8)]), a.armR, [0, -0.5, 0.06]).rotation.x = Math.PI;
+      c.torch = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTex, color: 0xffa040, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+      c.torch.scale.set(0.24, 0.32, 1); c.torch.position.set(0, -0.8, 0.06); a.armR.add(c.torch); c.props.push(c.torch);
+    } else if (c.kind === 'ca_kheo') {
+      const stilt = merge([B(0.07, 0.95, 0.07, '#8d6e63', 0, -0.83, 0.02), B(0.12, 0.04, 0.16, '#5d4037', 0, -1.3, 0.03)]);
+      mk(stilt, a.legL, [0, 0, 0]); mk(stilt, a.legR, [0, 0, 0]);
+      mk(merge([B(0.07, 0.95, 0.07, '#8d6e63', 0.095, -0.83, 0.02), B(0.07, 0.95, 0.07, '#8d6e63', -0.095, -0.83, 0.02)]), a.legs2, [0, 0, 0]);
+      mk(merge([CY(0.012, 0.012, 0.6, '#ffd54f', [0, 0, 0], null, 6), B(0.3, 0.2, 0.01, '#e91e63', 0.16, 0.22, 0)]), a.armR, [0, -0.6, 0.05]).rotation.x = Math.PI;
+      p.baseY = 0.95;
+    } else if (c.kind === 'xoay_dia') {
+      c.plates = [a.armL, a.armR].map(arm => {
+        mk(merge([CY(0.012, 0.012, 0.95, '#cfd8dc', [0, 0, 0], null, 6)]), arm, [0, -0.78, 0.05]);
+        const pl = mk(merge([CY(0.17, 0.12, 0.025, '#ffffff', [0, 0, 0], null, 18), CY(0.13, 0.13, 0.004, '#e53935', [0, -0.014, 0], null, 18)]), arm, [0, -1.27, 0.05]);
+        return pl;
+      });
+    } else if (c.kind === 'mua_lan') {
+      const head = new THREE.Group(); head.position.set(0, HIP + 0.66, 0.1); p.g.add(head); c.props.push(head); c.head = head;
+      const H = [B(0.78, 0.6, 0.66, '#d32f2f', 0, 0, 0), B(0.8, 0.12, 0.68, '#fdd835', 0, 0.3, 0), B(0.7, 0.16, 0.2, '#fdd835', 0, -0.2, 0.3),
+        SP(0.11, '#ffffff', [-0.2, 0.12, 0.34]), SP(0.11, '#ffffff', [0.2, 0.12, 0.34]), SP(0.05, '#111', [-0.2, 0.12, 0.43]), SP(0.05, '#111', [0.2, 0.12, 0.43]),
+        CO(0.07, 0.28, '#ffeb3b', [0, 0.48, 0.05], null, 8), B(0.22, 0.06, 0.04, '#43a047', 0, 0.22, 0.34), B(0.5, 0.05, 0.1, '#ffffff', 0, -0.33, 0.34),
+        B(0.08, 0.3, 0.08, '#ffffff', -0.36, -0.1, 0.25), B(0.08, 0.3, 0.08, '#ffffff', 0.36, -0.1, 0.25)];
+      mk(merge(H), head, [0, 0, 0]);
+      const cloth = [B(0.74, 0.5, 1.3, '#d32f2f', 0, 0, 0), B(0.76, 0.1, 1.32, '#fdd835', 0, 0.12, 0), B(0.76, 0.06, 1.32, '#ffffff', 0, -0.22, 0)];
+      for (let i = 0; i < 6; i++) cloth.push(B(0.06, 0.18, 0.06, '#fdd835', (i % 2 ? 0.34 : -0.34), -0.32, -0.55 + i * 0.2));
+      c.cloth = mk(merge(cloth), p.g, [0, HIP + 0.3, -0.75]);
+    }
+  },
+  perform(c) {
+    if (this.cur !== c) return;
+    c.phase = 'show'; c.t = 0; c.p.rot = CAM_FACE; c.p.state = 'stand';
+    Snd.drumroll && Snd.drumroll(0.8);
+    c.p.say(pick(['Kính chào bà con cô bác!', 'Xin mời cả nhà xem!', 'Biểu diễn đây!']), 2.6);
+    if (c.kind === 'ca_kheo') this.stiltWalk(c);
+  },
+  stiltWalk(c) {
+    if (this.cur !== c || c.phase !== 'show') return;
+    const z = STAGE.z + (c.p.g.position.z > STAGE.z ? -1.6 : 1.6);
+    c.p.walkTo([{ x: STAGE.x, z }], () => { c.p.rot = CAM_FACE; setTimeout(() => this.stiltWalk(c), 1600); });
+  },
+  tip(g, total) {
+    const c = this.cur; if (!c || c.phase === 'leave' || !g) return;
+    this.tips += total; if (c.phase === 'show') c.t = Math.max(0, c.t - Math.min(6, 2 + total / 5));
+    c.p.say(`Cảm ơn ${trunc(g.name, 12)} thưởng nha! 🙏`, 3); c.p.waveT = 1.2;
+    if (!c.tipped.has(g)) { c.tipped.add(g); feed(`🎪 <b>${esc(g.name)}</b> thưởng nghệ sĩ xiếc – diễn thêm!`, 'gift'); }
+    for (let i = 0; i < 6; i++) hearts.spawn(c.p.pos.x + rand(-0.4, 0.4), 1.6 + rand(0, 0.4), c.p.pos.z + rand(-0.4, 0.4), { size: 0.3, vy: rand(0.6, 1.1), life: 1.6, color: pick(['#ff4d6d', '#ffd166', '#ff8fab']) });
+  },
+  end() {
+    const c = this.cur; if (!c || c.phase === 'leave') return;
+    c.phase = 'leave'; this.last = now();
+    Snd.cheer(2.2, 0.4); addVibe(12);
+    c.p.say(pick(['Cảm ơn cả nhà đã xem! 🙇', 'Hẹn gặp lại bà con nha!', 'Thả tim cho đoàn xiếc nha!']), 3);
+    feed(`👏 ${c.A.name} kết thúc${this.tips ? ` – được thưởng ${this.tips} xu` : ''}! Comment <b>"xiếc"</b> để mời tiết mục khác`, 'sys');
+    if (c.kind === 'mua_lan') fireworksShow(3);
+    const out = c.back ? FRONT_Z + 4 : BACK_Z - 4;
+    setTimeout(() => { if (this.cur === c) c.p.walkTo([{ x: STAGE.x, z: out }], () => this.clear(c)); }, 1800);
+  },
+  clear(c) {
+    if (this.cur !== c) return;
+    c.p.dispose(); const i = actors.indexOf(c.p); if (i >= 0) actors.splice(i, 1);
+    if (c.torch) c.torch.material.dispose();
+    this.cur = null;
+  },
+  stop() { const c = this.cur; if (c) { this.last = now(); this.clear(c); } },
+  // gọi sau Actor.update để đè tư thế
+  update(dt, T) {
+    flames.update(dt);
+    const c = this.cur; if (!c) return;
+    const p = c.p, a = p.av;
+    if (c.phase !== 'show') return;
+    c.t += dt;
+    if (c.t >= c.A.dur) { this.end(); return; }
+    // khán giả phản ứng
+    c.cheerAcc += dt;
+    if (c.cheerAcc > 3.2) {
+      c.cheerAcc = 0; const sit = [...guests.values()].filter(g => g.state === 'sit' && !g.leaving);
+      const g = sit.length ? pick(sit) : null;
+      if (g) { g.say(pick(['Hay quá! 👏', 'Đỉnh thật sự!', 'Wow 😲', 'Thêm nữa đi!', 'Xịn xò ghê', 'Vỗ tay nào 👏👏']), 2.2); g.waveT = 1; }
+      if (Math.random() < 0.4) Snd.cheer(0.8, 0.18);
+    }
+    const s = Math.sin(T * 6), k = c.kind;
+    const setArms = (aL, aR, aLz = 0, aRz = 0) => { a.arms2.visible = false; a.armL.visible = a.armR.visible = true; a.armL.rotation.set(aL, 0, aLz); a.armR.rotation.set(aR, 0, aRz); };
+    if (k === 'tung_hung') {
+      setArms(-1.15 + s * 0.25, -1.15 - s * 0.25, 0.15, -0.15);
+      const n = c.balls.length, per = 0.55;
+      c.balls.forEach((b, i) => {
+        const ph = ((T / per) + i * (2 / n)) % 2, hand = ph < 1 ? 1 : -1, f = ph % 1;
+        b.position.set(hand * (0.28 - 0.56 * f), 0.98 + Math.sin(f * Math.PI) * 1.0, 0.42);
+      });
+      c.beat += dt; if (c.beat > per / 2) { c.beat = 0; Snd.pop(); }
+    } else if (k === 'phun_lua') {
+      setArms(-0.6 + s * 0.1, -2.5 + Math.sin(T * 3) * 0.2, 0, -0.25);
+      c.torch.scale.set(0.22 + Math.random() * 0.06, 0.3 + Math.random() * 0.1, 1);
+      c.nextFire -= dt;
+      if (c.nextFire <= 0 && c.nextFire > -1.1) {
+        const o = p.g.localToWorld(new THREE.Vector3(0, 1.45, 0.35)), d = new THREE.Vector3(Math.sin(p.rot), 0.35, Math.cos(p.rot));
+        for (let i = 0; i < 3; i++) flames.spawn(o.x, o.y, o.z, { vx: d.x * rand(3, 4.5) + rand(-0.3, 0.3), vy: d.y * rand(2, 3.5) + rand(0, 0.8), vz: d.z * rand(3, 4.5) + rand(-0.3, 0.3), size: rand(0.25, 0.4), grow: 2.4, life: rand(0.45, 0.7), color: pick(['#ffb300', '#ff6d00', '#ffd54f', '#ff3d00']), base: 0.95 });
+        if (!c.fireSnd) { c.fireSnd = true; Snd.ctx && Snd.nz(Snd.t, 1.1, 0.22, 'lowpass', 700, 0.8, null, 300); }
+      } else if (c.nextFire <= -1.1) { c.nextFire = rand(2, 3); c.fireSnd = false; Snd.cheer(0.7, 0.2); }
+    } else if (k === 'ca_kheo') {
+      if (p.state !== 'walk') setArms(-0.4 + s * 0.3, -2.6 + Math.sin(T * 4) * 0.3, 0.3, -0.3);
+    } else if (k === 'xoay_dia') {
+      setArms(-2.95 + s * 0.06, -2.9 - s * 0.06, 0.12 + Math.sin(T * 2) * 0.05, -0.12 - Math.sin(T * 2) * 0.05);
+      c.plates.forEach((pl, i) => { pl.rotation.y += dt * 14; pl.rotation.x = Math.sin(T * 3 + i) * 0.12; });
+    } else if (k === 'mua_lan') {
+      const bt = T * 4.2, jump = Math.max(0, Math.sin(bt)) * 0.28;
+      p.g.position.y = jump; p.g.rotation.z = Math.sin(T * 2.1) * 0.12;
+      c.head.rotation.x = -0.15 + Math.sin(bt * 2) * 0.2; c.head.rotation.y = Math.sin(T * 1.7) * 0.5;
+      c.cloth.rotation.y = Math.sin(T * 1.7 + 1) * 0.25; c.cloth.position.y = HIP + 0.3 + Math.sin(bt + 1.4) * 0.08;
+      setArms(-2.2 + s * 0.3, -2.2 - s * 0.3, 0.2, -0.2);
+      c.beat += dt;
+      if (c.beat > 0.3 && Snd.ctx) { c.beat = 0; c.n = (c.n || 0) + 1; const t0 = Snd.t; const accent = c.n % 4 === 0;
+        Snd.osc('sine', accent ? 120 : 95, t0, 0.22, accent ? 0.5 : 0.35, null, 0.002, 45);
+        if (c.n % 2 === 0) Snd.nz(t0 + 0.15, 0.08, 0.18, 'highpass', 3500, 1); }
+    }
+  }
+};
+function circusAsk(g, t) {
+  if (!RE_CIRCUS.test(t)) return false;
+  if (Circus.cur) { g.say('Đang diễn đó, xem đi nè! 👀', 2.5); return true; }
+  if (!Circus.ready()) { g.say(`Đoàn xiếc đang nghỉ, ${Math.ceil(Circus.wait() / 60)} phút nữa nha!`, 3); return true; }
+  const kind = Object.keys(CIRCUS_KEYS).find(k => CIRCUS_KEYS[k].test(t.replace(/xiec/g, ''))) || null;
+  Circus.start(kind, 'viewer', g); return true;
+}
+
 // ---- khách quen người máy: giữ quán luôn đông, tự cân đối với khách thật ----
 const BOT_NAMES = NPCS.concat(['Cô Ba Bán Chè', 'Chú Sáu Xích Lô', 'Anh Chín Thợ Điện', 'Chị Hai Tạp Hóa', 'Bác Năm Hưu Trí', 'Anh Tư Giao Hàng', 'Chị Bảy Bán Bún', 'Út Mập Hàng Xóm', 'Anh Mười Sửa Điện Thoại', 'Cô Sáu Bán Cá', 'Chú Hai Bảo Vệ', 'Anh Ba Tài Xế', 'Bé Tèo Sinh Viên', 'Anh Lâm Thợ Mộc', 'Chị Hoa Thu Ngân', 'Bác Tư Câu Cá', 'Anh Khoa IT', 'Chị Mai Kế Toán', 'Cu Bin Lớp 12 (uống trà đá)', 'Ông Bảy Cờ Tướng', 'Anh Đức Chạy Grab', 'Chú Lành Bán Than', 'Cô Ngọc Bán Hoa', 'Anh Phúc Thợ Ảnh']);
 const BOT_CHATS = ['Dzô cả quán ơi! 🍻', 'Ai mới vào thì comment gì đó để có ghế nha!', 'Muốn ngồi chung với bạn thì comment "ghép" + tên bạn nè', 'Comment "bàn riêng" là có bàn riêng cho hội bạn đó', 'Thả tim cho quán lên 100% quẩy đi mọi người!', 'Ai hát hay thì comment "hát" + tên bài rồi tặng quà nha', 'Cậu Cả ơi, thêm đĩa lạc!', 'Mực nướng thơm quá trời', 'Trăm phần trăm nha anh em!', 'Comment "oẳn tù tì" thách Cậu Cả đi, vui lắm', 'Comment "đố vui" là có câu đố liền', 'Gió đêm vỉa hè mát ghê', 'Nhạc quán nghe đã tai thiệt', 'Hôm nay quán đông vui ha', 'Ai ở Sài Gòn điểm danh nè', 'Ai ở Hà Nội điểm danh nè', 'Trà đá cho tỉnh rồi uống tiếp 😆', 'Bàn mình còn ghế trống nè, qua ngồi đi!'];
@@ -2864,7 +3221,7 @@ function autoEvent(kind) {
   evtLast[kind] = t; runEvent(kind); return true;
 }
 const realGuests = () => [...guests.values()].filter(g => !g.npc && !g.leaving);
-const Auto = { acc: 0, lastLucky: now(), lastFire: now(), lastClean: now(), lastDzo: now(), wake: null };
+const Auto = { acc: 0, lastLucky: now(), lastFire: now(), lastClean: now(), lastDzo: now(), lastCircus: now() - 4 * 60000, wake: null };
 function updateAuto(dt) {
   if (!opts.autoOn) return;
   Auto.acc += dt; if (Auto.acc < 5) return; Auto.acc = 0;
@@ -2872,6 +3229,7 @@ function updateAuto(dt) {
   if (rg >= 3 && t - Auto.lastLucky > Math.max(2, Number(opts.autoLuckyMin) || 8) * 60000 && autoEvent('lucky')) Auto.lastLucky = t;
   if (rg >= 4 && G.vibe < 35 && G.partyT <= 0 && t - Auto.lastDzo > 240000 && autoEvent('dzo')) Auto.lastDzo = t;
   if (rg >= 2 && t - Auto.lastFire > 12 * 60000 && autoEvent('fire')) Auto.lastFire = t;
+  if (opts.circusAuto !== false && !Circus.cur && !MG.cur && !G.draw && !(karaoke.cur && karaoke.cur.singing) && t - Circus.last > Math.max(2, Number(opts.circusEvery) || 6) * 60000 && t - (Auto.lastCircus || 0) > Math.max(2, Number(opts.circusEvery) || 6) * 60000) { Auto.lastCircus = t; Circus.start(null, 'auto'); }
   if (t - Auto.lastClean > 15 * 60000) { Auto.lastClean = t; clearAllDishes(); }
   if (!opts.botsOn && rg < 6) { const n = NPCS.find(x => !guests.has('npc:' + x)); if (n) ensureGuest('npc:' + n, n, true); }  // giữ quán không vắng
 }
@@ -2911,8 +3269,8 @@ Phòng live mới, ít người xem:
 const AI_TOOLS = [
   { name: 'noi', description: 'Cậu Cả nói một câu: hiện bong bóng trên đầu Cậu Cả và trong khung chat của live. Dùng để chào, cảm ơn, trả lời bình luận, rủ mọi người tương tác.', strict: true,
     input_schema: { type: 'object', properties: { text: { type: 'string', description: 'Câu nói tiếng Việt có dấu, tối đa 110 ký tự' }, to: { type: 'string', description: 'Tên người xem đang được trả lời; chuỗi rỗng nếu nói với cả quán' } }, required: ['text', 'to'], additionalProperties: false } },
-  { name: 'su_kien', description: 'Mở một sự kiện chung hoặc trò chơi nhỏ. dzo: đếm 1-2-3 cả quán cụng ly. boc_tham: bốc thăm một khách trúng tháp bia ảo. phao_hoa: bắn pháo hoa. quay: chế độ quẩy 20 giây. do_vui: câu đố, ai trả lời đúng trước thắng. doan_so: đoán số 1–100. nhanh_tay: ai gõ đúng cụm từ nhanh nhất thắng. dua_ban: bàn nào sôi nổi nhất 60 giây thắng tháp bia.', strict: true,
-    input_schema: { type: 'object', properties: { loai: { type: 'string', enum: ['dzo', 'boc_tham', 'phao_hoa', 'quay', 'do_vui', 'doan_so', 'nhanh_tay', 'dua_ban'] } }, required: ['loai'], additionalProperties: false } },
+  { name: 'su_kien', description: 'Mở một sự kiện chung hoặc trò chơi nhỏ. dzo: đếm 1-2-3 cả quán cụng ly. boc_tham: bốc thăm một khách trúng tháp bia ảo. phao_hoa: bắn pháo hoa. quay: chế độ quẩy 20 giây. do_vui: câu đố, ai trả lời đúng trước thắng. doan_so: đoán số 1–100. nhanh_tay: ai gõ đúng cụm từ nhanh nhất thắng. dua_ban: bàn nào sôi nổi nhất 60 giây thắng tháp bia. xiec: mời đoàn xiếc đường phố diễn ~25 giây (tung hứng, phun lửa, cà kheo, xoay đĩa, múa lân) – người xem thả tim/tặng quà thưởng nghệ sĩ.', strict: true,
+    input_schema: { type: 'object', properties: { loai: { type: 'string', enum: ['dzo', 'boc_tham', 'phao_hoa', 'quay', 'do_vui', 'doan_so', 'nhanh_tay', 'dua_ban', 'xiec'] } }, required: ['loai'], additionalProperties: false } },
   { name: 'thong_bao', description: 'Hiện băng thông báo lớn giữa màn hình. Dùng tiết kiệm, chỉ cho tin quan trọng (mốc tim, quà lớn, sự kiện sắp diễn ra).', strict: true,
     input_schema: { type: 'object', properties: { text: { type: 'string', description: 'Tối đa 60 ký tự' } }, required: ['text'], additionalProperties: false } },
   { name: 'moi_mon', description: 'Cậu Cả mời miễn phí một món nhỏ cho bàn của một khách đang ngồi trong quán, để thưởng người tương tác vui. lac: đậu phộng, muc: khô mực, tra: trà đá.', strict: true,
@@ -2945,6 +3303,7 @@ function aiState() {
     `Top điểm: ${top}`, priv ? `Bàn riêng: ${priv}` : '',
     `Sự kiện mở được lúc này: ${open.join(', ') || 'chưa có (đang hồi chiêu)'}`,
     `Trò chơi nhỏ: ${MG.cur ? 'đang chạy ' + MG.cur.type + ', còn ' + Math.ceil(MG.cur.t) + ' giây' : (now() - MG.last > 60000 ? 'có thể mở (do_vui, doan_so, nhanh_tay, dua_ban)' : 'vừa xong, chờ chút')}`,
+    `Xiếc đường phố: ${Circus.cur ? 'đang diễn ' + Circus.cur.kind : Circus.ready() ? 'có thể mời (su_kien xiec)' : 'đoàn đang nghỉ ' + Circus.wait() + ' giây'}`,
     `Khách quen 🏠 (nhân vật máy, không phải người xem): ${botList().length}`].filter(Boolean).join('\n');
 }
 let AnthropicSDK = null;
@@ -2975,6 +3334,7 @@ function aiExec(name, inp) {
     AI.said.push(txt); if (AI.said.length > 8) AI.said.shift(); aiLog('💬 ' + line);
   } else if (name === 'su_kien') {
     if (MG_INFO[inp.loai]) { if (!MG.cur && now() - MG.last > 60000 && MG.start(inp.loai, 'ai')) aiLog('🎯 Mở trò: ' + inp.loai); return; }
+    if (inp.loai === 'xiec') { if (Circus.ready() && Circus.start(null, 'ai')) aiLog('🎪 Mời xiếc đường phố'); return; }
     const k = Object.keys(EVT_AI).find(x => EVT_AI[x] === inp.loai);
     if (k && autoEvent(k)) aiLog('🎉 Mở sự kiện: ' + inp.loai);
   } else if (name === 'thong_bao') {
@@ -3083,7 +3443,7 @@ $('#presetLive').onclick = () => { Snd.resume(); applyLivePreset(); };
    VÒNG LẶP
    ===================================================================== */
 const clock = new THREE.Clock(); let T = 0, hudAcc = 0, ledAcc = 0, slowAcc = 0, perfAcc = 0, perfN = 0, perfT = 0, tipAcc = 0, idleAcc = 0;
-const TIPS = ['💡 Comment <b>"bàn 7"</b> để chọn bàn', '💡 Comment <b>"bàn riêng"</b> để giữ một bàn cho hội bạn', '💡 Comment <b>"ghép Tên"</b> để ngồi chung bàn với bạn', '💡 Comment <b>"mời Tên"</b> để rủ bạn qua bàn mình', '💡 Comment <b>"tên bàn Hội Bia"</b> để đặt tên bàn', '💡 Comment <b>"hát + tên bài"</b> rồi tặng quà để đăng ký karaoke 🎤', '💡 Tặng quà từ 30 xu để <b>chen hàng</b> karaoke ⏫', '💡 Comment <b>"xin lên mic"</b> để hát cho cả phòng nghe 🎙️', '💡 Comment <b>"oẳn tù tì búa"</b> để thách Cậu Cả', '💡 Comment <b>"xí ngầu"</b> – ra 6 cả bàn uống!', '💡 Comment <b>"cụng ly với Tên"</b> để mời bạn 1 ly', '💡 Say quá? Comment <b>"trà đá"</b> cho tỉnh 😅', '💡 Thả ❤️ để đẩy thanh <b>Không khí</b> lên 100%', '💡 Tặng quà để nhân viên <b>bưng món</b> ra bàn bạn'];
+const TIPS = ['💡 Comment <b>"bàn 7"</b> để chọn bàn', '💡 Comment <b>"bàn riêng"</b> để giữ một bàn cho hội bạn', '💡 Comment <b>"ghép Tên"</b> để ngồi chung bàn với bạn', '💡 Comment <b>"mời Tên"</b> để rủ bạn qua bàn mình', '💡 Comment <b>"tên bàn Hội Bia"</b> để đặt tên bàn', '💡 Comment <b>"hát + tên bài"</b> rồi tặng quà để đăng ký karaoke 🎤', '💡 Tặng quà từ 30 xu để <b>chen hàng</b> karaoke ⏫', '💡 Comment <b>"xin lên mic"</b> để hát cho cả phòng nghe 🎙️', '💡 Comment <b>"oẳn tù tì búa"</b> để thách Cậu Cả', '💡 Comment <b>"xí ngầu"</b> – ra 6 cả bàn uống!', '💡 Comment <b>"cụng ly với Tên"</b> để mời bạn 1 ly', '💡 Say quá? Comment <b>"trà đá"</b> cho tỉnh 😅', '💡 Thả ❤️ để đẩy thanh <b>Không khí</b> lên 100%', '💡 Tặng quà để nhân viên <b>bưng món</b> ra bàn bạn', '💡 Comment <b>"xiếc"</b> để mời đoàn xiếc đường phố (múa lân, phun lửa, tung hứng…)', '💡 Đang có xiếc? Thả tim, tặng quà để <b>thưởng nghệ sĩ</b> diễn thêm!'];
 const OWNER_IDLE = ['Anh em cứ tự nhiên nha!', 'Bia lạnh đây, dzô!', 'Comment "bàn riêng" để giữ bàn nè!', 'Muốn ngồi với bạn thì comment "ghép" tên bạn!', 'Comment "hát" lên hát karaoke đi!', 'Oẳn tù tì với Cậu Cả không?', 'Thả tim cho quán đông vui nào!', 'Không say không về!', 'Tặng quà là có món ngay!'];
 function drawLED(t) {
   const g = ledCtx, W = 320, H = 160;
@@ -3119,6 +3479,7 @@ function loop() {
   const dt = Math.min(clock.getDelta(), 0.05); T += dt;
   demoTick(dt);
   for (let i = actors.length - 1; i >= 0; i--) actors[i].update(dt, T);
+  Circus.update(dt, T);
   serveOrders(); updateKaraoke(dt); updateTraffic(dt, T); notes.update(dt);
   Mic.update();
   hearts.update(dt); smoke.update(dt); updateFireworks(dt); updateDraw(dt);
@@ -3169,7 +3530,7 @@ addEventListener('resize', fitCamera);
 fitCamera();
 drawLED(0);
 window.__gameReady = true;
-window.__cc = { renderer, guests, handle, runEvent, tables, camera, THREE, karaoke, traffic, Mic, YTK, MG, opts };
+window.__cc = { renderer, guests, handle, runEvent, tables, camera, THREE, karaoke, traffic, Mic, YTK, MG, opts, Circus, BGM, TRIVIA };
 document.getElementById('loadErr').style.display = 'none';
 loop();
 
@@ -3210,12 +3571,14 @@ if (params.get('auto') === '1' || params.get('demo') === '1') {
 const APP = { on: false, ctl: params.get('obs') === '1' };
 function syncSettingsUI() {
   for (const id of ['aiModel', 'aiEvery', 'aiMax', 'aiBridge', 'ytKey', 'kMin', 'kPrio', 'kMax', 'botMin', 'mgEvery', 'autoLuckyMin']) { const el = $('#' + id); if (el && opts[id] !== undefined) el.value = opts[id]; }
-  for (const [id, k] of [['optBots', 'botsOn'], ['optMgAuto', 'mgAuto'], ['optAuto', 'autoOn'], ['optAiTts', 'aiTts']]) { const el = $('#' + id); if (el) el.checked = !!opts[k]; }
+  for (const [id, k] of [['optBots', 'botsOn'], ['optMgAuto', 'mgAuto'], ['optAuto', 'autoOn'], ['optAiTts', 'aiTts'], ['optBgmYt', 'bgmYt']]) { const el = $('#' + id); if (el) el.checked = !!opts[k]; }
+  if ($('#bgmQuery')) $('#bgmQuery').value = opts.bgmQuery || ''; if ($('#bgmVol')) $('#bgmVol').value = opts.bgmVol ?? 35;
 }
 function applyAppConfig(c) {
   if (!c) return;
   const g = c.game || {};
-  for (const k of ['aiModel', 'aiEvery', 'aiMax', 'kMin', 'kPrio', 'kMax', 'botsOn', 'botMin', 'mgAuto', 'mgEvery', 'autoOn', 'autoLuckyMin']) if (g[k] !== undefined) opts[k] = g[k];
+  for (const k of ['aiModel', 'aiEvery', 'aiMax', 'kMin', 'kPrio', 'kMax', 'botsOn', 'botMin', 'mgAuto', 'mgEvery', 'autoOn', 'autoLuckyMin', 'bgmYt', 'bgmQuery', 'bgmVol', 'circusAuto', 'circusEvery']) if (g[k] !== undefined) opts[k] = g[k];
+  BGM.setVolume(Number(opts.bgmVol ?? 35)); setTimeout(() => BGM.tick(), 50);
   // key YouTube: app có key thì dùng key app; app chưa có mà game đã có (dán trong ⚙️ game) thì gửi lên app, không xoá
   if (g.ytKey) { if (g.ytKey !== opts.ytKey) { opts.ytKey = g.ytKey; karaoke.queue.forEach(it => { if (it.kind === 'song' && !it.link && it.vstatus !== 'ok') resolveVideo(it); }); } }
   else if (opts.ytKey && APP.on) appSaveYtKey();
@@ -3228,7 +3591,9 @@ function applyAppConfig(c) {
 }
 function appCmd(c) {
   switch (c && c.type) {
-    case 'event': if (['dzo', 'lucky', 'fire', 'party', 'clearDish', 'reset'].includes(c.name)) runEvent(c.name); break;
+    case 'event': if (['dzo', 'lucky', 'fire', 'party', 'clearDish', 'reset', 'circus'].includes(c.name)) runEvent(c.name); break;
+    case 'bgm': if (c.action === 'next') BGM.next(); break;
+    case 'circus': if (c.name === 'stop') Circus.stop(); else if (!Circus.cur) Circus.start(c.name, 'host'); break;
     case 'mg': if (c.name === 'stop') MG.stop('⏹ Chủ quán dừng trò chơi'); else if (MG_INFO[c.name] && !MG.start(c.name, 'host')) feed('Đang có trò chơi chạy', 'sys'); break;
     case 'skip': if (karaoke.cur) { feed('⏭️ Chủ quán cho qua bài', 'sys'); endSing(); } break;
     case 'say': if (c.text) { const t = trunc(String(c.text), 120); ownerSay(t, true); feed(`🍺 <b>Cậu Cả</b>: ${esc(t)}`, 'mc'); speakMC(t); } break;
@@ -3251,6 +3616,8 @@ function appPostState() {
     revenue: G.revenue, likes: G.totalLikes, top: rankList.slice(0, 3).map(g => ({ name: g.name, points: g.points })),
     karaoke: { cur: karaoke.cur ? singerName(karaoke.cur) + (karaoke.cur.title ? ' – ' + karaoke.cur.title : ' (hát mộc)') : null, queue: karaoke.queue.length, pending: karaoke.pending.size },
     mg: MG.cur ? MG.cur.title : null,
+    circus: Circus.cur ? Circus.cur.A.name : (Circus.ready() ? null : 'nghỉ ' + Circus.wait() + 's'),
+    bgm: opts.bgmYt ? (BGM.playing ? BGM.title : (BGM.err ? '⚠️ ' + BGM.err : 'chờ')) : null,
     ai: { on: AI.on, calls: AI.calls.filter(t => now() - t < 3600000).length, cost: +AI.cost.toFixed(4), err: AI.err, last: AI.log[0] || '' },
   };
   fetch('/api/state', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(st) }).catch(() => { });
