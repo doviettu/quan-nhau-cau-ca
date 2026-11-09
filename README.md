@@ -8,7 +8,7 @@ Repo gồm:
 |---|---|
 | `index.html` | Toàn bộ game (Three.js qua CDN, âm thanh tạo bằng Web Audio) |
 | `Cau Ca Live.app`, `start.command` | App khởi động trên Mac |
-| `app/` | Máy chủ cục bộ: chạy game, cầu nối Claude, bảng điều khiển, điều khiển OBS |
+| `app/` | Máy chủ cục bộ: chạy game, cầu nối Claude, kết nối TikTok, bảng điều khiển, mở cửa sổ game cho LIVE Studio |
 | `bridge/` | Cầu nối Claude dùng riêng, khi không chạy app |
 
 ---
@@ -39,23 +39,20 @@ Có thể kéo `Cau Ca Live.app` vào thư mục Applications hoặc Dock; app t
 1. Kết nối TikTok để game nhận comment, tim, quà. Chọn một trong hai cách:
    - **Kết nối thẳng (không cần TikFinity):** bắt đầu live trên TikTok, rồi trong bảng điều khiển → **⚙️ Cấu hình phiên live** nhập **@tên tài khoản** và bấm **Kết nối**. Dòng *TikTok Live* ở phần Trạng thái hiện 🔴 và số người xem là xong. Nếu bạn bấm trước khi live, app tự thử lại mỗi 30 giây. App nhớ tên, các lần sau tự kết nối.
    - **Qua TikFinity:** mở TikFinity, kết nối với tài khoản đang live. Nếu đang kết nối thẳng thì bấm **Ngắt** để game quay về dùng TikFinity.
-2. Mở **OBS** (bản 28 trở lên). Lần đầu: vào **Tools → WebSocket Server Settings**, bật **Enable WebSocket server**, ghi lại mật khẩu.
-3. Mở **Cau Ca Live.app**. Trong bảng điều khiển:
-   - Nhập mật khẩu OBS rồi bấm **🎬 Thiết lập cảnh OBS**. App tự chuyển khung hình OBS sang dọc 1080×1920, tạo cảnh *"Cậu Cả Live"* chạy game, và đưa âm thanh game vào OBS.
-   - Lần đầu: trong OBS vào **Settings → Stream**, dán *Server URL* và *Stream Key* lấy từ TikTok LIVE.
-   - Bấm **🔴 Bắt đầu phát**.
+2. Mở **Cau Ca Live.app**, rồi trong bảng điều khiển bấm **🪟 Mở cửa sổ game**. Game mở trong cửa sổ Chrome dọc 540×960, tự phát tiếng. Chỉ mở **một** cửa sổ game, vì hai bản cùng chạy sẽ tính đôi khách, quà và lượt gọi Claude.
+3. Trong **TikTok LIVE Studio**:
+   - Chọn bố cục **dọc**, rồi **Thêm nguồn → Chụp cửa sổ**, chọn cửa sổ game và kéo phủ kín khung. LIVE Studio không nhận địa chỉ trên máy (`localhost`, `127.0.0.1`) ở nguồn *Liên kết*, nên phải dùng *Chụp cửa sổ*.
+   - Cắt bỏ thanh tiêu đề cửa sổ ở cạnh trên: giữ **⌥ Option** rồi kéo cạnh trên xuống, nếu LIVE Studio hỗ trợ.
+   - Bật **âm thanh máy tính** để người xem nghe nhạc và karaoke.
+   - Bấm **Go LIVE**. Đừng thu nhỏ cửa sổ game xuống Dock; để cửa sổ khác che lên thì được.
 4. Trong lúc live, điều khiển từ bảng điều khiển:
    - Dzô, bốc thăm, pháo hoa, quẩy.
    - Mở trò chơi nhỏ, cho qua bài karaoke.
    - **Gõ câu cho Cậu Cả nói**, thêm bài hát, gửi comment thử.
-   - Bật/tắt Claude MC, đổi model, chỉnh số khách quen…: bấm **Lưu & áp dụng**, game trong OBS cập nhật ngay.
-5. Kết thúc: bấm **⏹ Dừng phát**, rồi nhấn **Ctrl+C** trong cửa sổ Terminal để tắt app.
+   - Bật/tắt Claude MC, đổi model, chỉnh số khách quen…: bấm **Lưu & áp dụng**, cửa sổ game cập nhật ngay.
+5. Kết thúc: dừng live trong LIVE Studio, rồi nhấn **Ctrl+C** trong cửa sổ Terminal để tắt app.
 
-> Dùng **TikTok LIVE Studio** thay OBS? LIVE Studio không nhận địa chỉ trên máy (`localhost`, `127.0.0.1`) ở nguồn *Liên kết*, nên hãy mở game thành một cửa sổ riêng rồi dùng nguồn **Chụp cửa sổ**:
-> ```bash
-> open -na "Google Chrome" --args --app="http://127.0.0.1:8686/?obs=1&auto=1&clean=1&preset=live" --window-size=540,960 --user-data-dir="$HOME/Library/Application Support/CauCaLive/chrome" --autoplay-policy=no-user-gesture-required
-> ```
-> Bật âm thanh máy tính trong LIVE Studio để có tiếng game, và đừng thu nhỏ cửa sổ game. Chỉ chạy **một** bản game (tắt OBS) để không bị tính đôi khách, quà và lượt gọi Claude. Các nút lệnh trên bảng điều khiển vẫn hoạt động như bình thường.
+> Không có Chrome? Cài bằng `brew install --cask google-chrome`. Nếu chưa cài, nút **Mở cửa sổ game** mở game trong trình duyệt mặc định, và cửa sổ đó có thêm thanh địa chỉ.
 
 ### Lệnh khởi động (Terminal, trong thư mục `quan-nhau-cau-ca`)
 
@@ -64,18 +61,17 @@ Có thể kéo `Cau Ca Live.app` vào thư mục Applications hoặc Dock; app t
 | `./start.command` | Chạy app (giống nhấp đúp `Cau Ca Live.app`) |
 | `./start.command --reset-key` | Xoá Claude API key trong Keychain rồi hỏi nhập lại |
 | `./start.command --no-open` | Chạy app nhưng không tự mở trình duyệt |
-| `npm run status` | Xem trạng thái Claude, TikFinity, OBS và game (khi app đang chạy) |
-| `npm run obs:setup` | Tạo hoặc cập nhật cảnh OBS |
-| `npm run obs:start` / `npm run obs:stop` | Bắt đầu / dừng phát trên OBS |
+| `npm run status` | Xem trạng thái Claude, TikTok và cửa sổ game (khi app đang chạy) |
+| `npm run window` | Mở cửa sổ game (giống nút **🪟 Mở cửa sổ game**) |
 | `npm run bridge` | Chỉ chạy cầu nối Claude (cổng 8787), không chạy app |
 
-Cấu hình (OBS, TikFinity, model Claude, khách quen, trò chơi…) được lưu trong file `config.json`. File này chỉ tài khoản của bạn đọc được và không được đưa lên git.
+Cấu hình (tài khoản TikTok, TikFinity, model Claude, khách quen, trò chơi…) được lưu trong file `config.json`. File này chỉ tài khoản của bạn đọc được và không được đưa lên git.
 
 ## 2. Chạy game không cần app
 
 - **Chơi thử**: mở `index.html` bằng Chrome, bấm **"Vào quán chơi thử"**.
 - **Mở qua web** (bắt buộc nếu muốn dùng karaoke YouTube mà không chạy app): bật GitHub Pages trong **Settings → Pages → Deploy from a branch → `main` / root**. Game sẽ ở địa chỉ https://doviettu.github.io/quan-nhau-cau-ca/
-- **Tham số URL** cho OBS / LIVE Studio:
+- **Tham số URL** khi đưa game lên live:
 
   | Tham số | Tác dụng |
   |---|---|
@@ -156,9 +152,9 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 |---|---|
 | App báo chưa có Node.js | Chạy `brew install node`, hoặc cài bản LTS từ nodejs.org |
 | *"Cổng 8686 đang bận"* | App đã chạy ở một cửa sổ Terminal khác; mở http://127.0.0.1:8686/panel hoặc đóng cửa sổ cũ |
-| OBS báo sai mật khẩu hoặc không phản hồi | Bật WebSocket server trong OBS và nhập đúng mật khẩu trên bảng điều khiển |
-| Không đổi được khung hình 1080×1920 | Dừng phát/ghi hình trong OBS rồi bấm **Thiết lập cảnh** lại |
-| Không có tiếng game trên live | Trong mixer của OBS kiểm tra nguồn *"Cậu Cả – Game"* chưa bị tắt tiếng |
+| Khung hình dư một dải phía trên | Đó là thanh tiêu đề cửa sổ Chrome: cắt cạnh trên của nguồn *Chụp cửa sổ* trong LIVE Studio |
+| Không có tiếng game trên live | Bật âm thanh máy tính trong LIVE Studio và cho phép quyền *Ghi màn hình & âm thanh* trong Cài đặt hệ thống của macOS |
+| Bảng điều khiển báo *"Chưa thấy cửa sổ game"* | Bấm **🪟 Mở cửa sổ game**; nếu cửa sổ đã mở thì bấm **🔄 Tải lại game** |
 | Không nhận được comment | Kết nối thẳng: kiểm tra đúng **@tên** và tài khoản đang live (dòng *TikTok Live* trong bảng điều khiển báo lỗi cụ thể). Dùng TikFinity: kiểm tra địa chỉ WebSocket (thử `ws://127.0.0.1:21213/`) |
 | *"Dịch vụ ký kết nối đang giới hạn lượt"* | Gói miễn phí của Euler Stream bị giới hạn; app tự thử lại sau 60 giây. Live thường xuyên thì lấy API key tại eulerstream.com rồi chạy app với biến `EULER_API_KEY`, hoặc dùng TikFinity |
 | YouTube báo lỗi 153 | Chạy game qua app hoặc GitHub Pages, không mở file trực tiếp |
