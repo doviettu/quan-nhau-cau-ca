@@ -83,6 +83,7 @@ Cấu hình (OBS, TikFinity, model Claude, khách quen, trò chơi…) được 
   | `ws=ws://localhost:21213/` | Tự kết nối TikFinity |
   | `clean=1` | Ẩn các nút điều khiển trên màn hình |
   | `preset=live` | Bật cấu hình Live |
+  | `safe=0` | Bỏ lề chừa cho giao diện TikTok (mặc định khi `preset=live` và khung dọc, bảng thông tin được đẩy xuống/lên để tên kênh và ô bình luận của TikTok không che) |
   | `autopilot=1` | Chỉ bật tự động dẫn live |
   | `ai=1` | Bật Claude MC |
 

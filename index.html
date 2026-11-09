@@ -14,6 +14,10 @@
   --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
   --sal:env(safe-area-inset-left,0px);--sar:env(safe-area-inset-right,0px);
 }
+/* chừa chỗ cho giao diện TikTok LIVE phủ lên (tên kênh ở trên, ô bình luận ở dưới) */
+@media (orientation:portrait){
+  body.tiktok-safe{--sat:calc(env(safe-area-inset-top,0px) + 9.5vh);--sab:calc(env(safe-area-inset-bottom,0px) + 11vh)}
+}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden;background:#160d14;color:var(--txt);
   font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
@@ -3190,6 +3194,7 @@ $('#btnLive').onclick = () => start(false, true);
 addEventListener('pointerdown', () => Snd.resume(), { passive: true });
 // tham số URL cho OBS / tự động
 if (params.get('ws')) { $('#wsUrl').value = params.get('ws'); opts.ws = params.get('ws'); }
+if (params.get('safe') === 'tiktok' || (params.get('preset') === 'live' && params.get('safe') !== '0')) document.body.classList.add('tiktok-safe');
 if (params.get('clean') === '1') { opts.clean = true; $('#optClean').checked = true; document.body.classList.add('clean'); }
 if (params.get('auto') === '1' || params.get('demo') === '1') {
   start(params.get('demo') === '1', false);
