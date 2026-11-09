@@ -94,7 +94,21 @@ Nút **"Áp dụng cấu hình Live"** trong ⚙️ của game, hoặc tham số
 - **Trò chơi nhỏ**: tự mở mỗi 3 phút. Đố vui có hơn 130 câu: địa lý, lịch sử, ẩm thực, câu đố mẹo, thành ngữ, khoa học, tính nhanh. Karaoke chốt bài từ 1 xu.
 - **Xiếc đường phố**: khoảng 6 phút một lần có một tiết mục (đổi được trong bảng điều khiển).
 
-## 4. Claude MC và chi phí
+## 4. Cậu Cả dẫn live bằng giọng nói
+
+Cậu Cả nói thành tiếng mọi câu thoại: chào khách, gọi tên người tặng quà, trả lời comment, giới thiệu trò chơi. Tính năng này **bật sẵn** ở cấu hình Live.
+- **Giọng đọc:** app dùng giọng tiếng Việt của macOS qua lệnh `say`, âm thanh ra loa máy. Trong LIVE Studio phải bật **âm thanh máy tính** thì người xem mới nghe được.
+  - Mac chưa có giọng tiếng Việt thì cài giọng **Linh**: *Cài đặt hệ thống → Trợ năng → Nội dung được đọc → Giọng hệ thống → Quản lý giọng → Tiếng Việt*.
+  - Bấm **Thử giọng** trên bảng điều khiển để nghe thử.
+- **Không để quán im lặng:** phòng im quá số giây đã đặt (mặc định 40 giây) thì Cậu Cả tự nói.
+  - Nếu đang bật Claude MC, game nhờ Claude nói trước: gọi tên một khách đang ngồi, hỏi han hoặc gợi ý trò chơi.
+  - Claude không trả lời thì Cậu Cả nói một câu theo tình huống thật của quán: tên khách, bàn đang ngồi, người dẫn đầu, trò đang mở.
+- Trong lúc Cậu Cả nói, nhạc nền tự nhỏ lại.
+- Cậu Cả luôn tự giới thiệu là **MC ảo do AI dẫn**. Trên màn hình có nhãn **AI MC**.
+
+> ⚠️ **Phiên live bị TikTok dừng vì "không có hoạt động gì":** TikTok có thể tự dừng phiên live khi cho rằng không có người dẫn. Giọng Cậu Cả và việc trả lời comment theo thời gian thực giúp phiên live có tương tác thật. Tuy vậy, mình **không xác minh được** TikTok dựa vào đâu để quyết định, và quy định của TikTok yêu cầu chủ kênh chịu trách nhiệm với nội dung do AI tạo ra. Cách chắc chắn nhất là **có bạn ở bên**: bật mic nói chuyện thỉnh thoảng, thêm khung camera nhỏ, và trả lời ngay khi LIVE Studio hỏi bạn còn ở đó không. App **không** giả thao tác của người dẫn để lách TikTok.
+
+## 4b. Claude MC và chi phí
 
 Claude đọc comment, quà, tim và người mới vào, rồi điều khiển Cậu Cả: chào khách, trả lời bình luận, mở sự kiện hoặc trò chơi, mời món nhỏ cho khách.
 

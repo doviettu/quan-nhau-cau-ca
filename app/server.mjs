@@ -6,7 +6,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { exec } from 'node:child_process';
+import { exec, execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
 import { createClaudeHandler, claudeReady } from '../bridge/claude-bridge.mjs';
@@ -18,7 +18,7 @@ const DEFAULTS = {
   port: 8686,
   tikfinityUrl: 'ws://localhost:21213/',
   tiktok: { username: '', on: false },   // kết nối thẳng TikTok LIVE bằng @tên (không cần TikFinity)
-  game: { aiOn: true, aiModel: 'claude-haiku-5-5', aiEvery: 20, aiMax: 180, ytKey: '', kMin: 1, kPrio: 30, kMax: 5, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, autoOn: true, autoLuckyMin: 8, bgmYt: false, bgmQuery: '', bgmVol: 35, circusAuto: true, circusEvery: 6 },
+  game: { aiOn: true, aiModel: 'claude-haiku-5-5', aiEvery: 20, aiMax: 180, ytKey: '', kMin: 1, kPrio: 30, kMax: 5, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, autoOn: true, autoLuckyMin: 8, bgmYt: false, bgmQuery: '', bgmVol: 35, circusAuto: true, circusEvery: 6, mcVoice: true, mcGap: 40 },
 };
 const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
 const merge = (a, b) => { const o = { ...a }; for (const k of Object.keys(b || {})) o[k] = isObj(a[k]) && isObj(b[k]) ? merge(a[k], b[k]) : b[k]; return o; };
@@ -67,6 +67,32 @@ function openGameWindow() {
   return { ok: true, chrome: false, warning: 'Chưa có Google Chrome nên game mở trong trình duyệt mặc định (có thanh địa chỉ). Cài Chrome để có cửa sổ dọc gọn: brew install --cask google-chrome' };
 }
 
+// ---- giọng Cậu Cả: đọc bằng giọng tiếng Việt của macOS (lệnh `say`), tiếng ra loa máy → LIVE Studio thu âm thanh máy tính ----
+let viVoice = null, voiceChecked = false, saying = false; const sayQ = [];
+function checkVoice() {
+  if (process.platform !== 'darwin') { voiceChecked = true; return; }
+  execFile('say', ['-v', '?'], (e, out) => {
+    voiceChecked = true; if (e) return;
+    const line = String(out).split('\n').find(l => /\bvi[_-]VN\b/.test(l));
+    viVoice = line ? line.split(/\s{2,}/)[0].trim() : null;
+  });
+}
+function sayNext() {
+  if (saying || !sayQ.length) return;
+  saying = true; const t = sayQ.shift();
+  execFile('say', ['-v', viVoice, '-r', '185', t], { timeout: 30000 }, () => { saying = false; sayNext(); });
+}
+function speak(text) {
+  if (process.platform !== 'darwin') return { ok: false, error: 'Chỉ đọc bằng giọng máy trên Mac' };
+  if (!viVoice) return { ok: false, error: voiceChecked ? 'Máy chưa có giọng tiếng Việt – cài giọng Linh: Cài đặt hệ thống → Trợ năng → Nội dung được đọc → Giọng hệ thống → Quản lý giọng → Tiếng Việt' : 'Đang kiểm tra giọng đọc' };
+  const t = String(text || '').replace(/[@#*_`<>\[\]{}|\\]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+  if (!t) return { ok: false, error: 'Không có nội dung' };
+  if (sayQ.length >= 2) sayQ.shift();   // đừng dồn: bỏ câu cũ nhất
+  sayQ.push(t); sayNext();
+  return { ok: true, voice: viVoice };
+}
+checkVoice();
+
 // ---- tiện ích HTTP ----
 const sameOrigin = req => { const o = req.headers.origin; return !o || o === BASE || o === `http://localhost:${PORT}`; };
 function json(res, status, obj) { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(obj)); }
@@ -99,6 +125,7 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, {
         claudeReady: claudeReady(), claudeCalls: claude.callsLastHour(), tikfinity: tikProbe.ok, tikfinityUrl: config.tikfinityUrl,
         tiktok: { ...tiktok.status(), on: config.tiktok.on, saved: config.tiktok.username, gameClients: liveWss.clients.size },
+        voice: { mac: process.platform === 'darwin', name: viVoice, checked: voiceChecked, on: config.game.mcVoice !== false },
         game: gameState, gameAge: gameStateAt ? Date.now() - gameStateAt : null, gameClients: controlClients.size,
         gameUrl: gameUrl(), panelUrl: `${BASE}/panel`, config: { game: config.game, tikfinityUrl: config.tikfinityUrl },
       });
@@ -148,6 +175,7 @@ const server = http.createServer(async (req, res) => {
       broadcast({ type: 'config', config: publicConfig() });
       return json(res, 200, { ok: true });
     }
+    if (p === '/api/speak') return json(res, 200, speak(b.text));
     if (p === '/api/window/open') return json(res, 200, openGameWindow());
     json(res, 404, { error: 'Không có' });
   } catch (e) { json(res, 500, { error: String(e.message || e) }); }

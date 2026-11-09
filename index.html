@@ -1364,7 +1364,7 @@ const Snd = {
   },
   resume() { if (this.ctx && this.ctx.state !== 'running') this.ctx.resume(); },
   get t() { return this.ctx ? this.ctx.currentTime : 0; },
-  setMusic(on) { if (this.musicG) this.musicG.gain.setTargetAtTime(on && !this.ducked && !(window.BGM_ON && window.BGM_ON()) ? 0.3 : 0, this.t, 0.1); },
+  setMusic(on) { if (this.musicG) this.musicG.gain.setTargetAtTime(on && !this.ducked && !(window.BGM_ON && window.BGM_ON()) ? (performance.now() < (window.G_VOICE ? window.G_VOICE() : 0) ? 0.09 : 0.3) : 0, this.t, 0.15); },
   duck(on) { this.ducked = on; this.setMusic(opts.music); },
   setSfx(on) { if (this.sfxG) this.sfxG.gain.setTargetAtTime(on ? 0.8 : 0, this.t, 0.05); },
   env(g, t, a, peak, dec) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + dec); },
@@ -2214,7 +2214,8 @@ function updateTraffic(dt, T) {
 /* =====================================================================
    GAME: KHÔNG KHÍ, DOANH THU, SỰ KIỆN
    ===================================================================== */
-const G = { vibe: 0, revenue: 0, partyT: 0, totalLikes: 0, likeStep: 300, nextLikeMs: 300, lastOwnerSay: 0, cdBusy: false, draw: null };
+const G = { vibe: 0, revenue: 0, partyT: 0, totalLikes: 0, likeStep: 300, nextLikeMs: 300, lastOwnerSay: 0, cdBusy: false, draw: null, voiceUntil: 0, mcAsked: 0, fillers: [] };
+window.G_VOICE = () => G.voiceUntil;
 function addVibe(v) { if (G.partyT > 0) return; G.vibe = clamp(G.vibe + v, 0, 100); if (G.vibe >= 100) startParty(); }
 function startParty() {
   G.partyT = 20; partyOn = true; document.body.classList.add('party'); Snd.bpm = 128;
@@ -2231,7 +2232,8 @@ function endParty() {
 }
 function ownerSay(text, force) {
   const t = now(); if (!force && t - G.lastOwnerSay < 3500) return;
-  G.lastOwnerSay = t; owner.say(text, 4); owner.waveT = 1.2;
+  G.lastOwnerSay = t; G.mcAsked = 0; owner.say(text, 4); owner.waveT = 1.2;
+  speakMC(text);
 }
 function tableToast(t, except) {
   t.seats.forEach(s => { if (s.guest && s.guest !== except && s.guest.state === 'sit') s.guest.toast(rand(0, 0.25)); });
@@ -2710,7 +2712,7 @@ for (const [id, key] of [['ytKey', 'ytKey'], ['kMin', 'kMin'], ['kPrio', 'kPrio'
   if (el.type === 'range') el.addEventListener('input', () => { opts[key] = Number(el.value); if (key === 'ytVol') YTK.setVolume(opts.ytVol); else Mic.apply(); });
 }
 bindToggle('optKSuffix', 'kSuffix');
-Object.assign(opts, Object.assign({ bgmYt: false, bgmQuery: '', bgmVol: 35, circusAuto: true, circusEvery: 6 }, opts));
+Object.assign(opts, Object.assign({ bgmYt: false, bgmQuery: '', bgmVol: 35, circusAuto: true, circusEvery: 6, mcVoice: false, mcGap: 40 }, opts));
 bindToggle('optBgmYt', 'bgmYt', () => BGM.tick());
 $('#bgmQuery').value = opts.bgmQuery || ''; $('#bgmQuery').placeholder = 'Từ khoá nhạc nền (mặc định: ' + BGM_DEF_Q + ')';
 $('#bgmQuery').addEventListener('change', e => { opts.bgmQuery = e.target.value.trim(); saveOpts(); if (BGM.playing) BGM.play(); });
@@ -3251,6 +3253,7 @@ Mục tiêu: giữ phòng live vui, ấm áp, nhiều tương tác, để ngư�
 - Trả lời bình luận thú vị hoặc câu hỏi; khi có người bối rối thì nhắc luật ngắn gọn.
 - Gợi ý tương tác đúng lúc: "bàn 5", "bàn riêng", "ghép <tên bạn>", "hát + tên bài" rồi tặng quà để đăng ký karaoke, "xin lên mic", "oẳn tù tì", "xí ngầu", thả tim cho thanh không khí lên 100%.
 - Không khí thấp hoặc vắng thì khuấy động (có thể mở sự kiện); quán đông thì nói ít lại, ưu tiên cảm ơn.
+- Lời của Cậu Cả được đọc thành tiếng trên live: câu ngắn (dưới 25 chữ), tự nhiên như nói chuyện, không dùng ký hiệu lạ. Khi được gọi mà không có sự kiện mới, vẫn nói MỘT câu: gọi tên một khách đang ngồi, hỏi han, hoặc gợi ý một trò (đố vui, xiếc, karaoke, ghép bàn) – đừng để quán im lặng.
 - Sự kiện chung (dzo, boc_tham, phao_hoa, quay) chỉ mở khi có lý do và chỉ khi trạng thái cho biết sự kiện đó đang mở được.
 
 Giọng: thân thiện, hài hước kiểu quán vỉa hè, tiếng Việt có dấu, câu ngắn dưới 110 ký tự, không lặp lại những câu vừa nói. Mỗi lượt chọn 0–3 hành động; không có gì đáng nói thì không gọi công cụ nào.
@@ -3322,15 +3325,21 @@ async function aiClient() {
 }
 function aiLog(s) { AI.log.unshift(`${new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${s}`); AI.log.length = Math.min(AI.log.length, 8); renderAI(); }
 function speakMC(text) {
-  if (!opts.aiTts || !('speechSynthesis' in window)) return;
-  const u = new SpeechSynthesisUtterance(trunc(text, 120)); u.lang = 'vi-VN'; if (ttsVoice) u.voice = ttsVoice; u.rate = 1.05; speechSynthesis.speak(u);
+  if (!(opts.mcVoice || opts.aiTts)) return;
+  const t = trunc(String(text || '').replace(/[@#*_`]/g, ' ').replace(/\s+/g, ' ').trim(), 160); if (!t) return;
+  const dur = 600 + t.length * 75; G.voiceUntil = Math.max(G.voiceUntil || 0, now()) + dur;
+  Snd.setMusic(opts.music); BGM.setVolume(Math.round(Number(opts.bgmVol ?? 35) * 0.35));
+  clearTimeout(G.voiceTimer); G.voiceTimer = setTimeout(() => { Snd.setMusic(opts.music); BGM.setVolume(Number(opts.bgmVol ?? 35)); }, G.voiceUntil - now() + 100);
+  const browserSay = () => { if (!('speechSynthesis' in window)) return; if (!ttsVoice) initTTS(); if (speechSynthesis.speaking && speechSynthesis.pending) speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'vi-VN'; if (ttsVoice) u.voice = ttsVoice; u.rate = 1.05; speechSynthesis.speak(u); };
+  if (APP && APP.on) fetch('/api/speak', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: t }) }).then(r => r.json()).then(j => { G.voiceErr = j.ok ? '' : j.error; if (!j.ok) browserSay(); }).catch(browserSay);
+  else browserSay();
 }
 function aiExec(name, inp) {
   inp = inp || {};
   if (name === 'noi') {
     const txt = clean(inp.text, 120); if (!txt) return;
     const to = clean(inp.to, 24); const line = to ? `@${to} ${txt}` : txt;
-    ownerSay(trunc(line, 120), true); feed(`🤖 <b>Cậu Cả</b>: ${esc(line)}`, 'mc'); speakMC(txt);
+    ownerSay(trunc(line, 120), true); feed(`🤖 <b>Cậu Cả</b>: ${esc(line)}`, 'mc');
     AI.said.push(txt); if (AI.said.length > 8) AI.said.shift(); aiLog('💬 ' + line);
   } else if (name === 'su_kien') {
     if (MG_INFO[inp.loai]) { if (!MG.cur && now() - MG.last > 60000 && MG.start(inp.loai, 'ai')) aiLog('🎯 Mở trò: ' + inp.loai); return; }
@@ -3389,6 +3398,38 @@ async function aiTick() {
     lines.length && AI.buf.unshift(...lines.slice(-10));
   } finally { AI.busy = false; renderAI(); }
 }
+// MC tự dẫn: phòng im quá lâu thì nhờ Claude nói; Claude không trả lời thì Cậu Cả nói câu theo tình huống thật của quán
+function mcFiller() {
+  const t = now(), d = new Date(), rg = realGuests();
+  const recent = rg.filter(g => t - g.lastActive < 150000 && g.seat);
+  const L = [];
+  if (recent.length) {
+    const g = pick(recent), n = g.seat.table.n;
+    L.push(`${g.name} ơi, bàn ${n} vui không? Comment cho Cậu Cả nghe với!`, `Cảm ơn ${g.name} đang ngồi bàn ${n}! Rủ bạn bè vào ngồi chung bàn nha!`, `${g.name} uống trà đá hay gì nè? Comment "trà đá" là có liền!`);
+  }
+  const top = rankList.find(g => !g.npc);
+  if (top) L.push(`Cảm ơn ${top.name} đang dẫn đầu bảng xếp hạng của quán hôm nay!`);
+  if (!Circus.cur && Circus.ready()) L.push('Muốn xem múa lân, phun lửa thì comment "xiếc" nha cả nhà!');
+  if (!MG.cur) L.push('Ai muốn chơi đố vui với Cậu Cả thì comment "đố vui" nè!');
+  L.push('Ai mới vào quán thì comment bất kỳ là có ghế ngồi liền nha!', 'Cả nhà thả tim cho thanh không khí đầy để cả quán cùng quẩy nào!',
+    'Muốn hát karaoke thì comment "hát" cộng tên bài nha!', 'Rủ bạn vào quán rồi comment "ghép" cộng tên bạn để ngồi chung bàn!',
+    `Bây giờ là ${d.getHours()} giờ ${String(d.getMinutes()).padStart(2, '0')}, quán Cậu Cả vẫn mở cửa đón cả nhà!`, 'Nhớ bấm theo dõi để lần sau quán mở là biết liền nha!',
+    'Cậu Cả là MC ảo do AI dẫn, cả nhà cứ comment thoải mái, Cậu Cả đọc hết!', 'Đồ ăn thức uống trong quán là ảo thôi nha, vui là chính!');
+  const fresh = L.filter(x => !G.fillers.includes(x)); const line = pick(fresh.length ? fresh : L);
+  G.fillers.push(line); if (G.fillers.length > 6) G.fillers.shift();
+  return line;
+}
+function updateMC() {
+  if (!opts.mcVoice || !gameStarted) return;
+  const gap = clamp(Number(opts.mcGap) || 40, 20, 180) * 1000, t = now();
+  if (t - G.lastOwnerSay < gap) return;
+  if (AI.on && !AI.err && t > AI.backoff) {
+    if (!G.mcAsked) { G.mcAsked = t; AI.acc = 1e9; AI.quiet = 1e9; return; }   // nhờ Claude nói trước
+    if (t - G.mcAsked < 15000) return;
+  }
+  G.mcAsked = 0; const line = mcFiller(); ownerSay(line, true); feed(`🍺 <b>Cậu Cả</b>: ${esc(line)}`, 'mc');
+}
+setInterval(updateMC, 1000);
 function updateAI(dt) {
   if (!AI.on) return;
   AI.acc += dt; AI.quiet += dt;
@@ -3429,7 +3470,7 @@ bindToggle('optBots', 'botsOn', on => { if (!on) botList().forEach((b, i) => set
 bindToggle('optMgAuto', 'mgAuto', () => { MG.autoAcc = 0; });
 settings.addEventListener('click', e => { const b = e.target.closest('button[data-mg]'); if (!b) return; if (b.dataset.mg === 'stop') MG.stop('⏹ Chủ quán dừng trò chơi'); else if (!MG.start(b.dataset.mg, 'host')) feed('Đang có trò chơi chạy', 'sys'); closeSettings(); });
 function applyLivePreset() {
-  Object.assign(opts, { aiModel: 'claude-haiku-5-5', aiEvery: 20, aiMax: 180, aiTts: false, autoOn: true, autoLuckyMin: 8, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, kMin: 1, kPrio: 30, kMax: 5, music: true, sfx: true, nums: true });
+  Object.assign(opts, { aiModel: 'claude-haiku-5-5', aiEvery: 20, aiMax: 180, aiTts: false, mcVoice: true, mcGap: 40, autoOn: true, autoLuckyMin: 8, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, kMin: 1, kPrio: 30, kMax: 5, music: true, sfx: true, nums: true });
   saveOpts();
   for (const id of ['aiModel', 'aiEvery', 'aiMax', 'autoLuckyMin', 'botMin', 'mgEvery', 'kMin', 'kPrio', 'kMax']) { const el = $('#' + id); if (el) el.value = opts[id]; }
   for (const [id, k] of [['optAiTts', 'aiTts'], ['optAuto', 'autoOn'], ['optBots', 'botsOn'], ['optMgAuto', 'mgAuto'], ['optMusic', 'music'], ['optSfx', 'sfx'], ['optNums', 'nums']]) $('#' + id).checked = !!opts[k];
@@ -3568,7 +3609,7 @@ if (params.get('auto') === '1' || params.get('demo') === '1') {
    - Claude gọi qua đường /mc của app (key nằm trong Keychain, không vào trình duyệt)
    - bản chạy trong OBS (?obs=1) nhận lệnh từ bảng điều khiển và gửi trạng thái về
    ===================================================================== */
-const APP = { on: false, ctl: params.get('obs') === '1' };
+var APP = { on: false, ctl: params.get('obs') === '1' };   // var: speakMC có thể chạy trước dòng này
 function syncSettingsUI() {
   for (const id of ['aiModel', 'aiEvery', 'aiMax', 'aiBridge', 'ytKey', 'kMin', 'kPrio', 'kMax', 'botMin', 'mgEvery', 'autoLuckyMin']) { const el = $('#' + id); if (el && opts[id] !== undefined) el.value = opts[id]; }
   for (const [id, k] of [['optBots', 'botsOn'], ['optMgAuto', 'mgAuto'], ['optAuto', 'autoOn'], ['optAiTts', 'aiTts'], ['optBgmYt', 'bgmYt']]) { const el = $('#' + id); if (el) el.checked = !!opts[k]; }
@@ -3577,7 +3618,7 @@ function syncSettingsUI() {
 function applyAppConfig(c) {
   if (!c) return;
   const g = c.game || {};
-  for (const k of ['aiModel', 'aiEvery', 'aiMax', 'kMin', 'kPrio', 'kMax', 'botsOn', 'botMin', 'mgAuto', 'mgEvery', 'autoOn', 'autoLuckyMin', 'bgmYt', 'bgmQuery', 'bgmVol', 'circusAuto', 'circusEvery']) if (g[k] !== undefined) opts[k] = g[k];
+  for (const k of ['aiModel', 'aiEvery', 'aiMax', 'kMin', 'kPrio', 'kMax', 'botsOn', 'botMin', 'mgAuto', 'mgEvery', 'autoOn', 'autoLuckyMin', 'bgmYt', 'bgmQuery', 'bgmVol', 'circusAuto', 'circusEvery', 'mcVoice', 'mcGap']) if (g[k] !== undefined) opts[k] = g[k];
   BGM.setVolume(Number(opts.bgmVol ?? 35)); setTimeout(() => BGM.tick(), 50);
   // key YouTube: app có key thì dùng key app; app chưa có mà game đã có (dán trong ⚙️ game) thì gửi lên app, không xoá
   if (g.ytKey) { if (g.ytKey !== opts.ytKey) { opts.ytKey = g.ytKey; karaoke.queue.forEach(it => { if (it.kind === 'song' && !it.link && it.vstatus !== 'ok') resolveVideo(it); }); } }
@@ -3596,7 +3637,7 @@ function appCmd(c) {
     case 'circus': if (c.name === 'stop') Circus.stop(); else if (!Circus.cur) Circus.start(c.name, 'host'); break;
     case 'mg': if (c.name === 'stop') MG.stop('⏹ Chủ quán dừng trò chơi'); else if (MG_INFO[c.name] && !MG.start(c.name, 'host')) feed('Đang có trò chơi chạy', 'sys'); break;
     case 'skip': if (karaoke.cur) { feed('⏭️ Chủ quán cho qua bài', 'sys'); endSing(); } break;
-    case 'say': if (c.text) { const t = trunc(String(c.text), 120); ownerSay(t, true); feed(`🍺 <b>Cậu Cả</b>: ${esc(t)}`, 'mc'); speakMC(t); } break;
+    case 'say': if (c.text) { const t = trunc(String(c.text), 120); ownerSay(t, true); feed(`🍺 <b>Cậu Cả</b>: ${esc(t)}`, 'mc'); } break;
     case 'song': if (c.text) { $('#kAdd').value = String(c.text).slice(0, 200); hostAddSong(); } break;
     case 'ai': setAI(!!c.on); break;
     case 'demo': setDemo(!!c.on); break;
@@ -3618,6 +3659,7 @@ function appPostState() {
     mg: MG.cur ? MG.cur.title : null,
     circus: Circus.cur ? Circus.cur.A.name : (Circus.ready() ? null : 'nghỉ ' + Circus.wait() + 's'),
     bgm: opts.bgmYt ? (BGM.playing ? BGM.title : (BGM.err ? '⚠️ ' + BGM.err : 'chờ')) : null,
+    mc: { voice: !!opts.mcVoice, err: G.voiceErr || '', quiet: Math.round((now() - G.lastOwnerSay) / 1000) },
     ai: { on: AI.on, calls: AI.calls.filter(t => now() - t < 3600000).length, cost: +AI.cost.toFixed(4), err: AI.err, last: AI.log[0] || '' },
   };
   fetch('/api/state', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(st) }).catch(() => { });
