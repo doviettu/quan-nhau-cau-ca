@@ -20,17 +20,17 @@ for a in "$@"; do
   else ARGS+=("$a"); fi
 done
 
-# 1) Node.js 18+
+# 1) Node.js 20+
 if ! command -v node >/dev/null 2>&1; then
-  echo "❌ Chưa có Node.js (cần bản 18 trở lên)."
+  echo "❌ Chưa có Node.js (cần bản 20 trở lên)."
   echo "   Cài bằng:  brew install node   – hoặc tải bản LTS tại https://nodejs.org"
   open "https://nodejs.org/" 2>/dev/null
   pause_exit 1
 fi
-if [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 18 ]; then echo "❌ Node.js $(node -v) quá cũ, cần 18 trở lên."; pause_exit 1; fi
+if [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 20 ]; then echo "❌ Node.js $(node -v) quá cũ, cần 20 trở lên. Cập nhật: brew upgrade node"; pause_exit 1; fi
 
 # 2) Thư viện (lần đầu hoặc khi có bản cập nhật)
-if [ ! -d node_modules/@anthropic-ai/sdk ] || [ ! -d node_modules/ws ] || [ package-lock.json -nt node_modules/.package-lock.json ]; then
+if [ ! -d node_modules/@anthropic-ai/sdk ] || [ ! -d node_modules/ws ] || [ ! -d node_modules/tiktok-live-connector ] || [ package-lock.json -nt node_modules/.package-lock.json ]; then
   echo "📦 Đang cài thư viện (cần mạng)…"
   npm ci --no-audit --no-fund || npm install --no-audit --no-fund || { echo "❌ Cài thư viện thất bại."; pause_exit 1; }
 fi
