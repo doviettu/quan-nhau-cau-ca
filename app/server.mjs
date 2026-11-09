@@ -113,6 +113,27 @@ const server = http.createServer(async (req, res) => {
       saveConfig(); broadcast({ type: 'config', config: publicConfig() });
       return json(res, 200, { ok: true });
     }
+    if (p === '/api/yt/test') {
+      // thử tìm một bài bằng key đã lưu, giống cách game tìm (gửi kèm Referer của trang game)
+      const key = String(config.game.ytKey || '').trim();
+      if (!key) return json(res, 200, { ok: false, error: 'Chưa có YouTube Data API key – dán key vào ô bên dưới rồi bấm Lưu' });
+      const q = String(b.q || 'Diễm xưa karaoke').slice(0, 100);
+      const u = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&safeSearch=moderate&maxResults=3&q=${encodeURIComponent(q)}&key=${encodeURIComponent(key)}`;
+      let r, j;
+      try { r = await fetch(u, { headers: { referer: BASE + '/' }, signal: AbortSignal.timeout(10000) }); j = await r.json(); }
+      catch (e) { return json(res, 200, { ok: false, error: 'Không gọi được Google: ' + (e.message || e) }); }
+      if (!r.ok) {
+        const msg = String(j?.error?.message || 'HTTP ' + r.status), reason = String(j?.error?.errors?.[0]?.reason || j?.error?.status || '');
+        let hint = '';
+        if (/API key not valid|keyInvalid/i.test(msg + reason)) hint = 'Key sai – chép lại key trong Google Cloud Console (APIs & Services → Credentials).';
+        else if (/has not been used|is disabled|accessNotConfigured|SERVICE_DISABLED/i.test(msg + reason)) hint = 'Chưa bật YouTube Data API v3 cho project của key – vào Google Cloud Console → Library → YouTube Data API v3 → Enable.';
+        else if (/referer|referrer/i.test(msg)) hint = `Key đang giới hạn trang web – thêm ${BASE}/* vào Website restrictions của key.`;
+        else if (/quota/i.test(msg + reason)) hint = 'Hết hạn mức miễn phí hôm nay (~100 lượt tìm) – mai dùng tiếp, hoặc dán link YouTube trực tiếp.';
+        return json(res, 200, { ok: false, error: msg, hint });
+      }
+      const items = (j.items || []).map(x => ({ id: x.id?.videoId, title: String(x.snippet?.title || '').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&') })).filter(x => x.id);
+      return json(res, 200, { ok: true, q, items });
+    }
     if (p === '/api/tiktok/connect') {
       const u = normalizeUser(b.username);
       if (!validUser(u)) throw new Error('Nhập đúng tên TikTok, ví dụ @tenban');

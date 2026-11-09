@@ -2633,7 +2633,7 @@ $('#bKara').onclick = () => { Snd.resume(); openSettings(); setTimeout(() => $('
 Object.assign(opts, Object.assign({ kMin: 1, kPrio: 30, kMax: 5, kSuffix: true, ytKey: '', ytVol: 100, micMon: false, micVol: 100 }, opts));
 for (const [id, key] of [['ytKey', 'ytKey'], ['kMin', 'kMin'], ['kPrio', 'kPrio'], ['kMax', 'kMax'], ['ytVol', 'ytVol'], ['micVol', 'micVol']]) {
   const el = $('#' + id); el.value = opts[key];
-  el.addEventListener('change', () => { opts[key] = el.type === 'text' ? el.value.trim() : Number(el.value); saveOpts(); if (key === 'ytVol') YTK.setVolume(opts.ytVol); if (key === 'micVol') Mic.apply(); if (key === 'ytKey') karaoke.queue.forEach(it => { if (it.kind === 'song' && !it.link && it.vstatus !== 'ok') resolveVideo(it); }); refreshKQ(); });
+  el.addEventListener('change', () => { opts[key] = el.type === 'text' ? el.value.trim() : Number(el.value); saveOpts(); if (key === 'ytVol') YTK.setVolume(opts.ytVol); if (key === 'micVol') Mic.apply(); if (key === 'ytKey') { appSaveYtKey(); } if (key === 'ytKey') karaoke.queue.forEach(it => { if (it.kind === 'song' && !it.link && it.vstatus !== 'ok') resolveVideo(it); }); refreshKQ(); });
   if (el.type === 'range') el.addEventListener('input', () => { opts[key] = Number(el.value); if (key === 'ytVol') YTK.setVolume(opts.ytVol); else Mic.apply(); });
 }
 bindToggle('optKSuffix', 'kSuffix');
@@ -3215,7 +3215,10 @@ function syncSettingsUI() {
 function applyAppConfig(c) {
   if (!c) return;
   const g = c.game || {};
-  for (const k of ['aiModel', 'aiEvery', 'aiMax', 'ytKey', 'kMin', 'kPrio', 'kMax', 'botsOn', 'botMin', 'mgAuto', 'mgEvery', 'autoOn', 'autoLuckyMin']) if (g[k] !== undefined) opts[k] = g[k];
+  for (const k of ['aiModel', 'aiEvery', 'aiMax', 'kMin', 'kPrio', 'kMax', 'botsOn', 'botMin', 'mgAuto', 'mgEvery', 'autoOn', 'autoLuckyMin']) if (g[k] !== undefined) opts[k] = g[k];
+  // key YouTube: app có key thì dùng key app; app chưa có mà game đã có (dán trong ⚙️ game) thì gửi lên app, không xoá
+  if (g.ytKey) { if (g.ytKey !== opts.ytKey) { opts.ytKey = g.ytKey; karaoke.queue.forEach(it => { if (it.kind === 'song' && !it.link && it.vstatus !== 'ok') resolveVideo(it); }); } }
+  else if (opts.ytKey && APP.on) appSaveYtKey();
   if (c.claudeReady) opts.aiBridge = '/mc';
   saveOpts(); syncSettingsUI(); renderAI();
   if (!opts.botsOn) botList().forEach(b => !b.leaving && b.leave());
@@ -3236,6 +3239,10 @@ function appCmd(c) {
     case 'config': applyAppConfig(c.config); break;
     case 'reload': location.reload(); break;
   }
+}
+function appSaveYtKey() {
+  if (!APP.on) return;
+  fetch('/api/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ game: { ytKey: String(opts.ytKey || '').trim() } }) }).catch(() => { });
 }
 function appPostState() {
   const st = {
