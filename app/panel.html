@@ -113,6 +113,8 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
     <div class="row"><label><input type="checkbox" id="aiOn"> Tự bật Claude MC khi mở game</label></div>
     <div class="row"><label>Nhịp Claude (giây)</label><input type="number" id="aiEvery" min="8" max="120"><label>Tối đa lượt/giờ</label><input type="number" id="aiMax" min="10" max="1000"></div>
     <div class="row"><label>YouTube Data API key</label><input type="password" id="ytKey" placeholder="(tuỳ chọn – để tự tìm bài)" autocomplete="off"></div>
+    <div class="row"><input type="text" id="ytQ" value="Diễm xưa" placeholder="Tên bài để thử" style="flex:2"><button id="bYtTest">🔎 Kiểm tra key</button><button id="bYtPlay">🎤 Phát thử</button></div>
+    <div class="mut" id="ytResult"></div>
     <div class="row"><label>Quà tối thiểu chốt bài (xu)</label><input type="number" id="kMin" min="0"><label>Chen hàng (xu)</label><input type="number" id="kPrio" min="1"></div>
     <div class="row"><label><input type="checkbox" id="botsOn"> Khách quen 🏠, tối thiểu</label><input type="number" id="botMin" min="0" max="50"><label>khách</label></div>
     <div class="row"><label><input type="checkbox" id="mgAuto"> Trò chơi nhỏ mỗi</label><input type="number" id="mgEvery" min="1" max="30"><label>phút</label></div>
@@ -194,9 +196,19 @@ $('#bSong').onclick = () => sendText('songText', 'song'); $('#songText').onkeydo
 $('#bTest').onclick = () => sendText('testText', 'chat'); $('#testText').onkeydown = e => e.key === 'Enter' && sendText('testText', 'chat');
 $('#bSaveCfg').onclick = async () => {
   const n = id => Number($('#' + id).value);
-  const game = { aiModel: $('#aiModel').value, aiOn: $('#aiOn').checked, aiEvery: n('aiEvery'), aiMax: n('aiMax'), ytKey: $('#ytKey').value.trim(), kMin: n('kMin'), kPrio: n('kPrio'), botsOn: $('#botsOn').checked, botMin: n('botMin'), mgAuto: $('#mgAuto').checked, mgEvery: n('mgEvery'), autoOn: $('#autoOn').checked, autoLuckyMin: n('autoLuckyMin') };
-  try { await post('/api/config', { game, tikfinityUrl: $('#tikUrl').value.trim() }); toast('💾 Đã lưu – game trong OBS cập nhật ngay'); } catch (e) { toast('❌ ' + e.message); }
+  const game = { aiModel: $('#aiModel').value, aiOn: $('#aiOn').checked, aiEvery: n('aiEvery'), aiMax: n('aiMax'), kMin: n('kMin'), kPrio: n('kPrio'), botsOn: $('#botsOn').checked, botMin: n('botMin'), mgAuto: $('#mgAuto').checked, mgEvery: n('mgEvery'), autoOn: $('#autoOn').checked, autoLuckyMin: n('autoLuckyMin') };
+  if ($('#ytKey').value.trim()) game.ytKey = $('#ytKey').value.trim();   // ô trống = giữ key đang có
+  try { await post('/api/config', { game, tikfinityUrl: $('#tikUrl').value.trim() }); toast('💾 Đã lưu – game cập nhật ngay'); } catch (e) { toast('❌ ' + e.message); }
 };
+$('#bYtTest').onclick = async () => {
+  const k = $('#ytKey').value.trim(); $('#ytResult').textContent = '⏳ Đang thử tìm trên YouTube…';
+  try {
+    if (k) await post('/api/config', { game: { ytKey: k } });
+    const r = await post('/api/yt/test', { q: ($('#ytQ').value.trim() || 'Diễm xưa') + ' karaoke' });
+    $('#ytResult').innerHTML = r.ok ? `✅ Key dùng được – tìm thấy ${r.items.length} bài:<br>` + r.items.map(x => '• ' + esc(x.title)).join('<br>') : `❌ ${esc(r.error)}` + (r.hint ? `<br>👉 ${esc(r.hint)}` : '');
+  } catch (e) { $('#ytResult').textContent = '❌ ' + e.message; }
+};
+$('#bYtPlay').onclick = () => { const q = $('#ytQ').value.trim() || 'Diễm xưa'; cmd({ type: 'song', text: q }, `🎤 Đã thêm “${q}” vào hàng chờ karaoke – xem màn hình game`); };
 </script>
 </body>
 </html>
