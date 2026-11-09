@@ -1,0 +1,11 @@
+{
+  "name": "cau-ca-claude-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cầu nối Claude cho game Quán nhậu vỉa hè Cậu Cả: giữ API key trên máy, game gọi qua localhost",
+  "type": "module",
+  "main": "claude-bridge.mjs",
+  "scripts": { "start": "node claude-bridge.mjs" },
+  "dependencies": { "@anthropic-ai/sdk": "1.3.0" },
+  "engines": { "node": ">=18" }
+}
