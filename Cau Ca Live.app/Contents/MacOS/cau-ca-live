@@ -1,0 +1,12 @@
+#!/bin/bash
+# Mở Terminal chạy start.command (xem nhật ký, dừng bằng Ctrl+C)
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+if [ ! -f "$ROOT/start.command" ]; then   # app đã được kéo vào /Applications
+  SAVED="$HOME/Library/Application Support/CauCaLive/root"
+  [ -f "$SAVED" ] && ROOT="$(cat "$SAVED")"
+fi
+if [ ! -f "$ROOT/start.command" ]; then
+  osascript -e 'display alert "Cậu Cả Live" message "Không tìm thấy thư mục quan-nhau-cau-ca. Hãy mở file start.command trong thư mục đó một lần, sau đó app sẽ tự nhớ."'
+  exit 1
+fi
+open -a Terminal "$ROOT/start.command"

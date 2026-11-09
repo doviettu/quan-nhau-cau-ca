@@ -3151,6 +3151,65 @@ if (params.get('auto') === '1' || params.get('demo') === '1') {
   start(params.get('demo') === '1', false);
   if (params.get('ws')) connectWS(params.get('ws'));
 }
+
+/* =====================================================================
+   CHẾ ĐỘ APP TRÊN MAC: game do app "Cậu Cả Live" phục vụ (http://127.0.0.1:8686)
+   - nhận cấu hình (model, khách quen, trò chơi, YouTube key…) từ app
+   - Claude gọi qua đường /mc của app (key nằm trong Keychain, không vào trình duyệt)
+   - bản chạy trong OBS (?obs=1) nhận lệnh từ bảng điều khiển và gửi trạng thái về
+   ===================================================================== */
+const APP = { on: false, ctl: params.get('obs') === '1' };
+function syncSettingsUI() {
+  for (const id of ['aiModel', 'aiEvery', 'aiMax', 'aiBridge', 'ytKey', 'kMin', 'kPrio', 'kMax', 'botMin', 'mgEvery', 'autoLuckyMin']) { const el = $('#' + id); if (el && opts[id] !== undefined) el.value = opts[id]; }
+  for (const [id, k] of [['optBots', 'botsOn'], ['optMgAuto', 'mgAuto'], ['optAuto', 'autoOn'], ['optAiTts', 'aiTts']]) { const el = $('#' + id); if (el) el.checked = !!opts[k]; }
+}
+function applyAppConfig(c) {
+  if (!c) return;
+  const g = c.game || {};
+  for (const k of ['aiModel', 'aiEvery', 'aiMax', 'ytKey', 'kMin', 'kPrio', 'kMax', 'botsOn', 'botMin', 'mgAuto', 'mgEvery', 'autoOn', 'autoLuckyMin']) if (g[k] !== undefined) opts[k] = g[k];
+  if (c.claudeReady) opts.aiBridge = '/mc';
+  saveOpts(); syncSettingsUI(); renderAI();
+  if (!opts.botsOn) botList().forEach(b => !b.leaving && b.leave());
+  if (opts.autoOn) keepAwake(true);
+  if (APP.ctl && c.tikfinityUrl && c.tikfinityUrl !== opts.ws) { opts.ws = c.tikfinityUrl; $('#wsUrl').value = c.tikfinityUrl; saveOpts(); connectWS(c.tikfinityUrl); }
+  if (gameStarted) { if (g.aiOn && c.claudeReady && !AI.on) setAI(true); else if (g.aiOn === false && AI.on) setAI(false); }
+}
+function appCmd(c) {
+  switch (c && c.type) {
+    case 'event': if (['dzo', 'lucky', 'fire', 'party', 'clearDish', 'reset'].includes(c.name)) runEvent(c.name); break;
+    case 'mg': if (c.name === 'stop') MG.stop('⏹ Chủ quán dừng trò chơi'); else if (MG_INFO[c.name] && !MG.start(c.name, 'host')) feed('Đang có trò chơi chạy', 'sys'); break;
+    case 'skip': if (karaoke.cur) { feed('⏭️ Chủ quán cho qua bài', 'sys'); endSing(); } break;
+    case 'say': if (c.text) { const t = trunc(String(c.text), 120); ownerSay(t, true); feed(`🍺 <b>Cậu Cả</b>: ${esc(t)}`, 'mc'); speakMC(t); } break;
+    case 'song': if (c.text) { $('#kAdd').value = String(c.text).slice(0, 200); hostAddSong(); } break;
+    case 'ai': setAI(!!c.on); break;
+    case 'demo': setDemo(!!c.on); break;
+    case 'chat': if (c.text) handle('chat', { uid: 'host-test', name: trunc(String(c.name || 'Khách Thử'), 24), text: String(c.text).slice(0, 200) }); break;
+    case 'config': applyAppConfig(c.config); break;
+    case 'reload': location.reload(); break;
+  }
+}
+function appPostState() {
+  const st = {
+    t: Date.now(), live: wsConnected, demo: demoOn, real: realGuests().length, bots: botList().length,
+    seats: `${seatedCount()}/${seats.length}`, vibe: Math.round(G.partyT > 0 ? 100 : G.vibe), party: G.partyT > 0,
+    revenue: G.revenue, likes: G.totalLikes, top: rankList.slice(0, 3).map(g => ({ name: g.name, points: g.points })),
+    karaoke: { cur: karaoke.cur ? singerName(karaoke.cur) + (karaoke.cur.title ? ' – ' + karaoke.cur.title : ' (hát mộc)') : null, queue: karaoke.queue.length, pending: karaoke.pending.size },
+    mg: MG.cur ? MG.cur.title : null,
+    ai: { on: AI.on, calls: AI.calls.filter(t => now() - t < 3600000).length, cost: +AI.cost.toFixed(4), err: AI.err, last: AI.log[0] || '' },
+  };
+  fetch('/api/state', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(st) }).catch(() => { });
+}
+async function appInit() {
+  if (!/^https?:$/.test(location.protocol)) return;
+  let c; try { const r = await fetch('/api/config', { cache: 'no-store' }); if (!r.ok) return; c = await r.json(); } catch { return; }
+  if (!c || !c.game) return;
+  APP.on = true; applyAppConfig(c);
+  if (!APP.ctl) return;
+  const es = new EventSource('/api/control');
+  es.onmessage = e => { try { appCmd(JSON.parse(e.data)); } catch (err) { console.warn('lệnh lỗi', err); } };
+  setInterval(appPostState, 2000); appPostState();
+}
+appInit();
 </script>
 </body>
 </html>

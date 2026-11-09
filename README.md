@@ -2,112 +2,123 @@
 
 Game web 3D tương tác cho **TikTok Live**. Người xem comment, thả tim, tặng quà để vào quán, chọn bàn, gọi món, hát karaoke và chơi trò nhỏ. Cậu Cả (chủ quán) có thể do **Claude** điều khiển để tự dẫn live.
 
-Toàn bộ game nằm trong **một file `index.html`**: không cần cài đặt hay đăng nhập, không có quảng cáo hay thanh toán.
+Repo gồm:
+
+| Thành phần | Vai trò |
+|---|---|
+| `index.html` | Toàn bộ game (Three.js qua CDN, âm thanh tạo bằng Web Audio) |
+| `Cau Ca Live.app`, `start.command` | App khởi động trên Mac |
+| `app/` | Máy chủ cục bộ: chạy game, cầu nối Claude, bảng điều khiển, điều khiển OBS |
+| `bridge/` | Cầu nối Claude dùng riêng, khi không chạy app |
 
 ---
 
-## 0. Tải về máy
+## 1. Chạy bằng app trên Mac (khuyên dùng)
 
-```bash
-git clone https://github.com/doviettu/quan-nhau-cau-ca.git
-cd quan-nhau-cau-ca
-```
+### Lần đầu
+1. **Cài Node.js 18 trở lên**: `brew install node`, hoặc tải bản LTS tại https://nodejs.org
+2. **Tải repo về máy**:
+   ```bash
+   cd ~
+   git clone https://github.com/doviettu/quan-nhau-cau-ca.git
+   ```
+3. Mở Finder → thư mục `quan-nhau-cau-ca` → nhấp đúp **`Cau Ca Live.app`**.
+   - Nếu macOS báo *"không thể mở vì không xác định được nhà phát triển"*: chuột phải vào app → **Open** → **Open**. Chỉ cần làm một lần.
+   - Nếu bạn tải repo bằng file ZIP và app vẫn không mở được, chạy lệnh này trong Terminal:
+     ```bash
+     xattr -dr com.apple.quarantine ~/quan-nhau-cau-ca
+     ```
+4. Cửa sổ Terminal mở ra, tự cài thư viện, rồi hỏi **Claude API key** (tạo tại console.anthropic.com → API Keys).
+   - Key được lưu vào **Keychain** của Mac nên chỉ phải nhập một lần.
+   - Muốn chạy không có Claude thì nhấn Enter để bỏ qua; Cậu Cả sẽ nói theo kịch bản có sẵn.
+5. **Bảng điều khiển** tự mở trong trình duyệt tại http://127.0.0.1:8686/panel
 
-Hoặc trên GitHub bấm **Code → Download ZIP** rồi giải nén.
+Có thể kéo `Cau Ca Live.app` vào thư mục Applications hoặc Dock; app tự nhớ vị trí thư mục repo.
 
-## 1. Chạy thử nhanh
+### Mỗi buổi live
+1. Mở **TikFinity**, kết nối với tài khoản TikTok đang live (để game nhận comment, tim, quà).
+2. Mở **OBS** (bản 28 trở lên). Lần đầu: vào **Tools → WebSocket Server Settings**, bật **Enable WebSocket server**, ghi lại mật khẩu.
+3. Mở **Cau Ca Live.app**. Trong bảng điều khiển:
+   - Nhập mật khẩu OBS rồi bấm **🎬 Thiết lập cảnh OBS**. App tự chuyển khung hình OBS sang dọc 1080×1920, tạo cảnh *"Cậu Cả Live"* chạy game, và đưa âm thanh game vào OBS.
+   - Lần đầu: trong OBS vào **Settings → Stream**, dán *Server URL* và *Stream Key* lấy từ TikTok LIVE.
+   - Bấm **🔴 Bắt đầu phát**.
+4. Trong lúc live, điều khiển từ bảng điều khiển:
+   - Dzô, bốc thăm, pháo hoa, quẩy.
+   - Mở trò chơi nhỏ, cho qua bài karaoke.
+   - **Gõ câu cho Cậu Cả nói**, thêm bài hát, gửi comment thử.
+   - Bật/tắt Claude MC, đổi model, chỉnh số khách quen…: bấm **Lưu & áp dụng**, game trong OBS cập nhật ngay.
+5. Kết thúc: bấm **⏹ Dừng phát**, rồi nhấn **Ctrl+C** trong cửa sổ Terminal để tắt app.
 
-Mở `index.html` bằng Chrome và bấm **"Vào quán chơi thử"**. Khách ảo sẽ tự vào quán, comment và tặng quà để bạn xem game hoạt động.
+> Dùng **TikTok LIVE Studio** thay OBS? Trong LIVE Studio thêm nguồn **Liên kết / Trang web** với địa chỉ game hiện trong bảng điều khiển (nút 📋 để chép). Các nút lệnh trên bảng điều khiển vẫn hoạt động như bình thường.
 
-> Lần đầu mở cần có Internet để tải thư viện 3D (Three.js).
+### Lệnh khởi động (Terminal, trong thư mục `quan-nhau-cau-ca`)
 
-## 2. Mở game qua web (bắt buộc nếu dùng karaoke YouTube)
+| Lệnh | Tác dụng |
+|---|---|
+| `./start.command` | Chạy app (giống nhấp đúp `Cau Ca Live.app`) |
+| `./start.command --reset-key` | Xoá Claude API key trong Keychain rồi hỏi nhập lại |
+| `./start.command --no-open` | Chạy app nhưng không tự mở trình duyệt |
+| `npm run status` | Xem trạng thái Claude, TikFinity, OBS và game (khi app đang chạy) |
+| `npm run obs:setup` | Tạo hoặc cập nhật cảnh OBS |
+| `npm run obs:start` / `npm run obs:stop` | Bắt đầu / dừng phát trên OBS |
+| `npm run bridge` | Chỉ chạy cầu nối Claude (cổng 8787), không chạy app |
 
-YouTube chặn video nhúng khi mở game bằng file trực tiếp (lỗi 153), nên hãy mở game qua `http/https`:
+Cấu hình (OBS, TikFinity, model Claude, khách quen, trò chơi…) được lưu trong file `config.json`. File này chỉ tài khoản của bạn đọc được và không được đưa lên git.
 
-- **GitHub Pages (khuyên dùng):**
-  1. Vào repo → **Settings → Pages**.
-  2. Mục **Source** chọn *Deploy from a branch*.
-  3. Chọn nhánh chứa `index.html`, thư mục `/ (root)`, rồi **Save**.
-  4. Vài phút sau game chạy ở địa chỉ dạng `https://<tên-bạn>.github.io/<repo>/`.
+## 2. Chạy game không cần app
 
-  *Repo riêng tư cần gói GitHub trả phí mới bật được Pages.*
-- **Chạy trên máy:** trong thư mục chứa `index.html`, chạy `npx serve` hoặc `python -m http.server 8000`, rồi mở `http://localhost:...`.
-
-## 3. Kết nối TikTok Live
-
-Game không đăng nhập TikTok mà nhận sự kiện qua **TikFinity** (hoặc công cụ tương thích phát sự kiện qua WebSocket):
-
-1. Cài và chạy TikFinity trên máy tính, kết nối với tài khoản TikTok đang live.
-2. Trong game, bấm **⚙️ → Kết nối** (mặc định `ws://localhost:21213/`).
-3. Góc trái trên màn hình hiện **● LIVE** là đã kết nối. Nếu mất kết nối, game tự kết nối lại.
-
-## 4. Đưa game lên Live
-
-- **TikTok LIVE Studio hoặc OBS:** thêm nguồn *Browser / Trang web* với URL:
-
-  ```
-  https://<tên-bạn>.github.io/<repo>/?auto=1&ws=ws://localhost:21213/&clean=1&preset=live
-  ```
+- **Chơi thử**: mở `index.html` bằng Chrome, bấm **"Vào quán chơi thử"**.
+- **Mở qua web** (bắt buộc nếu muốn dùng karaoke YouTube mà không chạy app): bật GitHub Pages trong **Settings → Pages → Deploy from a branch → `main` / root**. Game sẽ ở địa chỉ https://doviettu.github.io/quan-nhau-cau-ca/
+- **Tham số URL** cho OBS / LIVE Studio:
 
   | Tham số | Tác dụng |
   |---|---|
   | `auto=1` | Vào quán ngay, không hiện màn hình chào |
-  | `ws=...` | Tự kết nối TikFinity |
+  | `ws=ws://localhost:21213/` | Tự kết nối TikFinity |
   | `clean=1` | Ẩn các nút điều khiển trên màn hình |
-  | `preset=live` | Bật cấu hình Live (xem mục 5) |
+  | `preset=live` | Bật cấu hình Live |
   | `autopilot=1` | Chỉ bật tự động dẫn live |
-  | `ai=1` | Bật Claude MC (dùng key hoặc cầu nối đã lưu trong trình duyệt) |
+  | `ai=1` | Bật Claude MC |
 
-- **Kích thước khung:** 1080×1920 (dọc) cho TikTok, hoặc khung ngang tùy ý. Game tự căn khung hình theo tỉ lệ màn hình.
+## 3. Cấu hình Live
 
-## 5. Cấu hình Live một chạm
+Nút **"Áp dụng cấu hình Live"** trong ⚙️ của game, hoặc tham số `preset=live`. App luôn dùng sẵn cấu hình này. Cấu hình gồm:
 
-Bấm **⚙️ → "Áp dụng cấu hình Live (Haiku 5.5)"**. Nút này bật cùng lúc:
+- **Claude MC**: Haiku 5.5, nhịp 20 giây, chi phí khoảng $0,02–0,06 mỗi giờ.
+- **Tự động dẫn live**: bốc thăm, dzô, pháo hoa, dọn bàn.
+- **Khách quen 🏠**: giữ quán luôn có ít nhất 20 người. Đây là nhân vật máy của quán, được đánh dấu rõ; họ không thả tim, không tặng quà, không lên bảng xếp hạng và không thắng trò chơi.
+- **Trò chơi nhỏ**: tự mở mỗi 3 phút. Karaoke chốt bài từ 1 xu.
 
-- **Claude MC** dùng Claude Haiku 5.5: nhịp 20 giây, tối đa 180 lượt/giờ, chi phí khoảng $0,02–0,06 mỗi giờ.
-- **Tự động dẫn live:** bốc thăm, dzô, pháo hoa, dọn bàn, giữ màn hình sáng.
-- **Khách quen 🏠** giữ quán luôn có ít nhất 20 người. Đây là nhân vật máy của quán: họ không thả tim, không tặng quà, không lên bảng xếp hạng và không thắng trò chơi.
-- **Trò chơi nhỏ** mỗi 3 phút; karaoke chốt bài từ 1 xu.
+## 4. Claude MC và chi phí
 
-## 6. Claude MC (Cậu Cả do AI dẫn)
+Claude đọc comment, quà, tim và người mới vào, rồi điều khiển Cậu Cả: chào khách, trả lời bình luận, mở sự kiện hoặc trò chơi, mời món nhỏ cho khách.
 
-Claude đọc comment, quà, tim và người mới vào, rồi điều khiển Cậu Cả: chào khách, trả lời bình luận, mở sự kiện hoặc trò chơi nhỏ, mời món nhỏ cho khách.
-
-Có hai cách cấp quyền gọi Claude:
-
-1. **Dán API key vào ⚙️**: nhanh, nhưng key nằm trong trình duyệt. Dùng key riêng có đặt giới hạn chi tiêu tại console.anthropic.com, và đừng bật trên máy dùng chung.
-2. **Cầu nối trên máy (an toàn hơn)**: key chỉ nằm trên máy bạn, trang game không cần key.
-   ```bash
-   cd quan-nhau-cau-ca/bridge      # thư mục bridge nằm trong repo vừa tải về
-   npm install
-   export ANTHROPIC_API_KEY='key-that-cua-ban'   # lấy ở console.anthropic.com → API Keys
-   npm start                                     # hoặc đăng nhập bằng `ant auth login` rồi `npm start`
-   ```
-   Thấy dòng *"Cầu nối Claude đang chạy: http://127.0.0.1:8787/mc"* là xong; để cửa sổ Terminal mở suốt buổi live.
-   Trong game, điền ô cầu nối là `http://127.0.0.1:8787/mc`.
-   - Nếu game chạy trên GitHub Pages, thêm biến `ALLOW_ORIGINS=https://<tên-bạn>.github.io` khi chạy cầu nối.
-   - Cầu nối chỉ nhận yêu cầu từ trang game của bạn, chỉ cho dùng 3 model, và mặc định tối đa 300 lượt/giờ (đổi bằng biến `MAX_CALLS_PER_HOUR`).
-
-**Chi phí ước tính mỗi giờ** (nhịp 20 giây, tối đa 150 lượt/giờ):
+Key được giữ trên máy theo hai cách, không có cách nào để key nằm trong trang game:
+- **Chạy app**: key lưu trong Keychain, game gọi Claude qua đường `/mc` của app.
+- **Không chạy app**: dùng cầu nối riêng.
+  ```bash
+  npm install
+  export ANTHROPIC_API_KEY='key-that-cua-ban'
+  npm run bridge
+  ```
+  Trong ⚙️ của game, điền ô cầu nối là `http://127.0.0.1:8787/mc`. Nếu game mở qua GitHub Pages, chạy cầu nối kèm biến `ALLOW_ORIGINS=https://doviettu.github.io`.
 
 | Model | Phòng vắng | Phòng đông |
 |---|---|---|
-| Claude Haiku 5.5 | ~$0,02 | ~$0,06 |
-| Claude Sonnet 5.5 | ~$0,36 | ~$1,14 |
-| Claude Opus 5.5 | ~$0,73 | ~$2,30 |
+| Claude Haiku 5.5 | ~$0,02/giờ | ~$0,06/giờ |
+| Claude Sonnet 5.5 | ~$0,36/giờ | ~$1,14/giờ |
+| Claude Opus 5.5 | ~$0,73/giờ | ~$2,30/giờ |
 
-Chi phí thực tế của phiên hiện trong **⚙️ → 🤖**.
+Đây là ước tính với nhịp 20 giây và tối đa 150 lượt/giờ. Chi phí thực tế của phiên hiện trên bảng điều khiển. Nên đặt giới hạn chi tiêu cho key tại console.anthropic.com.
 
-## 7. Karaoke YouTube
+## 5. Karaoke YouTube
 
-- Người xem comment `hát <tên bài>` rồi tặng quà (mặc định từ 1 xu) để chốt bài. Quà từ 30 xu được chen hàng.
-- **Tự tìm bài:** nhập **YouTube Data API key** vào ⚙️. Hạn mức miễn phí khoảng 100 lượt tìm mỗi ngày.
-- **Không có key:** bấm 🔎 để mở trang tìm trên YouTube, rồi 🔗 để dán link vào bài trong hàng chờ.
-- **Lên mic:** người xem comment `xin lên mic`, bạn mời họ làm **Khách mời** trên TikTok, rồi bấm *"Đánh dấu đang lên mic"* trong game.
-- Mic của máy bạn dùng để chấm điểm, có thể phát ra loa kèm tiếng vang (nhớ đeo tai nghe).
+- Người xem comment `hát <tên bài>` rồi tặng quà để chốt bài. Quà từ 30 xu được chen hàng.
+- **Tự tìm bài**: nhập YouTube Data API key trong bảng điều khiển. Hạn mức miễn phí khoảng 100 lượt tìm mỗi ngày.
+- **Không có key**: dùng 🔎 Tìm và 🔗 Dán link trong ⚙️ của game, hoặc ô **Thêm bài** trên bảng điều khiển.
+- **Lên mic**: người xem comment `xin lên mic`, bạn mời họ làm **Khách mời** trên TikTok. Giọng hát đi thẳng vào phòng live.
 
-## 8. Lệnh cho người xem
+## 6. Lệnh cho người xem
 
 | Comment | Tác dụng |
 |---|---|
@@ -121,37 +132,36 @@ Chi phí thực tế của phiên hiện trong **⚙️ → 🤖**.
 | `dzô`, `100%` | Cả bàn cụng ly |
 | `cụng ly với Tên` | Mời riêng một người một ly |
 | `nhảy` | Quẩy tại chỗ |
-| `oẳn tù tì búa/bao/kéo` | Thách Cậu Cả: thắng được đĩa đậu phộng, thua thì uống phạt |
-| `xí ngầu` | Lắc xúc xắc, ra 6 thì cả bàn uống |
+| `oẳn tù tì búa/bao/kéo` | Thách Cậu Cả |
+| `xí ngầu` | Lắc xúc xắc |
 | `trà đá` | Gọi trà đá cho tỉnh rượu |
 | `hát <tên bài>` + tặng quà | Đăng ký hát karaoke |
 | `hát` | Hát mộc với nhạc của quán |
-| `xin lên mic` | Xin làm khách mời TikTok để hát |
+| `xin lên mic` | Xin làm khách mời để hát |
 | `đố vui`, `đoán số`, `nhanh tay`, `đua bàn` | Mở trò chơi nhỏ |
 | `về nha`, `tính tiền` | Ra về |
-| Thả tim | Đẩy thanh **Không khí**; đủ 100% thì cả quán quẩy; mỗi 300 tim cả quán dzô |
-| Tặng quà | Nhân viên bưng món ra bàn (tặng x2 là món lớn); quà từ 500 xu bắn pháo hoa |
+| Thả tim | Đẩy thanh **Không khí**; đủ 100% thì cả quán quẩy |
+| Tặng quà | Nhân viên bưng món ra bàn; quà từ 500 xu bắn pháo hoa |
 
-## 9. Phím tắt (máy tính)
-
-`D` dzô · `L` bốc thăm · `F` pháo hoa · `P` quẩy · `M` tắt/bật tiếng · `H` ẩn/hiện nút · `Esc` đóng bảng
-
-## 10. Khắc phục sự cố
+## 7. Khắc phục sự cố
 
 | Hiện tượng | Cách xử lý |
 |---|---|
-| Màn hình đen, báo không tải được Three.js | Kiểm tra mạng Internet rồi tải lại trang |
-| Không có tiếng | Chạm vào màn hình một lần (trình duyệt chặn tự phát âm thanh) và kiểm tra nút 🔊 |
-| YouTube báo lỗi 153 | Mở game qua `http/https` (mục 2) |
-| Không nhận được comment | Kiểm tra TikFinity đang chạy và đúng địa chỉ WebSocket; thử `ws://127.0.0.1:21213/` |
-| Claude MC tự tắt | Key sai hoặc hết hạn mức; xem dòng ⚠️ trong ⚙️ → 🤖 |
-| Máy yếu bị giật | Game tự giảm độ phân giải; có thể hạ số khách quen tối thiểu |
+| App báo chưa có Node.js | Chạy `brew install node`, hoặc cài bản LTS từ nodejs.org |
+| *"Cổng 8686 đang bận"* | App đã chạy ở một cửa sổ Terminal khác; mở http://127.0.0.1:8686/panel hoặc đóng cửa sổ cũ |
+| OBS báo sai mật khẩu hoặc không phản hồi | Bật WebSocket server trong OBS và nhập đúng mật khẩu trên bảng điều khiển |
+| Không đổi được khung hình 1080×1920 | Dừng phát/ghi hình trong OBS rồi bấm **Thiết lập cảnh** lại |
+| Không có tiếng game trên live | Trong mixer của OBS kiểm tra nguồn *"Cậu Cả – Game"* chưa bị tắt tiếng |
+| Không nhận được comment | Mở TikFinity và kiểm tra địa chỉ WebSocket (thử `ws://127.0.0.1:21213/`) |
+| YouTube báo lỗi 153 | Chạy game qua app hoặc GitHub Pages, không mở file trực tiếp |
+| Claude MC tự tắt | Key sai hoặc hết hạn mức; chạy `./start.command --reset-key` để nhập key mới |
 
-## 11. Quyền riêng tư và minh bạch
+## 8. Quyền riêng tư và minh bạch
 
-- Game không có máy chủ riêng. Settings và key được lưu trong trình duyệt của bạn (`localStorage`).
+- App chỉ chạy trên máy bạn (`127.0.0.1`) và không có máy chủ trên mạng.
+- Claude API key nằm trong Keychain; cấu hình nằm trong `config.json`.
 - Nội dung chỉ được gửi ra ngoài khi bạn bật tính năng tương ứng:
-  - **Claude MC**: tóm tắt diễn biến phòng live được gửi tới Anthropic (trực tiếp hoặc qua cầu nối).
+  - **Claude MC**: tóm tắt diễn biến phòng live được gửi tới Anthropic.
   - **Karaoke YouTube**: tên bài được gửi tới Google để tìm, và video phát qua `youtube-nocookie.com`.
 - Khách quen 🏠 là nhân vật máy, được đánh dấu rõ, và không tạo tim, quà hay thứ hạng giả.
 - Đồ ăn, bia trong quán là **ảo**. Cậu Cả do AI dẫn được dặn không cổ vũ uống rượu bia thật và luôn nói thật mình là MC ảo khi được hỏi.

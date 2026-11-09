@@ -1,0 +1,20 @@
+{
+  "name": "quan-nhau-cau-ca",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Quán nhậu vỉa hè Cậu Cả – game 3D tương tác cho TikTok Live, kèm app điều khiển trên Mac (Claude MC, OBS)",
+  "type": "module",
+  "scripts": {
+    "start": "node app/server.mjs",
+    "bridge": "node bridge/claude-bridge.mjs",
+    "status": "node app/cli.mjs status",
+    "obs:setup": "node app/cli.mjs obs-setup",
+    "obs:start": "node app/cli.mjs obs-start",
+    "obs:stop": "node app/cli.mjs obs-stop"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.3.0",
+    "ws": "8.18.0"
+  },
+  "engines": { "node": ">=18" }
+}
