@@ -10,6 +10,7 @@ Repo gồm:
 | `Cau Ca Live.app`, `start.command` | App khởi động trên Mac |
 | `app/` | Máy chủ cục bộ: chạy game, cầu nối Claude, kết nối TikTok, bảng điều khiển, mở cửa sổ game cho LIVE Studio |
 | `bridge/` | Cầu nối Claude dùng riêng, khi không chạy app |
+| `docs/tang-luot-xem-va-qua.md` | Nghiên cứu cách tăng lượt xem, tương tác và quà trên TikTok LIVE, kèm các rủi ro vi phạm cần tránh |
 
 ---
 
@@ -90,9 +91,48 @@ Nút **"Áp dụng cấu hình Live"** trong ⚙️ của game, hoặc tham số
 - **Claude MC**: Haiku 5.5, nhịp 20 giây, chi phí khoảng $0,02–0,06 mỗi giờ.
 - **Tự động dẫn live**: bốc thăm, dzô, pháo hoa, dọn bàn.
 - **Khách quen 🏠**: giữ quán luôn có ít nhất 20 người. Đây là nhân vật máy của quán, được đánh dấu rõ; họ không thả tim, không tặng quà, không lên bảng xếp hạng và không thắng trò chơi.
-- **Trò chơi nhỏ**: tự mở mỗi 3 phút. Karaoke chốt bài từ 1 xu.
+- **Trò chơi nhỏ**: tự mở mỗi 3 phút. Đố vui có hơn 130 câu: địa lý, lịch sử, ẩm thực, câu đố mẹo, thành ngữ, khoa học, tính nhanh. Karaoke chốt bài từ 1 xu.
+- **Xiếc đường phố**: khoảng 6 phút một lần có một tiết mục (đổi được trong bảng điều khiển).
 
-## 4. Claude MC và chi phí
+## 4. Cậu Cả dẫn live bằng giọng nói
+
+Cậu Cả nói thành tiếng mọi câu thoại: chào khách, gọi tên người tặng quà, trả lời comment, giới thiệu trò chơi. Tính năng này **bật sẵn** ở cấu hình Live.
+- **Giọng đọc:** app dùng giọng tiếng Việt của macOS qua lệnh `say`, âm thanh ra loa máy. Trong LIVE Studio phải bật **âm thanh máy tính** thì người xem mới nghe được.
+  - Mac chưa có giọng tiếng Việt thì cài giọng **Linh**: *Cài đặt hệ thống → Trợ năng → Nội dung được đọc → Giọng hệ thống → Quản lý giọng → Tiếng Việt*.
+  - Bấm **Thử giọng** trên bảng điều khiển để nghe thử.
+- **Không để quán im lặng:** phòng im quá số giây đã đặt (mặc định 40 giây) thì Cậu Cả tự nói.
+  - Nếu đang bật Claude MC, game nhờ Claude nói trước: gọi tên một khách đang ngồi, hỏi han hoặc gợi ý trò chơi.
+  - Claude không trả lời thì Cậu Cả nói một câu theo tình huống thật của quán: tên khách, bàn đang ngồi, người dẫn đầu, trò đang mở.
+- Trong lúc Cậu Cả nói, nhạc nền tự nhỏ lại.
+- Cậu Cả luôn tự giới thiệu là **MC ảo do AI dẫn**. Trên màn hình có nhãn **AI MC**.
+
+> ⚠️ **Phiên live bị TikTok dừng vì "không có hoạt động gì":** TikTok có thể tự dừng phiên live khi cho rằng không có người dẫn. Giọng Cậu Cả và việc trả lời comment theo thời gian thực giúp phiên live có tương tác thật. Tuy vậy, mình **không xác minh được** TikTok dựa vào đâu để quyết định, và quy định của TikTok yêu cầu chủ kênh chịu trách nhiệm với nội dung do AI tạo ra. Cách chắc chắn nhất là **có bạn ở bên**: bật mic nói chuyện thỉnh thoảng, thêm khung camera nhỏ, và trả lời ngay khi LIVE Studio hỏi bạn còn ở đó không. App **không** giả thao tác của người dẫn để lách TikTok.
+
+## 4a. Live dừng: báo về điện thoại và ngưng gọi Claude
+
+- **App theo dõi phiên live.**
+  - Kết nối bằng @tên: live coi là đang chạy khi TikTok báo phiên live còn mở.
+  - Kết nối qua TikFinity: live coi là đang chạy khi TikFinity chạy và cửa sổ game vẫn nhận được sự kiện.
+  - Ngoài ra, nếu không có sự kiện nào từ người xem thật trong 10 phút (chỉnh được), app cũng coi như live đã dừng.
+- **Khi live dừng quá 30 giây:**
+  - App **ngưng gọi Claude**. Game không gọi nữa, và máy chủ của app cũng chặn mọi lượt gọi.
+  - App gửi thông báo về **điện thoại** qua app **ntfy** và hiện thông báo trên Mac.
+  - Live chạy lại thì app tự gọi Claude tiếp và báo "Live chạy lại".
+- **Cài đặt:** trên bảng điều khiển → **🔔 Báo về điện thoại**.
+  1. Cài app ntfy trên điện thoại (miễn phí, không cần tài khoản).
+  2. Trong ntfy, đăng ký đúng **mã kênh** mà app đã tạo sẵn. Mã kênh này giữ kín như mật khẩu.
+  3. Bấm **Gửi thử** để kiểm tra điện thoại đã nhận được thông báo.
+- **Tin gửi qua ntfy.sh** chỉ gồm trạng thái live, không có thông tin cá nhân.
+- **Giới hạn:** app không nhìn thấy màn hình LIVE Studio, nên không phát hiện được captcha ngay lúc nó hiện ra. App chỉ báo khi phiên live có dấu hiệu dừng. Nhận được thông báo, bạn tự mở máy kiểm tra và giải captcha.
+
+## 4b. Claude MC và chi phí
+
+**Gọi Claude ít nhất có thể:**
+- Lời chào khách mới (gộp nhiều tên vào một câu), cảm ơn tim, quà, theo dõi, chia sẻ, mốc tim và các câu khuấy động khi quán im đều là **lời soạn sẵn** trong game. Có hơn 60 câu, chia theo tình huống và giờ trong ngày, nên không tốn lượt gọi nào.
+- Claude **chỉ được gọi** khi đang live và có **người xem thật** bình luận trò chuyện hoặc hỏi han, hoặc khi có quà từ 100 xu trở lên.
+  - Các comment là lệnh (`bàn 5`, `dzô`, `hát …`, `xiếc`…) và câu trả lời trò chơi do game tự xử lý.
+  - Khách quen 🏠 và khách ảo không bao giờ làm tốn lượt gọi.
+- Cấu hình Live gọi Claude cách nhau ít nhất 30 giây, tối đa 90 lượt mỗi giờ.
 
 Claude đọc comment, quà, tim và người mới vào, rồi điều khiển Cậu Cả: chào khách, trả lời bình luận, mở sự kiện hoặc trò chơi, mời món nhỏ cho khách.
 
@@ -121,7 +161,26 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 - **Không có key**: dùng 🔎 Tìm và 🔗 Dán link trong ⚙️ của game, hoặc ô **Thêm bài** trên bảng điều khiển.
 - **Lên mic**: người xem comment `xin lên mic`, bạn mời họ làm **Khách mời** trên TikTok. Giọng hát đi thẳng vào phòng live.
 
-## 6. Lệnh cho người xem
+## 6. Xiếc đường phố và nhạc nền
+
+**Xiếc đường phố**
+- Một nghệ sĩ đi bộ vào giữa phố, diễn khoảng 20–25 giây. Xe cộ dừng lại xem, khách trong quán vỗ tay.
+- Có 5 tiết mục: 🦁 múa lân (kèm trống), 🔥 phun lửa, 🤹 tung hứng, 🦯 đi cà kheo, 🍽️ xoay đĩa.
+- Cách mời đoàn xiếc:
+  - Người xem comment `xiếc`, hoặc gọi tên tiết mục như `múa lân`, `phun lửa`. Sau mỗi tiết mục, đoàn nghỉ khoảng 2 phút rưỡi.
+  - Chế độ tự động dẫn live tự mời đoàn theo nhịp đã chỉnh.
+  - Claude MC tự mời.
+  - Bạn bấm nút trên bảng điều khiển.
+- Ai tặng quà trong lúc đoàn đang diễn thì nghệ sĩ cảm ơn tên người đó và diễn thêm vài giây.
+
+**Nhạc nền remix từ YouTube** (tuỳ chọn, mặc định tắt)
+- Cách bật: trên bảng điều khiển → ⚙️ Cấu hình, tích **📻 Nhạc nền remix từ YouTube**, rồi chỉnh từ khoá (mặc định *nhạc remix vinahouse*) và âm lượng.
+- Game dùng chung YouTube key với karaoke. Mỗi lần tìm 25 bài và nhớ danh sách trong 12 giờ, nên tốn rất ít hạn mức.
+- Nhạc tự dừng khi có người hát karaoke hoặc lên mic, rồi phát tiếp sau đó. Khi đang phát nhạc YouTube, nhạc nền tự tạo của quán tạm tắt.
+- Trình phát hiện ở góc trên bên trái, kích thước 200×200 theo quy định của YouTube.
+- ⚠️ **Rủi ro bản quyền:** nhạc trên YouTube (nhất là remix) thường có bản quyền, TikTok có thể **tắt tiếng hoặc dừng** phiên live. An toàn nhất là dùng nhạc nền tự tạo sẵn của quán, hoặc nhạc miễn phí bản quyền có giấy phép phát trực tiếp.
+
+## 7. Lệnh cho người xem
 
 | Comment | Tác dụng |
 |---|---|
@@ -142,11 +201,12 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 | `hát` | Hát mộc với nhạc của quán |
 | `xin lên mic` | Xin làm khách mời để hát |
 | `đố vui`, `đoán số`, `nhanh tay`, `đua bàn` | Mở trò chơi nhỏ |
+| `xiếc`, `múa lân`, `phun lửa`, `tung hứng`, `cà kheo`, `xoay đĩa` | Mời đoàn xiếc đường phố; tặng quà lúc đoàn đang diễn để thưởng nghệ sĩ |
 | `về nha`, `tính tiền` | Ra về |
 | Thả tim | Đẩy thanh **Không khí**; đủ 100% thì cả quán quẩy |
 | Tặng quà | Nhân viên bưng món ra bàn; tên người tặng hiện trên đầu nhân vật vài giây (bình thường tên được ẩn cho gọn màn hình); quà từ 500 xu bắn pháo hoa |
 
-## 7. Khắc phục sự cố
+## 8. Khắc phục sự cố
 
 | Hiện tượng | Cách xử lý |
 |---|---|
@@ -160,7 +220,7 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 | YouTube báo lỗi 153 | Chạy game qua app hoặc GitHub Pages, không mở file trực tiếp |
 | Claude MC tự tắt | Key sai hoặc hết hạn mức; chạy `./start.command --reset-key` để nhập key mới |
 
-## 8. Quyền riêng tư và minh bạch
+## 9. Quyền riêng tư và minh bạch
 
 - App chỉ chạy trên máy bạn (`127.0.0.1`) và không có máy chủ trên mạng.
 - Claude API key nằm trong Keychain; cấu hình nằm trong `config.json`.
