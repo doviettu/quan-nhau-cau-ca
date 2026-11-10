@@ -32,7 +32,7 @@ const DEFAULTS = {
   obsLive: { url: 'ws://127.0.0.1:4455', res: '720x1280', bitrate: 3500, relayPort: 19350, relayKey: '', auto: false,
     yt: { on: false, server: 'rtmps://a.rtmps.youtube.com/live2' }, fb: { on: false, server: 'rtmps://live-api-s.facebook.com:443/rtmp/' }, tt: { on: false, server: '' } },
   notify: { on: true, topic: '', server: 'https://ntfy.sh', idleMin: 10 },   // báo về điện thoại qua app ntfy
-  game: { aiOn: true, aiModel: 'claude-haiku-5-5', aiEvery: 20, aiMax: 180, ytKey: '', kMin: 50, kPrio: 180, kMax: 5, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, autoOn: true, autoLuckyMin: 8, bgmYt: false, bgmQuery: '', bgmVol: 35, circusAuto: true, circusEvery: 6, mcVoice: true, mcGap: 40, jokeOn: true, jokeEvery: 4, voiceEngine: 'auto', vieneuVoice: 'Trúc Ly', macVoice: '', voiceRate: 1 },
+  game: { aiOn: true, aiModel: 'claude-haiku-5-5', aiEvery: 20, aiMax: 180, ytKey: '', kMin: 50, kPrio: 180, kMax: 5, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, autoOn: true, autoLuckyMin: 8, bgmYt: false, bgmQuery: '', bgmLinks: '', bgmShuffle: true, bgmVol: 35, circusAuto: true, circusEvery: 6, mcVoice: true, mcGap: 40, jokeOn: true, jokeEvery: 4, voiceEngine: 'auto', vieneuVoice: 'Trúc Ly', macVoice: '', voiceRate: 1 },
 };
 const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
 const merge = (a, b) => { const o = { ...a }; for (const k of Object.keys(b || {})) o[k] = isObj(a[k]) && isObj(b[k]) ? merge(a[k], b[k]) : b[k]; return o; };
@@ -487,6 +487,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/config') {
       const { game, tikfinityUrl, notify: nf } = b;
       if (isObj(nf)) { const o = {}; if (typeof nf.on === 'boolean') o.on = nf.on; if (typeof nf.topic === 'string' && /^[\w-]{1,64}$/.test(nf.topic.trim())) o.topic = nf.topic.trim(); if (Number(nf.idleMin) >= 3) o.idleMin = Math.min(120, Number(nf.idleMin)); config.notify = merge(config.notify, o); }
+      if (isObj(game) && typeof game.bgmLinks === 'string') game.bgmLinks = game.bgmLinks.slice(0, 8000);
       if (isObj(game)) { const prevEng = config.game.voiceEngine; config.game = merge(config.game, game); if (config.game.voiceEngine !== prevEng) { if (config.game.voiceEngine === 'mac') vnStop(); else vnStart(); } }
       if (typeof tikfinityUrl === 'string' && /^wss?:\/\//.test(tikfinityUrl)) config.tikfinityUrl = tikfinityUrl;
       saveConfig(); broadcast({ type: 'config', config: publicConfig() });
