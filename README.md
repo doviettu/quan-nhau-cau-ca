@@ -10,6 +10,7 @@ Repo gồm:
 | `Cau Ca Live.app`, `start.command` | App khởi động trên Mac |
 | `app/` | Máy chủ cục bộ: chạy game, cầu nối Claude, kết nối TikTok, bảng điều khiển, mở cửa sổ game cho LIVE Studio |
 | `bridge/` | Cầu nối Claude dùng riêng, khi không chạy app |
+| `docs/huong-dan-live-3-nen-tang.md` | Hướng dẫn từng bước live cùng lúc TikTok, YouTube, Facebook: lấy key/token, cài OBS, thứ tự bật live, sự cố thường gặp |
 | `docs/tang-luot-xem-va-qua.md` | Nghiên cứu cách tăng lượt xem, tương tác và quà trên TikTok LIVE, kèm các rủi ro vi phạm cần tránh |
 
 ---
@@ -132,6 +133,8 @@ Cậu Cả nói thành tiếng mọi câu thoại: chào khách, gọi tên ngư
 - **Giới hạn:** app không nhìn thấy màn hình LIVE Studio, nên không phát hiện được captcha ngay lúc nó hiện ra. App chỉ báo khi phiên live có dấu hiệu dừng. Nhận được thông báo, bạn tự mở máy kiểm tra và giải captcha.
 
 ## 4c. Live cùng lúc trên YouTube và Facebook
+
+> Hướng dẫn chi tiết từng bước (OBS, khóa luồng, thứ tự bật live, sự cố): **[docs/huong-dan-live-3-nen-tang.md](docs/huong-dan-live-3-nen-tang.md)**
 
 Quán nhận comment, quà và lượt thích từ **TikTok, YouTube và Facebook cùng lúc**. Người xem cả ba nơi ngồi chung một quán. Trong khung tin, người từ YouTube có nhãn đỏ **YT**, người từ Facebook có nhãn xanh **FB**. Chỉ cần một nơi còn đang live là app coi phiên live đang chạy, nên Claude vẫn được gọi.
 
