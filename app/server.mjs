@@ -99,8 +99,9 @@ async function vnStart() {
   vn.state = 'starting'; vn.err = '';
   fs.mkdirSync(VIENEU_HOME, { recursive: true });
   const logFile = path.join(VIENEU_HOME, 'server.log'), log = fs.openSync(logFile, 'a');
-  vn.proc = spawn(VIENEU_PY, ['-m', 'apps.openai_speech'], { stdio: ['ignore', log, log],
-    env: { ...process.env, HOST: '127.0.0.1', PORT: String(VIENEU_PORT), VIENEU_BACKEND: 'onnx', HF_HOME: path.join(VIENEU_HOME, 'hf') } });
+  // vieneu_run.py: tải mô hình vào thư mục thường (không symlink) để ONNX Runtime mới không chặn file .data
+  vn.proc = spawn(VIENEU_PY, [path.join(ROOT, 'app', 'vieneu_run.py')], { stdio: ['ignore', log, log],
+    env: { ...process.env, HOST: '127.0.0.1', PORT: String(VIENEU_PORT), VIENEU_BACKEND: 'onnx', HF_HOME: path.join(VIENEU_HOME, 'hf'), CAUCA_VIENEU_MODELS: path.join(VIENEU_HOME, 'models') } });
   vn.proc.on('exit', code => {
     const wasReady = vn.state === 'ready'; vn.proc = null; if (vn.state === 'off') return;
     vn.state = 'error'; vn.err = `VieNeu dừng (mã ${code}) – xem ${logFile}`; console.log('🗣️ ' + vn.err);

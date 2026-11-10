@@ -220,6 +220,7 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 | Bảng điều khiển báo *"Chưa thấy cửa sổ game"* | Bấm **🪟 Mở cửa sổ game**; nếu cửa sổ đã mở thì bấm **🔄 Tải lại game** |
 | Không nhận được comment | Kết nối thẳng: kiểm tra đúng **@tên** và tài khoản đang live (dòng *TikTok Live* trong bảng điều khiển báo lỗi cụ thể). Dùng TikFinity: kiểm tra địa chỉ WebSocket (thử `ws://127.0.0.1:21213/`) |
 | *"Dịch vụ ký kết nối đang giới hạn lượt"* | Gói miễn phí của Euler Stream bị giới hạn; app tự thử lại sau 60 giây. Live thường xuyên thì lấy API key tại eulerstream.com rồi chạy app với biến `EULER_API_KEY`, hoặc dùng TikFinity |
+| Cài giọng VieNeu báo *"External data path escapes model directory"* | Lỗi của bản cũ khi chạy với ONNX Runtime mới. Cập nhật (`git pull`) rồi nhấp đúp lại `cai-giong-vieneu.command`: mô hình được tải lại vào thư mục thường |
 | YouTube báo lỗi 153 | Chạy game qua app hoặc GitHub Pages, không mở file trực tiếp |
 | Claude MC tự tắt | Key sai hoặc hết hạn mức; chạy `./start.command --reset-key` để nhập key mới |
 
