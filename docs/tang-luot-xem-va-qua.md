@@ -24,7 +24,7 @@ Tài liệu dành cho kênh mới chạy game "Quán nhậu vỉa hè Cậu Cả
 | 3 | **Gọi tên** người mới vào, người bình luận, theo dõi, chia sẻ. Cảm ơn bằng hiệu ứng trong game. | Game | Đã có (Claude MC, tên hiện khi tặng quà) |
 | 4 | **Mốc tim**: thanh không khí đầy thì mở sự kiện miễn phí. Tim miễn phí nên ai cũng góp được. | Game | Đã có (thanh không khí, cứ 300 tim cả quán dzô) |
 | 5 | **Mini-game 5–8 phút một lần**, trả lời bằng comment, có đếm ngược. Không bắt tặng quà để chơi. | Game | Đã có (đố vui hơn 130 câu, đoán số, nhanh tay, đua bàn) |
-| 6 | **Tiết mục bất ngờ** để người xem ở lại lâu hơn. | Game | **Mới**: xiếc đường phố |
+| 6 | **Tiết mục bất ngờ** để người xem ở lại lâu hơn. | Game | Đã có: xiếc đường phố. **Mới**: MC kể chuyện cười độc thoại trên sân khấu, bình chọn 1/2 |
 | 7 | **Bảng xếp hạng** bàn sôi nổi nhất và người bình luận nhiều nhất. Cảm ơn người tặng quà nhẹ nhàng. | Game | Có một phần (top 3, đua bàn) |
 | 8 | **Live theo lịch cố định**, mỗi phiên từ 1 giờ trở lên, ghi lịch vào bio. Tạo **LIVE Event** và đăng **video teaser 30–60 phút trước khi live** [CXM]. | TikTok | Nên làm |
 | 9 | **Cắt 1–2 clip ngắn mỗi ngày** (pháo hoa, múa lân, karaoke, câu đùa của MC) để kéo người xem vào phiên live sau. | TikTok | Nên làm |

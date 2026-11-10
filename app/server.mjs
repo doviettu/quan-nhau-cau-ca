@@ -21,7 +21,7 @@ const DEFAULTS = {
   tikfinityUrl: 'ws://localhost:21213/',
   tiktok: { username: '', on: false },   // kết nối thẳng TikTok LIVE bằng @tên (không cần TikFinity)
   notify: { on: true, topic: '', server: 'https://ntfy.sh', idleMin: 10 },   // báo về điện thoại qua app ntfy
-  game: { aiOn: true, aiModel: 'claude-haiku-5-5', aiEvery: 20, aiMax: 180, ytKey: '', kMin: 50, kPrio: 180, kMax: 5, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, autoOn: true, autoLuckyMin: 8, bgmYt: false, bgmQuery: '', bgmVol: 35, circusAuto: true, circusEvery: 6, mcVoice: true, mcGap: 40, voiceEngine: 'auto', vieneuVoice: 'Hải Đăng' },
+  game: { aiOn: true, aiModel: 'claude-haiku-5-5', aiEvery: 20, aiMax: 180, ytKey: '', kMin: 50, kPrio: 180, kMax: 5, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, autoOn: true, autoLuckyMin: 8, bgmYt: false, bgmQuery: '', bgmVol: 35, circusAuto: true, circusEvery: 6, mcVoice: true, mcGap: 40, jokeOn: true, jokeEvery: 4, voiceEngine: 'auto', vieneuVoice: 'Trúc Ly' },
 };
 const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
 const merge = (a, b) => { const o = { ...a }; for (const k of Object.keys(b || {})) o[k] = isObj(a[k]) && isObj(b[k]) ? merge(a[k], b[k]) : b[k]; return o; };
@@ -29,6 +29,8 @@ function loadConfig() { try { return merge(DEFAULTS, JSON.parse(fs.readFileSync(
 function saveConfig() { fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), { mode: 0o600 }); }
 let config = loadConfig();
 // đổi mức quà karaoke mặc định cũ (1 xu chốt bài / 30 xu chen hàng) sang 50 / 180 xu
+// giọng mặc định đổi sang nữ hào hứng (Trúc Ly) nếu vẫn đang để giọng mặc định cũ
+if (config.game.vieneuVoice === 'Hải Đăng' && !config.game.voiceV2) { config.game.vieneuVoice = 'Trúc Ly'; config.game.voiceV2 = true; saveConfig(); }
 if (config.game.kMin === 1 && config.game.kPrio === 30 && !config.game.kPriceV2) { config.game.kMin = 50; config.game.kPrio = 180; config.game.kPriceV2 = true; saveConfig(); }
 if (config.obs) { delete config.obs; saveConfig(); }
 if (!config.notify.topic) { config.notify.topic = 'caucalive-' + crypto.randomBytes(5).toString('hex'); saveConfig(); }
@@ -136,7 +138,8 @@ function playWav(buf) {
     execFile(player, [f], { timeout: 60000 }, () => res());
   });
 }
-function sayMac(t) { return new Promise(res => execFile('say', ['-v', viVoice, '-r', '185', t], { timeout: 30000 }, () => res())); }
+const EMO = /\[(cười|thở dài|hắng giọng)\]/g;   // ký hiệu cảm xúc của VieNeu – giọng Mac thì bỏ đi
+function sayMac(t) { const s = t.replace(EMO, ' ').trim(); return s ? new Promise(res => execFile('say', ['-v', viVoice, '-r', '200', s], { timeout: 30000 }, () => res())) : Promise.resolve(); }
 let nextWav = null;   // tạo sẵn câu kế tiếp trong lúc đang phát câu trước
 async function sayNext() {
   if (saying || !sayQ.length) return;
@@ -154,9 +157,9 @@ function speak(text) {
   const useVn = vn.state === 'ready';
   if (!useVn && process.platform !== 'darwin') return { ok: false, error: vn.state === 'starting' ? 'Giọng VieNeu đang khởi động' : 'Chỉ đọc bằng giọng máy trên Mac' };
   if (!useVn && !viVoice) return { ok: false, error: vn.state === 'starting' ? 'Giọng VieNeu đang khởi động' : voiceChecked ? 'Chưa có giọng: chạy cai-giong-vieneu.command (khuyên dùng) hoặc cài giọng Linh của Mac' : 'Đang kiểm tra giọng đọc' };
-  const t = String(text || '').replace(/[@#*_`<>\[\]{}|\\]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+  const t = String(text || '').replace(/\[(cười|thở dài|hắng giọng)\]/g, '\u0001$1\u0002').replace(/[@#*_`<>\[\]{}|\\]/g, ' ').replace(/\u0001/g, '[').replace(/\u0002/g, ']').replace(/\s+/g, ' ').trim().slice(0, 220);
   if (!t) return { ok: false, error: 'Không có nội dung' };
-  if (sayQ.length >= 2) sayQ.shift();   // đừng dồn: bỏ câu cũ nhất
+  if (sayQ.length >= 4) sayQ.shift();   // đừng dồn quá: bỏ câu cũ nhất (đủ chỗ cho một câu chuyện nhiều câu)
   sayQ.push(t); sayNext();
   return { ok: true, voice: useVn ? 'VieNeu · ' + (config.game.vieneuVoice || 'mặc định') : viVoice };
 }

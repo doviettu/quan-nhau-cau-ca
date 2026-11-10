@@ -493,8 +493,36 @@ const LANE_IN = 2.9, LANE_MID = 6.5, LANE_OUT = 11.1;   // lối đi: sát lòng
 const TOP_DZ = 0.42, SIDE_OFF = 0.62, END_OFF = 1.2, GAP_DZ = 1.65;
 const SEATS_PER = 6, STOOL_H = 0.3, HIP = 0.37;
 const FRONT_Z = 14, BACK_Z = -14, DOOR_Z = -1.65;   // khách đi vào từ hai đầu phố (trái/phải màn hình)
-const KARAOKE = { x: -4.1, z: 3.6 };   // sân hát karaoke: thế chỗ 2 bàn đầu dãy sát đường, nằm trong khung hình dọc
-const KARA_ROWS = [6.6, 3.3];         // các chỗ bàn dãy ngoài nhường cho sân hát
+const KARAOKE = { x: -11.2, z: 4.35 };   // sân hát karaoke sát tường mặt tiền quán (TV treo tường, quay ra phố)
+const KARA_ROWS = [6.6, 3.3];          // 2 chỗ bàn dãy trong (sát quán) nhường cho sân hát
+const KARA_GAP = (KARA_ROWS[0] + KARA_ROWS[1]) / 2;   // khe giữa 2 bàn dãy ngoài trước sân hát – lối lên/xuống sân khấu
+// vùng cấm đi xuyên: thảm, loa, TV, mic (đã cộng bề ngang người); DX là lối vòng phía trước sân hát
+const STAGE_BOX = { x0: -FACADE_X - 1, x1: -10.15, z0: KARAOKE.z - 2.05, z1: KARAOKE.z + 2.05, DX: -9.7 };
+const inStage = p => p.x < STAGE_BOX.x1 && p.z > STAGE_BOX.z0 && p.z < STAGE_BOX.z1;
+function segHitsStage(a, b) {   // Liang–Barsky: đoạn a→b có cắt hộp sân hát không
+  const B = STAGE_BOX, dx = b.x - a.x, dz = b.z - a.z; let t0 = 0, t1 = 1;
+  for (const [pp, q] of [[-dx, a.x - B.x0], [dx, B.x1 - a.x], [-dz, a.z - B.z0], [dz, B.z1 - a.z]]) {
+    if (Math.abs(pp) < 1e-9) { if (q < 0) return false; continue; }
+    const r = q / pp; if (pp < 0) { if (r > t1) return false; if (r > t0) t0 = r; } else { if (r < t0) return false; if (r < t1) t1 = r; }
+  }
+  return t1 - t0 > 1e-6;
+}
+// chèn điểm vòng để không ai đi xuyên sân hát; điểm có stage:true (chỗ đứng hát) mới được vào trong
+function routeAround(from, pts) {
+  const B = STAGE_BOX, out = []; let prev = { x: from.x, z: from.z };
+  const corner = z => ({ x: B.DX, z: z < KARAOKE.z ? B.z0 - 0.3 : B.z1 + 0.3 });
+  for (let p of pts) {
+    if (!p.stage && inStage(p)) p = { x: B.DX, z: p.z };
+    if (segHitsStage(prev, p)) {
+      const via = [];
+      if (inStage(prev)) via.push({ x: B.DX, z: prev.z }); else if (prev.x < B.x1) via.push(corner(prev.z));
+      if (p.stage || inStage(p)) via.push({ x: B.DX, z: p.z }); else if (p.x < B.x1) via.push(corner(p.z));
+      for (const v of via) { const l = out[out.length - 1] || prev; if (Math.hypot(l.x - v.x, l.z - v.z) > 0.05) out.push(v); }
+    }
+    out.push(p); prev = p;
+  }
+  return out;
+}
 
 /* =====================================================================
    THỰC ĐƠN: QUÀ → MÓN
@@ -758,7 +786,7 @@ class Actor {
     if (this.bubble) this.bubble.position.y = y + (this.label && this.label.visible ? this.label.scale.y : 0) + 0.04;
   }
   say(text, dur = 4.5) { disposeSprite(this.bubble); this.bubble = bubbleSprite(text, this.bubbleStyle); this.g.add(this.bubble); this.bubbleT = dur; this.placeLabel(); }
-  walkTo(pts, cb) { this.path = pts; this.onArrive = cb || null; this.state = 'walk'; this.placeLabel(); }
+  walkTo(pts, cb) { this.path = routeAround(this.g.position, pts); this.onArrive = cb || null; this.state = 'walk'; this.placeLabel(); }
   toast(delay = 0, dur = 1.9) { this.toastDelay = delay; this.toastDur = dur; this.toastPending = true; }
   get pos() { return this.g.position; }
   update(dt, t) {
@@ -988,7 +1016,7 @@ addVerticalSign(-1, SHOP_Z1 + 0.5, 5.2, 'BIA HƠI', '#ffffff', '#1b5e20', 2.4);
   P.push(B(0.04, 0.9, 0.04, '#ddd', 0.28, 1.3, -1.08), B(0.04, 0.9, 0.04, '#ddd', 0.28, 1.3, 1.08), B(0.04, 0.04, 2.2, '#ddd', 0.28, 1.74, 0));
   for (let k = 0; k < 5; k++) { const zz = -0.85 + k * 0.42; P.push(SP(0.13, '#9c3d12', [0.12, 1.32, zz], [1, 1.45, 0.9]), B(0.02, 0.2, 0.02, '#888', 0.12, 1.62, zz)); }
   P.push(B(0.6, 0.25, 2.2, '#ffd54f', 0, 1.88, 0));
-  const cab = new THREE.Mesh(merge(P), vcMat); cab.position.set(-FACADE_X + 0.32, 0, 1.6); scene.add(cab);
+  const cab = new THREE.Mesh(merge(P), vcMat); cab.position.set(-FACADE_X + 0.32, 0, 1.0); scene.add(cab);
   const grill = new THREE.Mesh(merge([B(0.55, 0.7, 1.1, '#3a3a3a', 0, 0.35, 0), B(0.5, 0.06, 1.0, '#ff5a1f', 0, 0.72, 0),
   ...[0, 1, 2, 3, 4].map(k => B(0.5, 0.03, 0.04, '#d8b07a', 0.02, 0.77, -0.4 + k * 0.2))]), vcMat);
   grill.position.set(-FACADE_X + 0.3, 0, -4.6); scene.add(grill);
@@ -996,12 +1024,12 @@ addVerticalSign(-1, SHOP_Z1 + 0.5, 5.2, 'BIA HƠI', '#ffffff', '#1b5e20', 2.4);
   const crates = [];
   for (let k = 0; k < 5; k++) { const c = ['#c62828', '#2e7d32', '#f9a825'][k % 3]; crates.push(B(0.42, 0.3, 0.6, c, (k % 2) * 0.05, 0.15 + k * 0.31, k % 2 ? 0.03 : 0)); }
   for (let k = 0; k < 3; k++) crates.push(B(0.42, 0.3, 0.6, ['#2e7d32', '#c62828', '#1565c0'][k], 0, 0.15 + k * 0.31, 0.68));
-  const cr = new THREE.Mesh(merge(crates), vcMat); cr.position.set(-FACADE_X + 0.25, 0, 4.3); scene.add(cr);
+  const cr = new THREE.Mesh(merge(crates), vcMat); cr.position.set(-FACADE_X + 0.25, 0, -6.7); scene.add(cr);
   const keg = new THREE.Mesh(merge([CY(0.28, 0.28, 0.75, '#b0bec5', [0, 0.375, 0]), CY(0.29, 0.29, 0.05, '#78909c', [0, 0.15, 0]), CY(0.29, 0.29, 0.05, '#78909c', [0, 0.6, 0]), CY(0.03, 0.03, 0.15, '#333', [0, 0.82, 0]),
   CY(0.28, 0.28, 0.75, '#b0bec5', [0, 0.375, 0.62]), CY(0.29, 0.29, 0.05, '#78909c', [0, 0.15, 0.62]), CY(0.29, 0.29, 0.05, '#78909c', [0, 0.6, 0.62])]), vcMat);
   keg.position.set(-FACADE_X + 0.3, 0, -7.9); scene.add(keg);
   const cool = new THREE.Mesh(merge([B(0.5, 0.5, 0.8, '#1e88e5', 0, 0.25, 0), B(0.52, 0.06, 0.82, '#e3f2fd', 0, 0.52, 0)]), vcMat);
-  cool.position.set(-FACADE_X + 0.28, 0, 3.25); scene.add(cool);
+  cool.position.set(-FACADE_X + 0.28, 0, 7.6); scene.add(cool);
 }
 
 /* ---------- Góc karaoke vỉa hè (loa kẹo kéo + TV) & băng rôn ---------- */
@@ -1015,18 +1043,19 @@ const beams = [];
   CY(0.27, 0.27, 0.04, '#3a3a44', [0, 0.65, 0.28], [Math.PI / 2, 0, 0], 16), CY(0.1, 0.1, 0.05, '#666', [0, 0.65, 0.29], [Math.PI / 2, 0, 0], 12),
   CY(0.12, 0.12, 0.04, '#3a3a44', [0, 1.27, 0.28], [Math.PI / 2, 0, 0], 12),
   TO(0.08, 0.035, '#111', [-0.3, 0.08, 0.2], [0, Math.PI / 2, 0]), TO(0.08, 0.035, '#111', [0.3, 0.08, 0.2], [0, Math.PI / 2, 0])]), vcMat);
-  loa.position.set(KARAOKE.x - 0.7, 0, KARAOKE.z + 1.35); loa.rotation.y = Math.PI / 2 - 0.35; scene.add(loa);
+  loa.position.set(-FACADE_X + 0.55, 0, KARAOKE.z + 1.75); loa.rotation.y = Math.PI / 2 + 0.25; scene.add(loa);
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.29, 0.025, 6, 24), stageStrip); ring.position.set(0, 0.65, 0.3); loa.add(ring);
+  const loa2 = loa.clone(); loa2.position.z = KARAOKE.z - 1.75; loa2.rotation.y = Math.PI / 2 - 0.25; scene.add(loa2);   // 2 loa kẹp 2 bên TV
   const mic = new THREE.Mesh(merge([CY(0.15, 0.18, 0.03, '#222', [0, 0.015, 0], null, 10), CY(0.015, 0.015, 1.3, '#999', [0, 0.65, 0], null, 6), CY(0.03, 0.02, 0.12, '#111', [0, 1.33, 0.04], [0.5, 0, 0], 8), SP(0.04, '#aaa', [0, 1.4, 0.07])]), vcMat);
-  mic.position.set(KARAOKE.x + 0.25, 0, KARAOKE.z - 0.8); scene.add(mic);
-  const rug = new THREE.Mesh(merge([B(2.3, 0.01, 3.4, '#8e1b3a', 0, 0.007, 0), B(2.1, 0.012, 3.2, '#b5294e', 0, 0.008, 0), B(1.9, 0.014, 0.06, '#ffd54f', 0, 0.009, 1.45), B(1.9, 0.014, 0.06, '#ffd54f', 0, 0.009, -1.45)]), vcMat);
-  rug.position.set(KARAOKE.x - 0.1, 0, KARAOKE.z + 0.3); scene.add(rug);
+  mic.position.set(KARAOKE.x + 0.45, 0, KARAOKE.z - 0.45); scene.add(mic);
+  const rug = new THREE.Mesh(merge([B(2.6, 0.01, 3.8, '#8e1b3a', 0, 0.007, 0), B(2.4, 0.012, 3.6, '#b5294e', 0, 0.008, 0), B(2.2, 0.014, 0.06, '#ffd54f', 0, 0.009, 1.65), B(2.2, 0.014, 0.06, '#ffd54f', 0, 0.009, -1.65)]), vcMat);
+  rug.position.set(-FACADE_X + 1.35, 0, KARAOKE.z); scene.add(rug);
   ledCanvas = document.createElement('canvas'); ledCanvas.width = 320; ledCanvas.height = 160; ledCtx = ledCanvas.getContext('2d');
   ledTex = new THREE.CanvasTexture(ledCanvas); ledTex.colorSpace = THREE.SRGBColorSpace;
-  const tv = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.95), new THREE.MeshBasicMaterial({ map: ledTex }));
-  tv.position.set(KARAOKE.x - 1.0, 2.15, KARAOKE.z); tv.rotation.y = Math.PI / 2; scene.add(tv);
-  const tvFrame = new THREE.Mesh(merge([B(2.04, 1.1, 0.1, '#111', 0, 2.15, -0.07), B(0.08, 1.55, 0.08, '#444', 0, 0.78, -0.1), B(0.8, 0.05, 0.4, '#444', 0, 0.025, -0.1)]), vcMat);
-  tvFrame.position.set(KARAOKE.x - 1.0, 0, KARAOKE.z); tvFrame.rotation.y = Math.PI / 2; scene.add(tvFrame);
+  const tv = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshBasicMaterial({ map: ledTex }));   // TV treo sát tường quán
+  tv.position.set(-FACADE_X + 0.14, 1.62, KARAOKE.z); tv.rotation.y = Math.PI / 2; scene.add(tv);
+  const tvFrame = new THREE.Mesh(merge([B(2.56, 1.36, 0.1, '#111', 0, 1.62, -0.07), B(2.9, 0.06, 0.3, '#ff2d7a', 0, 0.86, 0.02), B(0.5, 0.04, 0.05, '#555', 0, 2.33, -0.1)]), vcMat);
+  tvFrame.position.set(-FACADE_X + 0.14, 0, KARAOKE.z); tvFrame.rotation.y = Math.PI / 2; scene.add(tvFrame);
   // bảng menu phấn trước quán
   const boardTex = signTexture([{ t: 'MỒI NHẬU', size: 34, color: '#ffffff', y: 34, blur: 2 }, { t: 'Bia hơi 10K', size: 26, color: '#ffe082', y: 74, blur: 2 }, { t: 'Lạc • Mực • Ốc', size: 24, color: '#b2ff59', y: 108, blur: 2 }, { t: 'Lẩu • Nướng', size: 24, color: '#ff8a80', y: 140, blur: 2 }], { w: 180, h: 170, bg: '#20302a', border: '#8d6e63', bw: 10, r: 6 });
   const board = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.7), new THREE.MeshBasicMaterial({ map: boardTex }));
@@ -1044,7 +1073,7 @@ const moon = new THREE.DirectionalLight(0xa8b4ff, 0.9); moon.position.set(6, 14,
 const warm1 = new THREE.PointLight(0xffb066, 40, 16, 1.6); warm1.position.set(-6.2, 4.6, 4); scene.add(warm1);
 const warm2 = new THREE.PointLight(0xffb066, 40, 16, 1.6); warm2.position.set(-6.2, 4.6, -4); scene.add(warm2);
 const shopLight = new THREE.PointLight(0xff9a3c, 40, 14, 1.6); shopLight.position.set(-10.4, 2.8, 0); scene.add(shopLight);
-const stageLight = new THREE.PointLight(0xff3d9a, 35, 13, 1.6); stageLight.position.set(KARAOKE.x + 1.6, 3.0, KARAOKE.z); scene.add(stageLight);
+const stageLight = new THREE.PointLight(0xff3d9a, 35, 13, 1.6); stageLight.position.set(KARAOKE.x + 2.0, 2.6, KARAOKE.z); scene.add(stageLight);
 // dây đèn bóng tròn giăng ngang phố
 {
   const bulbs = []; const wires = [];
@@ -1070,7 +1099,7 @@ const stageLight = new THREE.PointLight(0xff3d9a, 35, 13, 1.6); stageLight.posit
 {
   const lg = merge([SP(0.2, '#e53935', [0, 0, 0], [1, 1.25, 1], 10, 8), CY(0.12, 0.12, 0.05, '#ffcc33', [0, 0.25, 0]), CY(0.12, 0.12, 0.05, '#ffcc33', [0, -0.25, 0]), B(0.03, 0.22, 0.03, '#ffcc33', 0, -0.38, 0), B(0.01, 0.3, 0.01, '#333', 0, 0.42, 0)]);
   const lm = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x8a1a10 });
-  for (let z = 8.1; z > -9; z -= 1.8) { const l = new THREE.Mesh(lg, lm); l.position.set(-FACADE_X + 1.05, 2.2, z); scene.add(l); }
+  for (let z = 8.1; z > -9; z -= 1.8) { if (z > KARAOKE.z - 2.2 && z < KARAOKE.z + 2.2) continue; const l = new THREE.Mesh(lg, lm); l.position.set(-FACADE_X + 1.05, 2.2, z); scene.add(l); }
 }
 // cột điện bê tông + dây điện chằng chịt kiểu phố Việt
 {
@@ -1103,7 +1132,7 @@ const stageLight = new THREE.PointLight(0xff3d9a, 35, 13, 1.6); stageLight.posit
   const t1 = new THREE.Mesh(tree, vcMat); t1.position.set(-2.5, 0, -11.2); scene.add(t1);
   const t2 = new THREE.Mesh(tree, vcMat); t2.position.set(-2.6, 0, 11.6); t2.rotation.y = 1.3; scene.add(t2);
   const st = []; for (let k = 0; k < 6; k++) st.push(CY(0.16, 0.18, 0.06, k % 2 ? '#1f7fd8' : '#d7332f', [0, 0.2 + k * 0.07, 0], null, 10), CY(0.12, 0.17, 0.24, k % 2 ? '#1f7fd8' : '#d7332f', [0, 0.1 + k * 0.07, 0], null, 8));
-  const stack = new THREE.Mesh(merge(st), vcMat); stack.position.set(-FACADE_X + 0.3, 0, 7.9); scene.add(stack);
+  const stack = new THREE.Mesh(merge(st), vcMat); stack.position.set(-FACADE_X + 0.35, 0, 8.45); scene.add(stack);
   const bin = new THREE.Mesh(merge([CY(0.25, 0.22, 0.75, '#2e7d32', [0, 0.375, 0], null, 10), CY(0.27, 0.27, 0.06, '#1b5e20', [0, 0.77, 0], null, 10)]), vcMat); bin.position.set(-2.6, 0, -9.8); scene.add(bin);
 }
 // tiền cảnh bên này đường (như ảnh chụp thật): trụ cứu hỏa, cột đèn thấp; băng rôn dọc trên cột điện bên kia
@@ -1149,7 +1178,7 @@ const blobs = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.0, 3.0).rotateX(
   const r = mulberry32(42);
   let ti = 0, li = 0, si = 0;
   [0, 1].forEach((col, k) => [...ROWS].sort((p, q) => q - p).forEach((z, ri) => {
-    if (col === 0 && KARA_ROWS.includes(z)) return;
+    if (col === 1 && KARA_ROWS.includes(z)) return;
     const sd = -1, x = -(col ? TABLE_X2 : TABLE_X), n = tables.length + 1;
     const base = (ri + k) % 2 ? BLUE : RED;
     for (const dz of [-TOP_DZ, TOP_DZ]) {
@@ -1473,7 +1502,7 @@ function speak(text) {
 /* =====================================================================
    CẬU CẢ & NHÂN VIÊN
    ===================================================================== */
-const owner = new Actor({ skin: '#d9a07a', hairCol: '#151010', hair: 0, singlet: true, pants: '#3a3a3a', shoe: '#7a4a2a', mustache: true, scale: 1.2 }, { speed: 1.6 });
+const owner = new Actor({ skin: '#d9a07a', hairCol: '#151010', hair: 0, singlet: true, pants: '#3a3a3a', shoe: '#7a4a2a', mustache: true, scale: 1.2 }, { speed: 2.3 });
 owner.g.position.set(-FACADE_X + 0.75, 0, -3.9); owner.rot = Math.PI / 2 + 0.5; owner.g.rotation.y = owner.rot;
 owner.setLabel('Cậu Cả · Chủ quán', { bg: '#c62828', fg: '#ffe082', border: '#ffd54f', scale: 0.72 });
 owner.bubbleStyle = { bg: '#fff3c4', fg: '#5a1d00' };
@@ -1532,6 +1561,7 @@ function approach(s) {   // luôn bắt đầu từ lối đi sát lòng đườ
   return pre.concat([{ x: li, z: gz }, { x: lo, z: gz }, { x: lo, z: s.z }, { x: s.x, z: s.z }]);
 }
 const leavePath = s => approach(s).reverse().slice(1);
+const stageExit = () => [{ x: STAGE_BOX.DX, z: KARAOKE.z }, { x: -LANE_MID, z: KARA_GAP }, { x: -LANE_IN, z: KARA_GAP }];   // từ sân hát ra lối sát đường
 const freeSeats = t => t.seats.filter(s => !s.guest);
 function freeSeatAt(t, prefer) {
   const f = freeSeats(t); if (!f.length) return null;
@@ -1610,6 +1640,7 @@ class Guest extends Actor {
       this.walkTo(leavePath(s).concat([ex]), () => this.destroy());
     } else {
       const sx = p.x < 0 ? -LANE_IN : LANE_IN;
+      if (inStage(p)) { this.walkTo(stageExit().concat([{ x: sx, z: FRONT_Z + 3 }]), () => this.destroy()); return; }
       this.walkTo([{ x: sx, z: p.z }, { x: sx, z: p.z > 0 ? FRONT_Z + 3 : BACK_Z - 3 }], () => this.destroy());
     }
   }
@@ -1862,9 +1893,10 @@ function startSing(it) {
   const k = karaoke; k.cur = it; it.el = 0; it.singing = false;
   const a = it.g || owner; it.actor = a; a.pending = null;
   let path;
-  if (it.g) path = leavePath(it.g.seat).concat([{ x: -LANE_IN, z: KARAOKE.z + 0.6 }]);
-  else path = [{ x: -LANE_OUT, z: owner.g.position.z }, { x: -LANE_OUT, z: KARAOKE.z + GAP_DZ }, { x: KARAOKE.x, z: KARAOKE.z + GAP_DZ }];
-  path.push({ x: KARAOKE.x, z: KARAOKE.z });
+  // khách: ra lối sát đường → khe giữa 2 bàn trước sân hát → lên sân; chủ quán đi dọc mặt tiền rồi vòng vào (routeAround lo phần tránh loa/TV)
+  if (it.g) path = (it.g.state === 'sit' && it.g.seat ? leavePath(it.g.seat) : []).concat([{ x: -LANE_IN, z: KARA_GAP }, { x: -LANE_MID, z: KARA_GAP }]);
+  else path = [];
+  path.push({ x: KARAOKE.x, z: KARAOKE.z, stage: true });
   a.walkTo(path, () => { if (k.cur !== it) return; a.rot = Math.PI / 2 - 0.25; a.singing = true; it.singing = true; beginPerformance(it); });
   a.say(it.title ? `Lên hát "${trunc(it.title, 18)}" đây! 🎤` : 'Lên hát đây! 🎤', 2.5);
   refreshKQ();
@@ -1902,10 +1934,10 @@ function endSing(abort) {
   }
   if (it.g) {
     const s = it.g.seat; if (!s) return it.g.leave();
-    it.g.walkTo([{ x: -LANE_IN, z: KARAOKE.z + 0.6 }].concat(approach(s)), () => it.g.sit());
+    it.g.walkTo(stageExit().concat(approach(s)), () => it.g.sit());
     tableToast(s.table, it.g);
   } else {
-    owner.walkTo([{ x: KARAOKE.x, z: KARAOKE.z + GAP_DZ }, { x: -LANE_OUT, z: KARAOKE.z + GAP_DZ }, { x: -LANE_OUT, z: -3.9 }, { x: -FACADE_X + 0.75, z: -3.9 }], () => { owner.rot = Math.PI / 2 + 0.5; });
+    owner.walkTo([{ x: -FACADE_X + 0.75, z: -3.9 }], () => { owner.rot = Math.PI / 2 + 0.5; });
   }
 }
 function updateKaraoke(dt) {
@@ -1918,7 +1950,7 @@ function updateKaraoke(dt) {
     if (ch) refreshKQ();
   }
   if (!k.cur) {
-    while (k.queue.length) {
+    while (k.queue.length && !MCX.busy) {   // Cậu Cả đang kể chuyện trên sân khấu thì đợi kể xong mới gọi người hát
       const it = k.queue[0];
       if (it.g && it.g.leaving) { k.queue.shift(); refreshKQ(); continue; }
       if (it.g && it.g.state !== 'sit') break;          // chờ khách ngồi xuống đã
@@ -2267,9 +2299,12 @@ function endParty() {
   beams.forEach(b => b.visible = false);
   ledMsg = 'QUÁN NHẬU VỈA HÈ CẬU CẢ  •  DZÔ ANH EM ƠI!  •  KHÔNG SAY KHÔNG VỀ  •  ';
 }
+const EMO_RE = /\[(cười|thở dài|hắng giọng)\]/g;   // ký hiệu cảm xúc cho giọng VieNeu – không hiện lên màn hình
+const noEmo = s => String(s || '').replace(EMO_RE, ' ').replace(/\s+([!?.,])/g, '$1').replace(/\s+/g, ' ').trim();
 function ownerSay(text, force) {
   const t = now(); if (!force && t - G.lastOwnerSay < 3500) return;
-  G.lastOwnerSay = t; G.mcAsked = 0; owner.say(text, 4); owner.waveT = 1.2;
+  const shown = noEmo(text);
+  G.lastOwnerSay = t; G.mcAsked = 0; owner.say(shown, clamp(2.5 + shown.length * 0.06, 4, 9)); owner.waveT = 1.2;
   speakMC(text);
 }
 function tableToast(t, except) {
@@ -2364,7 +2399,7 @@ function onChat(uid, name, text) {
   speak(`${name} nói: ${text}`);
   const mgWin = MG.onChat(g, text);
   const t = norm(text), lo = text.normalize('NFC').toLowerCase();
-  if (mgWin || viewerStartMG(g, t) || circusAsk(g, t)) return;
+  if (mgWin || viewerStartMG(g, t) || circusAsk(g, t) || jokeAsk(g, t)) return;
   let m;
   // --- chọn chỗ ngồi ---
   if ((m = lo.match(RE_TABLE))) goTable(g, parseInt(m[1], 10));
@@ -2754,7 +2789,7 @@ for (const [id, key] of [['ytKey', 'ytKey'], ['kMin', 'kMin'], ['kPrio', 'kPrio'
   if (el.type === 'range') el.addEventListener('input', () => { opts[key] = Number(el.value); if (key === 'ytVol') YTK.setVolume(opts.ytVol); else Mic.apply(); });
 }
 bindToggle('optKSuffix', 'kSuffix');
-Object.assign(opts, Object.assign({ bgmYt: false, bgmQuery: '', bgmVol: 35, circusAuto: true, circusEvery: 6, mcVoice: false, mcGap: 40 }, opts));
+Object.assign(opts, Object.assign({ bgmYt: false, bgmQuery: '', bgmVol: 35, circusAuto: true, circusEvery: 6, mcVoice: false, mcGap: 40, jokeOn: true, jokeEvery: 4 }, opts));
 bindToggle('optBgmYt', 'bgmYt', () => BGM.tick());
 $('#bgmQuery').value = opts.bgmQuery || ''; $('#bgmQuery').placeholder = 'Từ khoá nhạc nền (mặc định: ' + BGM_DEF_Q + ')';
 $('#bgmQuery').addEventListener('change', e => { opts.bgmQuery = e.target.value.trim(); saveOpts(); if (BGM.playing) BGM.play(); });
@@ -2934,7 +2969,7 @@ TRIVIA.push(
   ['Môn thể thao nào dùng vợt và quả cầu có lông vũ?', ['Cầu lông', 'cau long']]
 );
 const TYPE_WORDS = ['BIA HƠI', 'MỰC NƯỚNG', 'CẬU CẢ', 'VỈA HÈ', 'LẨU THÁI', 'TRÀ ĐÁ', 'ỐC LUỘC', 'DZÔ DZÔ', 'GHẾ NHỰA', 'ĐẬU PHỘNG'];
-const MG_INFO = { do_vui: ['🧠 ĐỐ VUI', 40], doan_so: ['🔢 ĐOÁN SỐ 1–100', 75], nhanh_tay: ['⚡ NHANH TAY', 25], dua_ban: ['🏁 ĐUA BÀN', 60] };
+const MG_INFO = { do_vui: ['🧠 ĐỐ VUI', 40], doan_so: ['🔢 ĐOÁN SỐ 1–100', 75], nhanh_tay: ['⚡ NHANH TAY', 25], dua_ban: ['🏁 ĐUA BÀN', 60], binh_chon: ['📊 BÌNH CHỌN', 40] };
 const mgNorm = s => norm(s).replace(/[^\p{L}\p{N}\/\s-]/gu, ' ').replace(/\s+/g, ' ').trim();
 const MG = {
   cur: null, last: -1e9, lastHint: 0, autoAcc: 0,
@@ -2946,9 +2981,11 @@ const MG = {
     if (type === 'doan_so') { c.n = randi(1, 100); c.lo = 1; c.hi = 100; c.text = 'Cậu Cả nghĩ một số từ 1 đến 100. Comment một con số để đoán!'; }
     if (type === 'nhanh_tay') { c.word = pick(TYPE_WORDS) + ' ' + randi(10, 99); c.text = `Ai gõ đúng nhanh nhất: <b class="mgWord">${esc(c.word)}</b>`; c.ans = [mgNorm(c.word)]; }
     if (type === 'dua_ban') c.text = 'Bàn nào comment, thả tim, tặng quà nhiều nhất trong 60 giây thắng <b>tháp bia</b>!';
+    if (type === 'binh_chon') { const q = pick(POLLS.filter(x => x !== this.lastPoll)); this.lastPoll = q; c.poll = q; c.votes = new Map(); c.text = this.pollHtml(c); }
     $('#mgTitle').textContent = title; $('#mgBody').innerHTML = c.text; $('#mg').classList.remove('hidden'); document.body.classList.add('mgOn');
     banner(`${title}${who === 'viewer' ? '' : ''} bắt đầu!`, 'purple', 2200); Snd.sparkle();
     feed(`🎯 <b>${title}</b>: ${c.text}`, 'sys');
+    if (type === 'binh_chon') ownerSay(`Bình chọn nè cả nhà! ${c.poll[0]} Comment số một là ${c.poll[1]}, số hai là ${c.poll[2]}!`, true); else
     ownerSay(type === 'do_vui' ? 'Đố vui nè, ai trả lời nhanh nhất có quà!' : type === 'doan_so' ? 'Đoán số đi cả nhà!' : type === 'nhanh_tay' ? 'Nhanh tay lên nào!' : 'Đua bàn! Bàn nào sôi nổi nhất?', true);
     Bots.mgPlan = [randi(4, 12), randi(12, 25)]; // khách quen tham gia cho vui (không bao giờ thắng)
     return true;
@@ -2963,9 +3000,20 @@ const MG = {
     explode(new THREE.Vector3(g.pos.x, 2.2, g.pos.z), 80, 0.2, 2.4, 1.4); Snd.fanfare(); Snd.cheer(1.4); addVibe(10);
     ownerSay(`Chúc mừng ${trunc(g.name, 12)}! Tặng đĩa khô mực nha!`, true);
   },
+  pollHtml(c) {
+    const n = [0, 0]; c.votes.forEach(v => n[v]++); const tot = n[0] + n[1];
+    const pc = i => tot ? Math.round(n[i] * 100 / tot) : 0;
+    return `${esc(c.poll[0])}<br>` + [1, 2].map(i => `<b>${i}</b> ${esc(c.poll[i])}: <b>${n[i - 1]}</b>${tot ? ` (${pc(i - 1)}%)` : ''}`).join(' · ') + '<br><small>Comment 1 hoặc 2 để bình chọn</small>';
+  },
   onChat(g, text) { // trả về true nếu là câu trả lời đúng
     const c = this.cur; if (!c) return false;
     const t = mgNorm(text);
+    if (c.type === 'binh_chon') {   // mỗi người xem thật một phiếu (đổi ý được); khách quen 🏠 không bỏ phiếu
+      const a = mgNorm(c.poll[1]), b = mgNorm(c.poll[2]);
+      const v = /^(so )?(1|mot)$/.test(t) || t === a ? 0 : /^(so )?(2|hai)$/.test(t) || t === b ? 1 : -1;
+      if (v < 0 || g.npc || isBotUid(g.uid)) return false;
+      c.votes.set(String(g.uid), v); g.points += 1; $('#mgBody').innerHTML = this.pollHtml(c); return false;
+    }
     if (c.type === 'dua_ban') { this.score(g, 1); return false; }
     if (c.type === 'doan_so') {
       const m = t.match(/^(\d{1,3})$/); if (!m) return false;
@@ -2998,6 +3046,16 @@ const MG = {
       $('#mgBody').innerHTML = c.text + (top.length ? '<br>' + top.map(([t, s], i) => `${['🥇', '🥈', '🥉'][i]} Bàn ${t.n}${t.name ? ' “' + esc(t.name) + '”' : ''}: <b>${Math.round(s)}</b>`).join(' · ') : '');
     }
     if (c.t <= 0) {
+      if (c.type === 'binh_chon') {
+        const n = [0, 0]; c.votes.forEach(v => n[v]++); const tot = n[0] + n[1]; this.stop();
+        if (!tot) { feed(`📊 Bình chọn “${esc(c.poll[0])}” kết thúc – chưa ai chọn, lần sau nha!`, 'sys'); ownerSay('Chưa ai bình chọn hết trơn! Lần sau comment số một hay số hai nha cả nhà!', true); return; }
+        const w = n[0] === n[1] ? -1 : n[0] > n[1] ? 1 : 2, pa = Math.round(n[0] * 100 / tot);
+        const res = `${esc(c.poll[1])} ${pa}% – ${esc(c.poll[2])} ${100 - pa}%`;
+        banner(`📊 ${esc(c.poll[0])}<br><b>${w < 0 ? 'Hòa nhau!' : esc(c.poll[w]) + ' thắng!'}</b> (${res})`, 'gold', 4000);
+        feed(`📊 Kết quả bình chọn “${esc(c.poll[0])}”: ${res} (${tot} phiếu)`, 'gift');
+        ownerSay(w < 0 ? `Hòa nhau luôn! Cả nhà chia đôi, vui ghê! Cảm ơn ${tot} người đã bình chọn nha!` : `Kết quả nè! ${c.poll[w]} thắng với ${w === 1 ? pa : 100 - pa} phần trăm! Cảm ơn ${tot} người đã bình chọn nha!`, true);
+        Snd.fanfare(); addVibe(6); return;
+      }
       if (c.type === 'dua_ban') {
         const best = [...c.scores.entries()].sort((a, b) => b[1] - a[1])[0];
         this.stop();
@@ -3017,7 +3075,7 @@ const MG = {
   }
 };
 $('#bGame').onclick = () => { Snd.resume(); if (MG.cur) MG.stop('⏹ Chủ quán dừng trò chơi'); else MG.start(pick(Object.keys(MG_INFO)), 'host'); };
-const RE_MG = { do_vui: /(^|\s)(do vui|choi do vui|cau do)(\s|$|!|\?)/, doan_so: /(^|\s)(doan so|choi doan so)(\s|$|!)/, nhanh_tay: /(^|\s)(nhanh tay|go nhanh)(\s|$|!)/, dua_ban: /(^|\s)(dua ban|thi dua ban)(\s|$|!)/ };
+const RE_MG = { binh_chon: /(^|\s)(binh chon|bau chon)(\s|$|!)/, do_vui: /(^|\s)(do vui|choi do vui|cau do)(\s|$|!|\?)/, doan_so: /(^|\s)(doan so|choi doan so)(\s|$|!)/, nhanh_tay: /(^|\s)(nhanh tay|go nhanh)(\s|$|!)/, dua_ban: /(^|\s)(dua ban|thi dua ban)(\s|$|!)/ };
 function viewerStartMG(g, t) {
   for (const [k, re] of Object.entries(RE_MG)) if (re.test(t)) {
     if (MG.cur) return true;
@@ -3231,6 +3289,7 @@ function updateBots(dt) {
     Bots.mgPlan.shift(); const b = pick(seated);
     if (c.type === 'doan_so') { let v = randi(c.lo, c.hi); if (v === c.n) v = v < 100 ? v + 1 : v - 1; botSay(b, String(v)); MG.onChat(b, String(v)); }
     else if (c.type === 'do_vui') { const w = pick(TRIVIA.filter(x => x[0] !== c.q))[1][0]; botSay(b, pick([`${w} hả?`, `Chắc là ${w}`, 'Khó quá, ai biết không?'])); }
+    else if (c.type === 'binh_chon') botSay(b, pick(['Khó chọn ghê 🤔', 'Coi mọi người chọn gì nè', 'Chọn gì cũng vui!']));   // khách quen không bỏ phiếu
     else if (c.type === 'nhanh_tay') botSay(b, pick(['Gõ không kịp 😭', c.word.split(' ')[0].toLowerCase() + ' ...', 'Tay run quá!']));
     else botSay(b, pick(['Bàn mình cố lên!', 'Thả tim cho bàn mình đi!', 'Comment nhiều vô mọi người ơi!']));
   }
@@ -3298,7 +3357,7 @@ Mục tiêu: giữ phòng live vui, ấm áp, nhiều tương tác, để ngư�
 - Lời của Cậu Cả được đọc thành tiếng trên live: câu ngắn (dưới 25 chữ), tự nhiên như nói chuyện, không dùng ký hiệu lạ. Mỗi lượt nói tối đa 1–2 câu.
 - Sự kiện chung (dzo, boc_tham, phao_hoa, quay) chỉ mở khi có lý do và chỉ khi trạng thái cho biết sự kiện đó đang mở được.
 
-Giọng: thân thiện, hài hước kiểu quán vỉa hè, tiếng Việt có dấu, câu ngắn dưới 110 ký tự, không lặp lại những câu vừa nói. Mỗi lượt chọn 0–3 hành động; không có gì đáng nói thì không gọi công cụ nào.
+Giọng: giọng đọc là giọng nữ, hào hứng, năng lượng như MC dẫn sự kiện; thân thiện, hài hước kiểu quán vỉa hè; có thể chèn [cười] sau câu đùa (giọng đọc sẽ bật cười), tiếng Việt có dấu, câu ngắn dưới 110 ký tự, không lặp lại những câu vừa nói. Mỗi lượt chọn 0–3 hành động; không có gì đáng nói thì không gọi công cụ nào.
 
 Giới hạn:
 - Đồ ăn, bia trong quán là ảo. Không cổ vũ uống rượu bia thật, không hứa tiền, quà hay phần thưởng thật.
@@ -3309,13 +3368,13 @@ Giới hạn:
 Phòng live mới, ít người xem:
 - Trong quán có "khách quen" 🏠 là nhân vật máy của quán cho đông vui; họ không phải người xem. Đừng chào, cảm ơn hay trả lời họ; tập trung vào người xem thật.
 - Gọi tên từng người xem thật, hỏi han họ (ở đâu, uống gì, thích bài gì), mời họ chơi.
-- Khi vắng comment, mở trò chơi nhỏ: do_vui (câu đố), doan_so (đoán số 1–100), nhanh_tay (gõ nhanh), dua_ban (bàn nào sôi nổi nhất thắng tháp bia). Không mở trò khi đang có trò chạy.
+- Khi vắng comment, mở trò chơi nhỏ: do_vui (câu đố), doan_so (đoán số 1–100), nhanh_tay (gõ nhanh), dua_ban (bàn nào sôi nổi nhất thắng tháp bia), binh_chon (bình chọn vui 1/2). Không mở trò khi đang có trò chạy. Có người xin nghe chuyện cười thì dùng su_kien ke_chuyen (quán có sẵn kho chuyện).
 - Câu mẫu: "@Lan ơi, Sài Gòn hay Hà Nội đó?", "Ai trả lời được câu đố này có khô mực nha!", "Quán đang vắng, comment đố vui đi cả nhà!".`;
 const AI_TOOLS = [
   { name: 'noi', description: 'Cậu Cả nói một câu: hiện bong bóng trên đầu Cậu Cả và trong khung chat của live. Dùng để chào, cảm ơn, trả lời bình luận, rủ mọi người tương tác.', strict: true,
     input_schema: { type: 'object', properties: { text: { type: 'string', description: 'Câu nói tiếng Việt có dấu, tối đa 110 ký tự' }, to: { type: 'string', description: 'Tên người xem đang được trả lời; chuỗi rỗng nếu nói với cả quán' } }, required: ['text', 'to'], additionalProperties: false } },
   { name: 'su_kien', description: 'Mở một sự kiện chung hoặc trò chơi nhỏ. dzo: đếm 1-2-3 cả quán cụng ly. boc_tham: bốc thăm một khách trúng tháp bia ảo. phao_hoa: bắn pháo hoa. quay: chế độ quẩy 20 giây. do_vui: câu đố, ai trả lời đúng trước thắng. doan_so: đoán số 1–100. nhanh_tay: ai gõ đúng cụm từ nhanh nhất thắng. dua_ban: bàn nào sôi nổi nhất 60 giây thắng tháp bia. xiec: mời đoàn xiếc đường phố diễn ~25 giây (tung hứng, phun lửa, cà kheo, xoay đĩa, múa lân) – người xem thả tim/tặng quà thưởng nghệ sĩ.', strict: true,
-    input_schema: { type: 'object', properties: { loai: { type: 'string', enum: ['dzo', 'boc_tham', 'phao_hoa', 'quay', 'do_vui', 'doan_so', 'nhanh_tay', 'dua_ban', 'xiec'] } }, required: ['loai'], additionalProperties: false } },
+    input_schema: { type: 'object', properties: { loai: { type: 'string', enum: ['dzo', 'boc_tham', 'phao_hoa', 'quay', 'do_vui', 'doan_so', 'nhanh_tay', 'dua_ban', 'binh_chon', 'xiec', 'ke_chuyen'] } }, required: ['loai'], additionalProperties: false } },
   { name: 'thong_bao', description: 'Hiện băng thông báo lớn giữa màn hình. Dùng tiết kiệm, chỉ cho tin quan trọng (mốc tim, quà lớn, sự kiện sắp diễn ra).', strict: true,
     input_schema: { type: 'object', properties: { text: { type: 'string', description: 'Tối đa 60 ký tự' } }, required: ['text'], additionalProperties: false } },
   { name: 'moi_mon', description: 'Cậu Cả mời miễn phí một món nhỏ cho bàn của một khách đang ngồi trong quán, để thưởng người tương tác vui. lac: đậu phộng, muc: khô mực, tra: trà đá.', strict: true,
@@ -3324,7 +3383,7 @@ const AI_TOOLS = [
 const AI = { on: false, need: 0, client: null, clientKey: '', busy: false, buf: [], likes: {}, joins: [], acc: 0, quiet: 0, said: [], calls: [], cost: 0, nCalls: 0, log: [], err: '', backoff: 0, lastBanner: -1e9, lastDish: -1e9 };
 const clean = (s, n) => trunc(String(s ?? '').replace(/[\u0000-\u001f<>`]/g, ' ').replace(/"/g, '”').replace(/\s+/g, ' ').trim(), n);
 // lệnh game tự xử lý, không cần Claude trả lời
-const CMD_RE = /^(ban\s*\d+|ban rieng|ghep |ngoi voi |ngoi chung |moi |ten ban |doi ban|dzo|zo+\b|100|tram phan tram|cung ly|nhay|oan tu|xi ngau|tra da|hat\b|xin len mic|huy bai|thoi khong hat|do vui|doan so|nhanh tay|dua ban|xiec|mua lan|phun lua|tung hung|ca kheo|xoay dia|ve nha|ve thoi|tinh tien)/;
+const CMD_RE = /^(ban\s*\d+|ban rieng|ghep |ngoi voi |ngoi chung |moi |ten ban |doi ban|dzo|zo+\b|100|tram phan tram|cung ly|binh chon|bau chon|ke chuyen|chuyen cuoi|nhay|oan tu|xi ngau|tra da|hat\b|xin len mic|huy bai|thoi khong hat|do vui|doan so|nhanh tay|dua ban|xiec|mua lan|phun lua|tung hung|ca kheo|xoay dia|ve nha|ve thoi|tinh tien)/;
 function needsReply(text) {
   const t = mgNorm(text); if (t.length < 3 || MG.cur) return false;   // câu quá ngắn / đang trả lời trò chơi
   return !CMD_RE.test(t);
@@ -3353,7 +3412,8 @@ function aiState() {
     `Karaoke: ${sing}; chờ ${k.queue.length} bài; ${k.pending.size} bài chờ tặng quà; ${k.micReq.size} người xin lên mic`,
     `Top điểm: ${top}`, priv ? `Bàn riêng: ${priv}` : '',
     `Sự kiện mở được lúc này: ${open.join(', ') || 'chưa có (đang hồi chiêu)'}`,
-    `Trò chơi nhỏ: ${MG.cur ? 'đang chạy ' + MG.cur.type + ', còn ' + Math.ceil(MG.cur.t) + ' giây' : (now() - MG.last > 60000 ? 'có thể mở (do_vui, doan_so, nhanh_tay, dua_ban)' : 'vừa xong, chờ chút')}`,
+    `Trò chơi nhỏ: ${MG.cur ? 'đang chạy ' + MG.cur.type + ', còn ' + Math.ceil(MG.cur.t) + ' giây' : (now() - MG.last > 60000 ? 'có thể mở (do_vui, doan_so, nhanh_tay, dua_ban, binh_chon)' : 'vừa xong, chờ chút')}`,
+    `Chuyện cười: ${MCX.busy ? 'Cậu Cả đang kể' : now() - MCX.lastJoke > 60000 ? 'kể được (su_kien ke_chuyen)' : 'vừa kể xong'}`,
     `Xiếc đường phố: ${Circus.cur ? 'đang diễn ' + Circus.cur.kind : Circus.ready() ? 'có thể mời (su_kien xiec)' : 'đoàn đang nghỉ ' + Circus.wait() + ' giây'}`,
     `Khách quen 🏠 (nhân vật máy, không phải người xem): ${botList().length}`].filter(Boolean).join('\n');
 }
@@ -3374,24 +3434,25 @@ async function aiClient() {
 function aiLog(s) { AI.log.unshift(`${new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${s}`); AI.log.length = Math.min(AI.log.length, 8); renderAI(); }
 function speakMC(text) {
   if (!(opts.mcVoice || opts.aiTts)) return;
-  const t = trunc(String(text || '').replace(/[@#*_`]/g, ' ').replace(/\s+/g, ' ').trim(), 160); if (!t) return;
-  const dur = 600 + t.length * 75; G.voiceUntil = Math.max(G.voiceUntil || 0, now()) + dur;
+  const t = trunc(String(text || '').replace(/[@#*_`]/g, ' ').replace(/\s+/g, ' ').trim(), 200); if (!noEmo(t)) return;
+  const dur = 600 + noEmo(t).length * 75; G.voiceUntil = Math.max(G.voiceUntil || 0, now()) + dur;
   Snd.setMusic(opts.music); BGM.setVolume(Math.round(Number(opts.bgmVol ?? 35) * 0.35));
   clearTimeout(G.voiceTimer); G.voiceTimer = setTimeout(() => { Snd.setMusic(opts.music); BGM.setVolume(Number(opts.bgmVol ?? 35)); }, G.voiceUntil - now() + 100);
-  const browserSay = () => { if (!('speechSynthesis' in window)) return; if (!ttsVoice) initTTS(); if (speechSynthesis.speaking && speechSynthesis.pending) speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'vi-VN'; if (ttsVoice) u.voice = ttsVoice; u.rate = 1.05; speechSynthesis.speak(u); };
+  const browserSay = () => { if (!('speechSynthesis' in window)) return; if (!ttsVoice) initTTS(); if (speechSynthesis.speaking && speechSynthesis.pending) speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(noEmo(t)); u.lang = 'vi-VN'; if (ttsVoice) u.voice = ttsVoice; u.rate = 1.1; u.pitch = 1.15; speechSynthesis.speak(u); };
   if (APP && APP.on) fetch('/api/speak', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: t }) }).then(r => r.json()).then(j => { G.voiceErr = j.ok ? '' : j.error; if (!j.ok) browserSay(); }).catch(browserSay);
   else browserSay();
 }
 function aiExec(name, inp) {
   inp = inp || {};
   if (name === 'noi') {
-    const txt = clean(inp.text, 120); if (!txt) return;
+    const txt = clean(inp.text, 130); if (!noEmo(txt)) return;
     const to = clean(inp.to, 24); const line = to ? `@${to} ${txt}` : txt;
-    ownerSay(trunc(line, 120), true); feed(`🤖 <b>Cậu Cả</b>: ${esc(line)}`, 'mc');
+    ownerSay(trunc(line, 130), true); feed(`🤖 <b>Cậu Cả</b>: ${esc(noEmo(line))}`, 'mc');
     AI.said.push(txt); if (AI.said.length > 8) AI.said.shift(); aiLog('💬 ' + line);
   } else if (name === 'su_kien') {
     if (MG_INFO[inp.loai]) { if (!MG.cur && now() - MG.last > 60000 && MG.start(inp.loai, 'ai')) aiLog('🎯 Mở trò: ' + inp.loai); return; }
     if (inp.loai === 'xiec') { if (Circus.ready() && Circus.start(null, 'ai')) aiLog('🎪 Mời xiếc đường phố'); return; }
+    if (inp.loai === 'ke_chuyen') { if (now() - MCX.lastJoke > 60000 && !karaoke.cur && tellJoke('auto')) aiLog('🎭 Kể chuyện cười'); return; }
     const k = Object.keys(EVT_AI).find(x => EVT_AI[x] === inp.loai);
     if (k && autoEvent(k)) aiLog('🎉 Mở sự kiện: ' + inp.loai);
   } else if (name === 'thong_bao') {
@@ -3470,6 +3531,79 @@ const LINES = {
   late: ['Khuya rồi, ai còn thức thì vào quán ngồi tâm sự với Cậu Cả nha!', 'Đêm khuya quán vẫn sáng đèn, cả nhà ngủ ngon nha!'],
   noon: ['Trưa rồi cả nhà ăn cơm chưa? Ghé quán ngồi nghỉ chút nha!', 'Giờ nghỉ trưa vào quán Cậu Cả giải trí nè!'],
 };
+// ---- HÀI ĐỘC THOẠI: mỗi chuyện vài câu ngắn, câu chốt có [cười] (giọng VieNeu bật cười; chữ trên màn hình thì ẩn ký hiệu) ----
+const JOKES = [
+  ['Thằng bạn tui đi xem bói.', 'Thầy phán: hai năm tới con sẽ nghèo lắm.', 'Nó hỏi: rồi sau hai năm thì sao thầy?', 'Thầy nói: thì con quen rồi! [cười]'],
+  ['Có ông khách gọi: em ơi cho anh đĩa ốc, nhỏ nhỏ thôi nha.', 'Nhân viên bưng ra đúng một con.', 'Ổng hỏi sao có một con? Nhân viên nói: anh dặn nhỏ thôi mà, con này nhỏ nhất quán đó! [cười]'],
+  ['Hôm qua có ông khách hỏi: quán có wifi không em?', 'Nhân viên nói: dạ có anh.', 'Hỏi mật khẩu là gì, nhân viên nói: gọi thêm đĩa mực đi rồi em đọc cho! [cười]'],
+  ['Có anh kia ngồi một mình, nói chuyện với ly trà đá suốt một tiếng.', 'Hỏi ra mới biết: ly trà đá là đứa duy nhất chịu ngồi nghe ảnh than! [cười]'],
+  ['Hàng xóm qua hỏi: sao đêm nào anh cũng hát karaoke tới khuya vậy?', 'Ảnh nói: tui đang muốn bán nhà, hát kiểu này thì cả xóm góp tiền mua cho nhanh! [cười]'],
+  ['Cô giáo hỏi: em hãy kể tên năm con vật sống ở Bắc Cực.', 'Học trò trả lời: dạ, hai con gấu trắng với ba con hải cẩu! [cười]'],
+  ['Bác sĩ dặn ông khách: anh phải bỏ ăn đêm.', 'Từ đó ổng toàn ăn lúc mười hai giờ một phút.', 'Ổng nói: giờ đó là buổi sáng rồi bác sĩ ơi! [cười]'],
+  ['Bạn tui than: tao ngủ đủ tám tiếng mà vẫn mệt.', 'Tui hỏi: mày ngủ lúc mấy giờ?', 'Nó nói: từ chín giờ sáng tới năm giờ chiều, ở công ty! [cười]'],
+  ['Có cậu nhắn tin cho crush: em có tin vào tình yêu sét đánh không?', 'Crush trả lời liền: không anh, nhưng em tin vào nút chặn! [cười]'],
+  ['Khách ngồi sau xe ôm nói: anh chạy chậm thôi, em sợ quá.', 'Anh xe ôm nói: sợ thì em nhắm mắt lại như anh nè! [cười]'],
+  ['Mẹ hỏi: điểm kiểm tra sao rồi con?', 'Con nói: dạ bằng điểm bạn lớp trưởng.', 'Mẹ mừng quá hỏi: lớp trưởng được mấy điểm?', 'Con nói: dạ, bạn lớp trưởng nghỉ ốm, không làm bài! [cười]'],
+  ['Vợ dặn chồng: anh ra chợ mua một ổ bánh mì, nếu có trứng thì mua sáu.', 'Ổng về xách theo sáu ổ bánh mì.', 'Vợ hỏi sao vậy, ổng nói: thì chợ có trứng mà em! [cười]'],
+  ['Thằng em tui đi phỏng vấn.', 'Người ta hỏi: điểm yếu lớn nhất của em là gì?', 'Nó nói: dạ, em thật thà quá.', 'Người ta nói: anh thấy đó đâu phải điểm yếu.', 'Nó nói: dạ, em cũng đâu cần biết anh thấy sao! [cười]'],
+  ['Có người hỏi Cậu Cả: sao quán tên là Cậu Cả vậy?', 'Tại ai vào quán này cũng được gọi là cậu cả, cô cả hết đó!', 'Nên cả nhà comment đi, để Cậu Cả gọi tên từng người nè! [cười]'],
+  ['Tui mới mua cái máy chạy bộ để giảm cân.', 'Ba tháng rồi, máy thì gầy hẳn đi, còn tui thì vẫn y nguyên! [cười]'],
+  ['Ông khách hỏi: em ơi, mực hôm nay tươi không?', 'Nhân viên nói: dạ tươi lắm anh, sáng nay nó còn nhắn tin cho em! [cười]'],
+  ['Thằng bạn tui hứa: từ mai tao dậy sớm tập thể dục.', 'Sáng hôm sau nó dậy sớm thật.', 'Dậy sớm để tắt báo thức rồi ngủ tiếp! [cười]'],
+  ['Con hỏi ba: ba ơi, sao ba không mua xe hơi?', 'Ba nói: tại ba thích đi xe máy cho gần gũi thiên nhiên.', 'Con nói: dạ, gần gũi luôn cả mưa nắng với kẹt xe hả ba! [cười]'],
+];
+const JOKE_IN = ['Cả nhà ơi, giờ tới tiết mục hài độc thoại của Cậu Cả nha!', 'Ngồi yên nghe Cậu Cả kể chuyện này nè, vui lắm!', 'Quán đang vui, Cậu Cả kể thêm một chuyện cười nha!', 'Ai buồn thì nghe Cậu Cả kể chuyện cho cười một cái nè!'];
+const JOKE_OUT = ['Ai cười rồi thì thả tim cho Cậu Cả nha!', 'Thấy vui thì comment ha ha cho Cậu Cả biết nha!', 'Muốn nghe nữa thì comment "kể chuyện" nha cả nhà!', 'Cười nhiều cho trẻ lâu nha! Thả tim đi cả nhà!'];
+// ---- KHUẤY ĐỘNG kiểu MC dẫn sự kiện ----
+const HYPE = ['Cả nhà ơi! Quán vỉa hè Cậu Cả đang lên sóng! Comment một câu cho cả quán biết bạn đang ở đây nào!',
+  'Bây giờ Cậu Cả đếm tới ba, cả nhà thả tim thật mạnh nha! Một, hai, ba, thả tim nào!', 'Điểm danh nào cả nhà! Ai đang xem thì comment chữ "có mặt" cho Cậu Cả nha!',
+  'Sôi động lên nào! Thanh không khí đang chờ tim của mọi người đó!', 'Xin một tràng pháo tay thật lớn cho tất cả các bàn đang ngồi trong quán!',
+  'Bàn nào vui nhất quán tối nay? Comment số bàn của mình cho Cậu Cả nghe nào!', 'Cậu Cả thách cả nhà: một phút nữa thanh không khí có đầy được không? Thả tim cho Cậu Cả xem nào!',
+  'Sân khấu karaoke đang trống nè! Ai muốn lên hát thì comment "hát" cộng tên bài nha!', 'Điểm danh vùng miền nào: miền Bắc comment số một, miền Trung số hai, miền Nam số ba!',
+  'Chào mừng tất cả những ai mới vào! Ở đây comment là có ghế, tặng quà là có món, vui hết cỡ luôn!', 'Lát nữa có đố vui, có xiếc đường phố, có karaoke, cả nhà ở lại chơi với Cậu Cả nha!',
+  'Năng lượng lên nào cả nhà ơi! Bàn nào comment nhiều nhất Cậu Cả gọi tên bàn đó!', 'Có ai đang buồn không? Chia sẻ quán cho bạn đó vào đây cười với Cậu Cả nha!',
+  'Ai muốn nghe Cậu Cả kể chuyện cười thì comment "kể chuyện" nha!', 'Cả nhà muốn bình chọn vui thì comment "bình chọn" nha, chọn một hay hai thôi!'];
+// ---- BÌNH CHỌN 1/2: người xem comment 1 hoặc 2 ----
+const POLLS = [['Ăn ốc thì chấm gì ngon hơn?', 'Muối tiêu chanh', 'Mắm gừng'], ['Tối rảnh thích đi đâu hơn?', 'Ngồi vỉa hè', 'Đi cà phê'], ['Cả nhà thích mùa nào hơn?', 'Mùa hè', 'Mùa đông'],
+  ['Sáng nay ăn gì?', 'Phở', 'Bún bò'], ['Cả nhà là cú đêm hay chim sớm?', 'Cú đêm', 'Chim sớm'], ['Uống gì cho mát?', 'Trà đá', 'Trà sữa'], ['Buồn thì nghe nhạc gì?', 'Nhạc buồn', 'Nhạc sôi động'],
+  ['Đi du lịch biển hay núi?', 'Biển', 'Núi'], ['Cơm nhà hay cơm tiệm?', 'Cơm nhà', 'Cơm tiệm'], ['Nuôi chó hay nuôi mèo?', 'Chó', 'Mèo'], ['Bữa sáng bánh mì hay xôi?', 'Bánh mì', 'Xôi'],
+  ['Xem phim ma hay phim hài?', 'Phim ma', 'Phim hài'], ['Nghe Cậu Cả kể chuyện hay hát karaoke?', 'Kể chuyện', 'Karaoke'], ['Món nhậu vỉa hè nào đỉnh hơn?', 'Mực nướng', 'Lẩu Thái']];
+const MCX = { busy: false, lastJoke: -1e9, bag: [], timers: [] };
+function tellJoke(by, g) {
+  if (MCX.busy) return false;
+  if (!MCX.bag.length) MCX.bag = JOKES.map((_, i) => i).sort(() => Math.random() - 0.5);
+  const j = JOKES[MCX.bag.pop()];
+  const lines = [by === 'viewer' && g ? `${trunc(g.name, 14)} muốn nghe chuyện cười, Cậu Cả kể liền nè!` : pick(JOKE_IN), ...j, pick(JOKE_OUT)];
+  MCX.busy = true; MCX.lastJoke = now();
+  // Cậu Cả ra đứng micro trên sân khấu karaoke để kể (sân khấu nằm trong khung hình, khách nhìn thấy)
+  const up = !karaoke.cur && owner.state !== 'walk';
+  if (up) owner.walkTo([{ x: KARAOKE.x, z: KARAOKE.z, stage: true }], () => { owner.rot = Math.PI / 2 - 0.25; });
+  feed(`🎭 <b>Cậu Cả kể chuyện</b>: ${esc(j.map(noEmo).join(' '))}`, 'mc');
+  let at = 0;
+  lines.forEach((line, i) => {
+    MCX.timers.push(setTimeout(() => {
+      ownerSay(line, true);
+      if (/\[cười\]/.test(line)) {   // câu chốt: khách trong quán cười theo
+        actors.forEach(a => { if (a !== owner && a.state === 'sit' && Math.random() < 0.55) setTimeout(() => !a.leaving && a.say(pick(['😂', 'Ha ha ha!', '🤣', 'Trời ơi 😆', 'Hết nói nổi 😂']), 2.4), rand(300, 1400)); });
+        Snd.cheer(0.9, 0.6); addVibe(5);
+      }
+      if (i === lines.length - 1) MCX.timers.push(setTimeout(() => {
+        MCX.busy = false; MCX.timers.length = 0;
+        if (up && !karaoke.cur) owner.walkTo([{ x: -FACADE_X + 0.75, z: -3.9 }], () => { owner.rot = Math.PI / 2 + 0.5; });
+      }, 700 + noEmo(line).length * 78));
+    }, at));
+    at += 700 + noEmo(line).length * 78;
+  });
+  return true;
+}
+const RE_JOKE = /(^|\s)(ke chuyen|chuyen cuoi|ke chuyen cuoi|ke chuyen hai|hai doc thoai)(\s|$|!|\?)/;
+function jokeAsk(g, t) {
+  if (!RE_JOKE.test(t)) return false;
+  if (MCX.busy) return true;
+  if (karaoke.cur || MG.cur || Circus.cur) { g.say('Xong tiết mục này Cậu Cả kể cho nghe nha!', 3); return true; }
+  if (now() - MCX.lastJoke < 60000) { g.say('Cậu Cả đang nghĩ chuyện mới, chờ chút nha!', 3); return true; }
+  tellJoke('viewer', g); return true;
+}
 const fill = (s, o) => s.replace(/\{(\w+)\}/g, (_, k) => o[k] ?? '');
 const pickLine = (key, o = {}) => { const L = LINES[key]; const fresh = L.filter(x => !G.fillers.includes(x)); const s = pick(fresh.length ? fresh : L); G.fillers.push(s); if (G.fillers.length > 12) G.fillers.shift(); return fill(s, o); };
 const nameList = a => a.length === 1 ? a[0] : a.slice(0, -1).join(', ') + ' và ' + a[a.length - 1];
@@ -3477,7 +3611,7 @@ const Script = { joins: [], likeAt: 0, likeBy: {}, acc: 0 };
 function scriptJoin(name) { if (!Script.joins.includes(name) && Script.joins.length < 12) Script.joins.push(name); }
 function scriptLike(name, n) { Script.likeBy[name] = (Script.likeBy[name] || 0) + n; }
 function scriptTick() {
-  const t = now();
+  const t = now(); if (MCX.busy) return;   // đang kể chuyện thì để kể xong
   if (Script.joins.length && t - G.lastOwnerSay > 4000) {
     const names = Script.joins.splice(0, 3).map(n => trunc(n, 14)); Script.joins.length = 0;
     ownerSay(names.length === 1 ? pickLine('join1', { n: names[0] }) : pickLine('joinN', { list: nameList(names) }), true);
@@ -3506,10 +3640,19 @@ function mcFiller() {
   return pickLine('quiet');
 }
 function updateMC() {
-  if (!opts.mcVoice || !gameStarted) return;
+  if (!opts.mcVoice || !gameStarted || MCX.busy) return;
   const gap = clamp(Number(opts.mcGap) || 40, 20, 180) * 1000, t = now();
   if (t - G.lastOwnerSay < gap) return;
-  G.mcAsked = 0; const line = mcFiller(); ownerSay(line, true); feed(`🍺 <b>Cậu Cả</b>: ${esc(line)}`, 'mc');
+  G.mcAsked = 0;
+  // xen kẽ như MC dẫn sự kiện: hài độc thoại (mỗi ~4 phút, khi sân khấu rảnh) → câu khuấy động → lời dẫn theo tình huống
+  const free = !karaoke.cur && !MG.cur && !Circus.cur && !G.cdBusy;
+  if (opts.jokeOn !== false && free && t - MCX.lastJoke > clamp(Number(opts.jokeEvery) || 4, 2, 30) * 60000 && tellJoke('auto')) return;
+  const line = Math.random() < 0.4 ? pickHype() : mcFiller();
+  ownerSay(line, true); feed(`🍺 <b>Cậu Cả</b>: ${esc(line)}`, 'mc');
+}
+function pickHype() {
+  const ok = HYPE.filter(s => !G.fillers.includes(s) && !(karaoke.cur && /karaoke/.test(s)) && !(MG.cur && /bình chọn/.test(s)));
+  const s = pick(ok.length ? ok : HYPE); G.fillers.push(s); if (G.fillers.length > 12) G.fillers.shift(); return s;
 }
 setInterval(updateMC, 1000);
 function updateAI(dt) {
@@ -3655,7 +3798,7 @@ addEventListener('resize', fitCamera);
 fitCamera();
 drawLED(0);
 window.__gameReady = true;
-window.__cc = { renderer, guests, handle, runEvent, tables, camera, THREE, karaoke, traffic, Mic, YTK, MG, opts, Circus, BGM, TRIVIA };
+window.__cc = { renderer, guests, handle, runEvent, tables, camera, THREE, karaoke, traffic, Mic, YTK, MG, opts, Circus, BGM, TRIVIA, approach, KARAOKE, STAGE_BOX, routeAround, owner, LANES: { LANE_IN, LANE_MID, LANE_OUT, FACADE_X } };
 document.getElementById('loadErr').style.display = 'none';
 loop();
 
@@ -3702,7 +3845,7 @@ function syncSettingsUI() {
 function applyAppConfig(c) {
   if (!c) return;
   const g = c.game || {};
-  for (const k of ['aiModel', 'aiEvery', 'aiMax', 'kMin', 'kPrio', 'kMax', 'botsOn', 'botMin', 'mgAuto', 'mgEvery', 'autoOn', 'autoLuckyMin', 'bgmYt', 'bgmQuery', 'bgmVol', 'circusAuto', 'circusEvery', 'mcVoice', 'mcGap']) if (g[k] !== undefined) opts[k] = g[k];
+  for (const k of ['aiModel', 'aiEvery', 'aiMax', 'kMin', 'kPrio', 'kMax', 'botsOn', 'botMin', 'mgAuto', 'mgEvery', 'autoOn', 'autoLuckyMin', 'bgmYt', 'bgmQuery', 'bgmVol', 'circusAuto', 'circusEvery', 'mcVoice', 'mcGap', 'jokeOn', 'jokeEvery']) if (g[k] !== undefined) opts[k] = g[k];
   BGM.setVolume(Number(opts.bgmVol ?? 35)); setTimeout(() => BGM.tick(), 50);
   // key YouTube: app có key thì dùng key app; app chưa có mà game đã có (dán trong ⚙️ game) thì gửi lên app, không xoá
   if (g.ytKey) { if (g.ytKey !== opts.ytKey) { opts.ytKey = g.ytKey; karaoke.queue.forEach(it => { if (it.kind === 'song' && !it.link && it.vstatus !== 'ok') resolveVideo(it); }); } }
@@ -3723,6 +3866,7 @@ function appCmd(c) {
     case 'circus': if (c.name === 'stop') Circus.stop(); else if (!Circus.cur) Circus.start(c.name, 'host'); break;
     case 'mg': if (c.name === 'stop') MG.stop('⏹ Chủ quán dừng trò chơi'); else if (MG_INFO[c.name] && !MG.start(c.name, 'host')) feed('Đang có trò chơi chạy', 'sys'); break;
     case 'skip': if (karaoke.cur) { feed('⏭️ Chủ quán cho qua bài', 'sys'); endSing(); } break;
+    case 'mc': if (c.name === 'joke') { if (!tellJoke('host')) feed('Cậu Cả đang kể chuyện rồi', 'sys'); } else if (c.name === 'hype') { const l = pickHype(); ownerSay(l, true); feed(`🍺 <b>Cậu Cả</b>: ${esc(l)}`, 'mc'); } else if (c.name === 'poll') { if (!MG.start('binh_chon', 'host')) feed('Đang có trò chơi chạy', 'sys'); } break;
     case 'say': if (c.text) { const t = trunc(String(c.text), 120); ownerSay(t, true); feed(`🍺 <b>Cậu Cả</b>: ${esc(t)}`, 'mc'); } break;
     case 'song': if (c.text) { $('#kAdd').value = String(c.text).slice(0, 200); hostAddSong(); } break;
     case 'ai': setAI(!!c.on); break;
