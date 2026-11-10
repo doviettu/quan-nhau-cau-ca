@@ -78,6 +78,12 @@ body.party .vibeBar i{animation:hue 1s linear infinite}
 body:has(#ktv:not(.hidden):not(.mini)) #menuList,body:has(#ktv:not(.hidden):not(.mini)) #menuPanel .hint{display:none}   /* thu gọn bảng quà khi đang hát */
 .ktvBar{display:flex;align-items:center;gap:6px;padding:4px 6px 4px 10px;background:linear-gradient(90deg,#7b1fa2,#e91e63);font-size:12.5px;font-weight:800}
 .ktvBar span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ktvTick{overflow:hidden;white-space:nowrap;background:linear-gradient(90deg,#2a0f3a,#4a1240,#2a0f3a);border-top:1px solid rgba(255,79,184,.5);font-size:14px;font-weight:800;line-height:30px;height:30px}
+.ktvTick span{display:inline-block;padding-left:100%;animation:ktvTick var(--tickDur,28s) linear infinite;color:#ffe9a6}
+.ktvTick b{color:#fff}
+@keyframes ktvTick{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+@media (orientation:landscape){.ktvTick{font-size:17px;line-height:36px;height:36px}}
+#ktv.mini .ktvTick{font-size:11px;line-height:22px;height:22px}
 .ktvBar button{flex:none;width:30px;height:26px;border-radius:8px;border:none;background:rgba(0,0,0,.3);font-size:14px}
 .ktvBox{position:relative;width:100%;aspect-ratio:16/9;background:#000}
 #ktvPlayer,#ktvPlayer iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
@@ -259,6 +265,7 @@ kbd{background:rgba(255,255,255,.15);border-radius:5px;padding:0 5px;font-size:1
   <div id="ktv" class="pe hidden">
     <div class="ktvBar"><span id="ktvTitle">🎤</span><button id="ktvSize" title="Thu nhỏ / phóng to">⤢</button><button id="ktvSkip" title="Qua bài">⏭</button></div>
     <div class="ktvBox"><div id="ktvPlayer"></div><div id="ktvMsg" class="hidden"></div></div>
+    <div class="ktvTick"><span id="ktvTick"></span></div>
   </div>
   <div id="feed"></div>
 
@@ -1935,7 +1942,21 @@ function updateKaraoke(dt) {
 /* ---------- trình phát YouTube (khung karaoke) ---------- */
 const ktv = $('#ktv');
 function ktvMsg(html) { const m = $('#ktvMsg'); m.innerHTML = html || ''; m.classList.toggle('hidden', !html); }
-function showKtv(it) { ktv.classList.remove('hidden'); $('#ktvTitle').textContent = `🎤 ${singerName(it)} – ${it.title || ''}`; }
+function ktvTicker() {
+  const k = karaoke, nx = k.queue[0];
+  const gift = kMin() > 0 ? `rồi tặng quà từ <b>${kMin()} xu</b> để chốt bài` : 'là được xếp hàng';
+  const parts = [
+    `🎤 Muốn hát: comment <b>"hát + tên bài"</b> ${gift}`,
+    `⏫ Tặng quà từ <b>${kPrio()} xu</b> để chen hàng`,
+    `🎙️ Muốn hát cho cả phòng nghe: comment <b>"xin lên mic"</b> – Cậu Cả mời bạn làm khách mời, bấm chấp nhận rồi bật mic hát theo lời trên màn hình`,
+    `❤️ Thả tim, tặng quà cổ vũ người đang hát`,
+    nx ? `⏭ Tiếp theo: <b>${esc(singerName(nx))}</b>${nx.title ? ' – ' + esc(trunc(nx.title, 30)) : ''}` : `📋 Hàng chờ đang trống – comment "hát" là tới lượt bạn!`,
+  ];
+  const html = parts.join('&nbsp;&nbsp;•&nbsp;&nbsp;');
+  const el = $('#ktvTick'); if (el.innerHTML === html) return;
+  el.innerHTML = html; el.parentElement.style.setProperty('--tickDur', Math.max(20, Math.round(el.textContent.length / 9)) + 's');
+}
+function showKtv(it) { ktvTicker(); ktv.classList.remove('hidden'); $('#ktvTitle').textContent = `🎤 ${singerName(it)} – ${it.title || ''}`; }
 function hideKtv() { ktv.classList.add('hidden'); ktvMsg(''); }
 const YTK = {
   api: null, player: null, ready: false, it: null,
@@ -2082,6 +2103,7 @@ const Mic = {
 /* ---------- bảng hàng chờ karaoke (HUD + bảng điều khiển) ---------- */
 const VST = { ok: '✓ có video', searching: '🔎 đang tìm…', nokey: '⚠ chưa có video', none: '⚠ không thấy video', err: '⚠ lỗi tìm' };
 function refreshKQ() {
+  if (!ktv.classList.contains('hidden')) ktvTicker();
   const k = karaoke, rows = [];
   if (k.cur) rows.push(`<div class="kqi now">▶ <b>${esc(trunc(singerName(k.cur), 14))}</b>${k.cur.title ? ' – ' + esc(trunc(k.cur.title, 24)) : ' (hát mộc)'}${k.cur.g && k.cur.g.onMic ? ' 🎙️' : ''}</div>`);
   k.queue.slice(0, 3).forEach((it, i) => rows.push(`<div class="kqi">${i + 1}. ${it.prio ? '⏫ ' : ''}<b>${esc(trunc(singerName(it), 12))}</b>${it.title ? ' – ' + esc(trunc(it.title, 20)) : ' (hát mộc)'}</div>`));
