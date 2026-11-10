@@ -15,6 +15,8 @@ import { createClaudeHandler, claudeReady } from '../bridge/claude-bridge.mjs';
 import { TikTokSource, normalizeUser, validUser } from './tiktok.mjs';
 import { YouTubeSource, parseYouTubeInput } from './youtube.mjs';
 import { FacebookSource, parsePage } from './facebook.mjs';
+import { ObsClient } from './obs.mjs';
+import { Relay } from './relay.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG_PATH = path.join(ROOT, 'config.json');
@@ -24,6 +26,9 @@ const DEFAULTS = {
   tiktok: { username: '', on: false },   // kết nối thẳng TikTok LIVE bằng @tên (không cần TikFinity)
   youtube: { on: false, input: '', key: '', minPoll: 8 },   // chat YouTube Live qua YouTube Data API (key riêng hoặc dùng chung key karaoke)
   facebook: { on: false, page: '' },   // comment Facebook Live qua Graph API; Page token lưu trong Keychain
+  // OBS phát một luồng về bộ chuyển tiếp trên máy → YouTube, Facebook, TikTok (khóa luồng + mật khẩu OBS nằm trong Keychain)
+  obsLive: { url: 'ws://127.0.0.1:4455', res: '720x1280', bitrate: 3500, relayPort: 19350, relayKey: '', auto: false,
+    yt: { on: false, server: 'rtmps://a.rtmps.youtube.com/live2' }, fb: { on: false, server: 'rtmps://live-api-s.facebook.com:443/rtmp/' }, tt: { on: false, server: '' } },
   notify: { on: true, topic: '', server: 'https://ntfy.sh', idleMin: 10 },   // báo về điện thoại qua app ntfy
   game: { aiOn: true, aiModel: 'claude-haiku-5-5', aiEvery: 20, aiMax: 180, ytKey: '', kMin: 50, kPrio: 180, kMax: 5, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, autoOn: true, autoLuckyMin: 8, bgmYt: false, bgmQuery: '', bgmVol: 35, circusAuto: true, circusEvery: 6, mcVoice: true, mcGap: 40, jokeOn: true, jokeEvery: 4, voiceEngine: 'auto', vieneuVoice: 'Trúc Ly' },
 };
@@ -37,6 +42,7 @@ let config = loadConfig();
 if (config.game.vieneuVoice === 'Hải Đăng' && !config.game.voiceV2) { config.game.vieneuVoice = 'Trúc Ly'; config.game.voiceV2 = true; saveConfig(); }
 if (config.game.kMin === 1 && config.game.kPrio === 30 && !config.game.kPriceV2) { config.game.kMin = 50; config.game.kPrio = 180; config.game.kPriceV2 = true; saveConfig(); }
 if (config.obs) { delete config.obs; saveConfig(); }
+if (!config.obsLive.relayKey) { config.obsLive.relayKey = 'cauca-' + crypto.randomBytes(4).toString('hex'); saveConfig(); }
 if (!config.notify.topic) { config.notify.topic = 'caucalive-' + crypto.randomBytes(5).toString('hex'); saveConfig(); }
 if (!fs.existsSync(CONFIG_PATH)) saveConfig();
 
@@ -274,6 +280,38 @@ const facebook = new FacebookSource();
 facebook.on('event', ev => relayEvent(ev));
 facebook.on('connected', () => console.log(`📡 Đã kết nối Facebook Live: ${facebook.pageName} – ${facebook.title || facebook.liveId}`));
 function facebookApply() { if (config.facebook.on && secretGet('facebook')) facebook.start(config.facebook.page, { getToken: () => secretGet('facebook') }); else facebook.stop(); tfRelayApply(); }
+// ---- OBS + bộ chuyển tiếp: một luồng từ OBS → YouTube, Facebook, TikTok ----
+const obs = new ObsClient();
+const relay = new Relay();
+const obsState = { lastSync: null, streaming: false, timecode: '', at: 0 };
+const PF_NAMES = { yt: 'YouTube', fb: 'Facebook', tt: 'TikTok' };
+function relayTargets() {
+  const o = config.obsLive, out = [];
+  for (const k of ['yt', 'fb', 'tt']) {
+    const t = o[k], key = secretGet('stream-' + k);
+    if (t && t.on && key && /^rtmps?:\/\//.test(t.server || '')) out.push({ name: PF_NAMES[k], url: String(t.server).replace(/\/+$/, '') + '/' + key });
+  }
+  return out;
+}
+function relayApply() { relay.start(relayTargets(), { port: config.obsLive.relayPort, key: config.obsLive.relayKey }); }
+relay.on('streaming', () => console.log('🎬 OBS đang phát qua bộ chuyển tiếp → ' + relay.targets.map(t => t.name).join(', ')));
+relay.on('targetFailed', (name, line) => { console.log(`⚠️ Không phát được lên ${name}: ${line}`); notify(`⚠️ Mất luồng ${name}`, `Bộ chuyển tiếp không phát được lên ${name}. Kiểm tra khóa luồng và bấm Phát trực tiếp trên ${name}, rồi dừng/phát lại OBS.`, 4); });
+async function obsConnect() { await obs.connect(config.obsLive.url, secretGet('obs')); }
+async function obsSync() {
+  await obsConnect();
+  const [w, h] = String(config.obsLive.res || '720x1280').split('x').map(Number);
+  relayApply();
+  const r = await obs.sync({ width: w || 720, height: h || 1280, bitrate: Number(config.obsLive.bitrate) || 3500, server: relay.ingest, key: config.obsLive.relayKey });
+  if (!relay.targets.length) r.warnings.push(relay.error);
+  obsState.lastSync = { ...r, at: Date.now() };
+  if (!config.obsLive.auto) { config.obsLive.auto = true; saveConfig(); }
+  return r;
+}
+setInterval(async () => {
+  if (!obs.connected) return;
+  try { const s = await obs.streamStatus(); obsState.streaming = s.active; obsState.timecode = s.timecode; obsState.at = Date.now(); } catch { }
+}, 4000);
+
 // Dùng TikFinity cho TikTok nhưng có thêm YouTube/Facebook: app nhận sự kiện TikFinity rồi chuyển tiếp cho game
 const tfRelay = { ws: null, ok: false, timer: null, want: false };
 function tfRelayApply() {
@@ -312,6 +350,9 @@ const server = http.createServer(async (req, res) => {
         tiktok: { ...tiktok.status(), on: config.tiktok.on, saved: config.tiktok.username, gameClients: liveWss.clients.size, relay: tfRelay.want ? tfRelay.ok : null },
         youtube: { ...youtube.status(), on: config.youtube.on, saved: config.youtube.input, minPoll: config.youtube.minPoll, ownKey: !!config.youtube.key, hasKey: !!ytKey() },
         facebook: { ...facebook.status(), on: config.facebook.on, saved: config.facebook.page, hasToken: !!secretGet('facebook') },
+        obs: { connected: obs.connected, error: obs.err, streaming: obsState.streaming, timecode: obsState.timecode, lastSync: obsState.lastSync, relay: relay.status(),
+          cfg: { url: config.obsLive.url, res: config.obsLive.res, bitrate: config.obsLive.bitrate, hasPassword: !!secretGet('obs'),
+            ...Object.fromEntries(['yt', 'fb', 'tt'].map(k => [k, { on: !!config.obsLive[k].on, server: config.obsLive[k].server, hasKey: !!secretGet('stream-' + k) }])) } },
         live: { ok: live.ok, reason: live.reason, since: live.since, lastReal: Math.max(live.lastReal, (gameState && gameState.lastReal) || 0) },
         notify: { on: config.notify.on, topic: config.notify.topic, idleMin: config.notify.idleMin },
         voice: { mac: process.platform === 'darwin', name: viVoice, checked: voiceChecked, on: config.game.mcVoice !== false, engine: config.game.voiceEngine || 'auto',
@@ -388,6 +429,33 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/facebook/disconnect') { config.facebook.on = false; saveConfig(); facebookApply(); broadcast({ type: 'config', config: publicConfig() }); return json(res, 200, { ok: true }); }
     if (p === '/api/facebook/forget') { secretSet('facebook', ''); config.facebook.on = false; saveConfig(); facebookApply(); broadcast({ type: 'config', config: publicConfig() }); return json(res, 200, { ok: true }); }
+    if (p === '/api/obs/save') {
+      const o = config.obsLive;
+      if (typeof b.url === 'string' && /^wss?:\/\/[\w.\-]+(:\d+)?\/?$/.test(b.url.trim())) o.url = b.url.trim();
+      if (typeof b.password === 'string' && b.password) secretSet('obs', b.password);
+      if (['720x1280', '1080x1920'].includes(b.res)) o.res = b.res;
+      if (Number(b.bitrate) >= 1000) o.bitrate = Math.min(9000, Math.round(Number(b.bitrate)));
+      for (const k of ['yt', 'fb', 'tt']) {
+        const t = isObj(b.targets) && b.targets[k]; if (!isObj(t)) continue;
+        if (typeof t.on === 'boolean') o[k].on = t.on;
+        if (typeof t.server === 'string' && t.server.trim()) { if (!/^rtmps?:\/\/\S+$/.test(t.server.trim())) throw new Error(`Địa chỉ máy chủ ${PF_NAMES[k]} phải bắt đầu bằng rtmp:// hoặc rtmps://`); o[k].server = t.server.trim(); }
+        if (typeof t.key === 'string' && t.key.trim()) { if (/[\s|\[\]]/.test(t.key.trim())) throw new Error(`Khóa luồng ${PF_NAMES[k]} không đúng dạng`); secretSet('stream-' + k, t.key.trim()); }
+        if (t.forget) secretSet('stream-' + k, '');
+      }
+      saveConfig();
+      if (relay.want && relay.state !== 'streaming') relayApply();
+      return json(res, 200, { ok: true, targets: relayTargets().map(t => t.name) });
+    }
+    if (p === '/api/obs/sync') { try { return json(res, 200, await obsSync()); } catch (e) { return json(res, 200, { ok: false, error: String(e.message || e) }); } }
+    if (p === '/api/obs/start') {
+      try {
+        await obsConnect();
+        if (!relay.want || relay.state === 'off' || relay.state === 'error') { const r = await obsSync(); if (!relay.targets.length) return json(res, 200, { ok: false, error: relay.error, sync: r }); }
+        if (relay.state === 'streaming') return json(res, 200, { ok: true, already: true });
+        await obs.startStream(); return json(res, 200, { ok: true, targets: relay.targets.map(t => t.name) });
+      } catch (e) { return json(res, 200, { ok: false, error: String(e.message || e) }); }
+    }
+    if (p === '/api/obs/stop') { try { await obsConnect(); await obs.stopStream(); return json(res, 200, { ok: true }); } catch (e) { return json(res, 200, { ok: false, error: String(e.message || e) }); } }
     if (p === '/api/notify/test') return json(res, 200, await notify('🍻 Cậu Cả Live', 'Thử thông báo: điện thoại đã nhận được báo từ app.', 3));
     if (p === '/api/speak') return json(res, 200, speak(b.text));
     if (p === '/api/window/open') return json(res, 200, openGameWindow());
@@ -417,6 +485,7 @@ server.listen(PORT, '127.0.0.1', () => {
 `);
   if (process.platform === 'darwin' && !process.argv.includes('--no-open')) exec(`open "${BASE}/panel"`);
   tiktokApply(); youtubeApply(); facebookApply();
+  if (config.obsLive.auto) { relayApply(); obsConnect().then(() => console.log('🎬 Đã kết nối OBS')).catch(() => { }); }
 });
-const stop = () => { console.log('\n👋 Đóng quán. Hẹn gặp lại!'); tiktok.stop(); youtube.stop(); facebook.stop(); vnStop(); server.close(); process.exit(0); };
+const stop = () => { console.log('\n👋 Đóng quán. Hẹn gặp lại!'); tiktok.stop(); youtube.stop(); facebook.stop(); relay.stop(); obs.close(); vnStop(); server.close(); process.exit(0); };
 process.on('SIGINT', stop); process.on('SIGTERM', stop);

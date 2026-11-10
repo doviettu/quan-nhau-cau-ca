@@ -32,6 +32,7 @@ input,select{font:inherit;color:#fff;background:rgba(0,0,0,.35);border:1px solid
 .row label{flex:1;color:var(--mut);font-size:13px}
 .row input[type=text],.row input[type=password]{flex:2}
 .row input[type=number]{width:90px}
+.card.obs .row{flex-wrap:wrap}.card.obs .row input[type=text],.card.obs .row input[type=password]{min-width:170px}.card.obs .row label{min-width:90px}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}
 .kv b{color:#fff}
 code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px;word-break:break-all}
@@ -55,6 +56,7 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
     <div class="st"><span><span class="dot" id="dTik"></span>TikTok Live</span><span class="mut" id="sTik">…</span></div>
     <div class="st"><span><span class="dot" id="dYt"></span>YouTube Live</span><span class="mut" id="sYt">…</span></div>
     <div class="st"><span><span class="dot" id="dFb"></span>Facebook Live</span><span class="mut" id="sFb">…</span></div>
+    <div class="st"><span><span class="dot" id="dObs"></span>OBS phát hình</span><span class="mut" id="sObs">…</span></div>
     <div class="st"><span><span class="dot" id="dLive"></span>Phiên live</span><span class="mut" id="sLive">…</span></div>
     <div class="st"><span><span class="dot" id="dVoice"></span>Giọng Cậu Cả</span><span class="mut" id="sVoice">…</span></div>
     <div class="st"><span><span class="dot" id="dGame"></span>Cửa sổ game</span><span class="mut" id="sGame">…</span></div>
@@ -72,6 +74,23 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
       <li>Đừng thu nhỏ cửa sổ game xuống Dock (để cửa sổ khác che lên thì được).</li>
     </ol>
     <p class="mut">Địa chỉ game: <code id="gameUrl"></code> <button id="bCopy" style="padding:3px 8px">📋</button></p>
+  </section>
+
+  <section class="card obs">
+    <h2>🎬 OBS – phát YouTube, Facebook, TikTok</h2>
+    <p class="mut" style="margin-top:0">OBS chụp cửa sổ game và phát <b>một</b> luồng về app; app chép nguyên luồng lên các nơi đã bật (cần <code>brew install ffmpeg</code>). TikTok chỉ phát qua OBS được khi tài khoản có <b>khóa luồng</b>; nếu không, giữ TikTok trên LIVE Studio như cũ.</p>
+    <div class="btns"><button class="pri" id="bObsSync">🔗 Khớp lại OBS</button><button id="bObsStart">▶️ Bắt đầu phát</button><button id="bObsStop">⏹ Dừng phát</button></div>
+    <div class="mut" id="obsStatus">Chưa kết nối OBS</div>
+    <ul class="mut" id="obsSyncList" style="margin:6px 0 4px;padding-left:18px"></ul>
+    <details style="margin-top:6px"><summary><b>Cài đặt OBS và khóa luồng</b></summary>
+      <div class="row"><label>OBS WebSocket</label><input type="text" id="obsUrl" placeholder="ws://127.0.0.1:4455"><input type="password" id="obsPass" placeholder="mật khẩu WebSocket" autocomplete="off"></div>
+      <div class="row"><label>Khung hình</label><select id="obsRes"><option value="720x1280">720×1280 (nhẹ, khuyên dùng)</option><option value="1080x1920">1080×1920</option></select><label>Bitrate</label><input type="number" id="obsBitrate" min="1000" max="9000" step="250"><span class="mut">Kbps</span></div>
+      <div class="row"><label><input type="checkbox" id="obsYtOn"> ▶️ YouTube</label><input type="password" id="obsYtKey" placeholder="khóa luồng YouTube" autocomplete="off"></div>
+      <div class="row"><label><input type="checkbox" id="obsFbOn"> 📘 Facebook</label><input type="password" id="obsFbKey" placeholder="khóa luồng Facebook" autocomplete="off"></div>
+      <div class="row"><label><input type="checkbox" id="obsTtOn"> 🎵 TikTok</label><input type="text" id="obsTtServer" placeholder="Server URL TikTok (rtmp://…)" autocomplete="off" spellcheck="false"><input type="password" id="obsTtKey" placeholder="khóa luồng TikTok" autocomplete="off"></div>
+      <div class="btns"><button class="pri" id="bObsSave">💾 Lưu</button></div>
+      <p class="mut">Mật khẩu OBS và khóa luồng được cất trong Keychain của Mac, không hiện lại ở đây. Bật WebSocket trong OBS: <b>Tools → WebSocket Server Settings → Enable WebSocket server</b>, bấm <b>Show Connect Info</b> để xem mật khẩu.</p>
+    </details>
   </section>
 
   <section class="card">
@@ -183,6 +202,14 @@ async function refresh() {
     set('Fb', fb.state === 'live' ? 'ok' : fb.state === 'connecting' || fb.state === 'offline' ? 'warn' : 'bad', l);
     $('#fbStatus').textContent = (fb.state === 'live' ? '✅ ' : '') + l;
   } else { set('Fb', '', 'chưa bật'); $('#fbStatus').textContent = fb.hasToken ? 'Đã lưu token · chưa kết nối' : 'Chưa có token'; }
+  const ob = s.obs || {}, rl = ob.relay || {}, oc = ob.cfg || {};
+  const tgt = (rl.targets || []).map(t => (t.ok ? '✅' : '❌') + ' ' + t.name).join(' · ');
+  if (!ob.connected) set('Obs', ob.error ? 'bad' : '', ob.error ? 'chưa kết nối – ' + ob.error : 'chưa kết nối (bấm Khớp lại OBS)');
+  else if (ob.streaming) set('Obs', rl.state === 'streaming' ? 'ok' : 'warn', `🔴 đang phát ${ob.timecode ? ob.timecode.slice(0, 8) : ''} · ${tgt || 'chưa có nơi phát'}`);
+  else set('Obs', 'warn', 'đã kết nối · chưa phát');
+  $('#obsStatus').textContent = (ob.connected ? '✅ Đã kết nối OBS' : '⚪ Chưa kết nối OBS') + ' · Bộ chuyển tiếp: ' + ({ off: 'tắt', listening: 'đang chờ OBS phát', streaming: 'đang phát ' + (rl.time || ''), error: '⚠️ ' + rl.error }[rl.state] || rl.state) + (tgt ? ' · ' + tgt : '');
+  const ls = ob.lastSync;
+  $('#obsSyncList').innerHTML = ls ? (ls.done || []).map(x => `<li>✅ ${esc(x)}</li>`).join('') + (ls.warnings || []).filter(Boolean).map(x => `<li>⚠️ ${esc(x)}</li>`).join('') : '';
   const lv = s.live || {};
   set('Live', lv.ok ? 'ok' : 'bad', lv.ok ? '🔴 đang live · Claude MC được phép gọi' : `⏸ ${lv.reason || 'chưa live'} · Claude tạm nghỉ`);
   const v = s.voice || {}, vnS = v.vieneu || {};
@@ -219,6 +246,10 @@ async function refresh() {
     if (yt.saved) $('#ytInput').value = yt.saved; if (yt.minPoll) $('#ytPoll').value = yt.minPoll; $('#ytChatKey').placeholder = yt.ownKey ? 'đã lưu key riêng – dán key mới để thay' : 'để trống = dùng key karaoke';
     if (fb.saved) $('#fbPage').value = fb.saved; $('#fbToken').placeholder = fb.hasToken ? 'đã lưu trong Keychain – dán token mới để thay' : 'Page access token';
     ytQuota();
+    $('#obsUrl').value = oc.url || 'ws://127.0.0.1:4455'; $('#obsRes').value = oc.res || '720x1280'; $('#obsBitrate').value = oc.bitrate || 3500;
+    $('#obsPass').placeholder = oc.hasPassword ? 'đã lưu – dán mật khẩu mới để thay' : 'mật khẩu WebSocket';
+    for (const [k, id] of [['yt', 'Yt'], ['fb', 'Fb'], ['tt', 'Tt']]) { const t = oc[k] || {}; $('#obs' + id + 'On').checked = !!t.on; $('#obs' + id + 'Key').placeholder = t.hasKey ? 'đã lưu khóa – dán khóa mới để thay' : 'khóa luồng'; }
+    if (oc.tt && oc.tt.server) $('#obsTtServer').value = oc.tt.server;
     for (const k of ['aiModel', 'aiEvery', 'aiMax', 'ytKey', 'kMin', 'kPrio', 'botMin', 'mgEvery', 'autoLuckyMin', 'bgmQuery', 'bgmVol', 'circusEvery']) $('#' + k).value = c[k] ?? '';
     for (const k of ['aiOn', 'botsOn', 'mgAuto', 'autoOn', 'bgmYt']) $('#' + k).checked = !!c[k];
     $('#circusAuto').checked = c.circusAuto !== false; $('#mcVoice').checked = c.mcVoice !== false; $('#mcGap').value = c.mcGap ?? 40; $('#jokeOn').checked = c.jokeOn !== false; $('#jokeEvery').value = c.jokeEvery ?? 4;
@@ -242,6 +273,20 @@ $('#bFbConnect').onclick = async () => {
 };
 $('#bFbStop').onclick = async () => { try { await post('/api/facebook/disconnect'); toast('Đã ngắt Facebook'); refresh(); } catch (e) { toast('❌ ' + e.message); } };
 $('#bFbForget').onclick = async () => { if (!confirm('Xóa Page access token đã lưu?')) return; try { await post('/api/facebook/forget'); toast('Đã xóa token Facebook'); refresh(); } catch (e) { toast('❌ ' + e.message); } };
+const obsSave = async () => {
+  const t = (id, extra = {}) => ({ on: $('#obs' + id + 'On').checked, key: $('#obs' + id + 'Key').value.trim(), ...extra });
+  const r = await post('/api/obs/save', { url: $('#obsUrl').value.trim(), password: $('#obsPass').value, res: $('#obsRes').value, bitrate: Number($('#obsBitrate').value) || 3500,
+    targets: { yt: t('Yt'), fb: t('Fb'), tt: t('Tt', { server: $('#obsTtServer').value.trim() }) } });
+  for (const id of ['obsPass', 'obsYtKey', 'obsFbKey', 'obsTtKey']) $('#' + id).value = '';
+  return r;
+};
+$('#bObsSave').onclick = async () => { try { const r = await obsSave(); toast('💾 Đã lưu · phát lên: ' + (r.targets.join(', ') || 'chưa có nơi nào')); loaded = false; refresh(); } catch (e) { toast('❌ ' + e.message, 5000); } };
+$('#bObsSync').onclick = async () => {
+  toast('🔗 Đang khớp lại OBS…');
+  try { const r = await post('/api/obs/sync'); toast(r.ok ? (r.warnings && r.warnings.filter(Boolean).length ? '⚠️ Đã khớp, còn vài việc cần làm – xem danh sách bên dưới' : '✅ Đã khớp lại OBS') + (r.windowName ? ' · ' + r.windowName : '') : '❌ ' + r.error, 6000); refresh(); } catch (e) { toast('❌ ' + e.message, 5000); }
+};
+$('#bObsStart').onclick = async () => { try { const r = await post('/api/obs/start'); toast(r.ok ? (r.already ? 'OBS đang phát rồi' : '🎬 OBS bắt đầu phát → ' + (r.targets || []).join(', ') + '. Nhớ bấm Phát trực tiếp trong YouTube Studio / Live Producer nếu cần') : '❌ ' + r.error, 7000); refresh(); } catch (e) { toast('❌ ' + e.message); } };
+$('#bObsStop').onclick = async () => { if (!confirm('Dừng phát OBS (YouTube, Facebook, TikTok qua OBS)?')) return; try { const r = await post('/api/obs/stop'); toast(r.ok ? '⏹ Đã dừng phát OBS' : '❌ ' + r.error); refresh(); } catch (e) { toast('❌ ' + e.message); } };
 $('#bTtConnect').onclick = ttConnect; $('#ttUser').onkeydown = e => e.key === 'Enter' && ttConnect();
 $('#bTtStop').onclick = async () => { try { await post('/api/tiktok/disconnect'); toast('Đã ngắt – quay lại dùng TikFinity'); refresh(); } catch (e) { toast('❌ ' + e.message); } };
 $('#bOpenWin').onclick = async () => { try { const r = await post('/api/window/open'); toast(r.ok ? (r.warning ? '⚠️ ' + r.warning : '🪟 Đã mở cửa sổ game – thêm nguồn “Chụp cửa sổ” trong LIVE Studio') : '❌ ' + r.error, 6000); } catch (e) { toast('❌ ' + e.message); } };
