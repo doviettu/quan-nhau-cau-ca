@@ -155,6 +155,7 @@ button.big{font-size:16px;padding:12px 18px}
   <section class="card obs">
     <h2>🎬 OBS – phát YouTube, Facebook, TikTok</h2>
     <p class="mut" style="margin-top:0">OBS chụp cửa sổ game và phát <b>một</b> luồng về app; app chép nguyên luồng lên các nơi đã bật (cần <code>brew install ffmpeg</code>). TikTok chỉ phát qua OBS được khi tài khoản có <b>khóa luồng</b>; nếu không, giữ TikTok trên LIVE Studio như cũ.</p>
+    <p class="mut" style="margin-top:0">⚡ Lần đầu: nhấp đúp file <code>cai-obs.command</code> trong thư mục quan-nhau-cau-ca – tự cài OBS, ffmpeg và bật WebSocket (app tự đọc mật khẩu). Sau đó chỉ cần dán khóa luồng bên dưới.</p>
     <div class="btns"><button class="pri" id="bObsSync">🔗 Khớp lại OBS</button><button id="bObsStart">▶️ Bắt đầu phát</button><button id="bObsStop">⏹ Dừng phát</button></div>
     <div class="mut" id="obsStatus">Chưa kết nối OBS</div>
     <ul class="mut" id="obsSyncList" style="margin:6px 0 4px;padding-left:18px"></ul>
@@ -215,6 +216,8 @@ button.big{font-size:16px;padding:12px 18px}
     <div class="row"><label><input type="checkbox" id="mcVoice"> 🔊 Cậu Cả nói thành tiếng, không để quán im quá</label><input type="number" id="mcGap" min="20" max="180"><label>giây</label><button id="bVoiceTest">Thử giọng</button></div>
     <div class="row"><label><input type="checkbox" id="jokeOn"> 🎭 Cậu Cả kể chuyện cười độc thoại mỗi</label><input type="number" id="jokeEvery" min="2" max="30"><label>phút (khi sân khấu rảnh)</label></div>
     <p class="mut" style="margin:2px 0 8px">🎙️ Chọn giọng đọc, tốc độ, nghe thử ở thẻ <b>Giọng MC</b>.</p>
+    <div class="row"><label><input type="checkbox" id="stageFx"> 🎆 Hiệu ứng sân khấu khi có người hát (đèn quét, đèn rọi, khói)</label></div>
+    <div class="row"><label><input type="checkbox" id="stageCam"> 🎬 Máy quay biểu diễn: theo người hát lên sân khấu, đổi góc quay</label><button id="bStageFx">🎤 Thử sân khấu</button></div>
     <div class="row"><label>🎥 Máy quay xoay 360° quanh quán mỗi <span class="mut">(0 = tắt)</span></label><input type="number" id="camTourEvery" min="0" max="60"><label style="flex:none">phút</label><button id="bCamTour">🎥 Xoay thử</button></div>
     <div class="row"><label><input type="checkbox" id="circusAuto"> Xiếc đường phố tự ghé mỗi</label><input type="number" id="circusEvery" min="2" max="60"><label>phút</label></div>
     <div class="row"><label><input type="checkbox" id="mgAuto"> Trò chơi nhỏ mỗi</label><input type="number" id="mgEvery" min="1" max="30"><label>phút</label></div>
@@ -301,13 +304,13 @@ async function refresh() {
     if (fb.saved) $('#fbPage').value = fb.saved; $('#fbToken').placeholder = fb.hasToken ? 'đã lưu trong Keychain – dán token mới để thay' : 'Page access token';
     ytQuota();
     $('#obsUrl').value = oc.url || 'ws://127.0.0.1:4455'; $('#obsRes').value = oc.res || '720x1280'; $('#obsBitrate').value = oc.bitrate || 3500;
-    $('#obsPass').placeholder = oc.hasPassword ? 'đã lưu – dán mật khẩu mới để thay' : 'mật khẩu WebSocket';
+    $('#obsPass').placeholder = oc.autoPassword ? 'tự đọc từ OBS – không cần dán' : oc.hasPassword ? 'đã lưu – dán mật khẩu mới để thay' : 'mật khẩu WebSocket (hoặc chạy cai-obs.command)';
     for (const [k, id] of [['yt', 'Yt'], ['fb', 'Fb'], ['tt', 'Tt']]) { const t = oc[k] || {}; $('#obs' + id + 'On').checked = !!t.on; $('#obs' + id + 'Key').placeholder = t.hasKey ? 'đã lưu khóa – dán khóa mới để thay' : 'khóa luồng'; }
     if (oc.tt && oc.tt.server) $('#obsTtServer').value = oc.tt.server;
     for (const k of ['aiModel', 'aiEvery', 'aiMax', 'ytKey', 'kMin', 'kPrio', 'botMin', 'mgEvery', 'autoLuckyMin', 'bgmQuery', 'bgmVol', 'circusEvery']) $('#' + k).value = c[k] ?? '';
     for (const k of ['aiOn', 'botsOn', 'mgAuto', 'autoOn', 'bgmYt']) $('#' + k).checked = !!c[k];
     $('#bgmLinks').value = c.bgmLinks || ''; $('#bgmShuffle').checked = c.bgmShuffle !== false; bgmCount();
-    $('#bgmFolder').value = c.bgmFolder || ''; bgmSetSrc(c.bgmSource || (c.bgmFolder ? 'folder' : 'youtube')); $('#camTourEvery').value = c.camTourEvery ?? 8; bgmFolderInfo();
+    $('#bgmFolder').value = c.bgmFolder || ''; bgmSetSrc(c.bgmSource || (c.bgmFolder ? 'folder' : 'youtube')); $('#camTourEvery').value = c.camTourEvery ?? 8; $('#stageFx').checked = c.stageFx !== false; $('#stageCam').checked = c.stageCam !== false; bgmFolderInfo();
     $('#circusAuto').checked = c.circusAuto !== false; $('#mcVoice').checked = c.mcVoice !== false; $('#mcGap').value = c.mcGap ?? 40; $('#jokeOn').checked = c.jokeOn !== false; $('#jokeEvery').value = c.jokeEvery ?? 4;
   }
 }
@@ -392,6 +395,7 @@ $('#bBgmSave').onclick = async () => {
   } catch (e) { toast('❌ ' + e.message); }
 };
 $('#bCamTour').onclick = () => cmd({ type: 'camtour' }, '🎥 Máy quay đang xoay 360°');
+$('#bStageFx').onclick = () => cmd({ type: 'stagefx' }, '🎤 Cậu Cả lên thử sân khấu (khoảng 25 giây)');
 $('#bBgmNext2').onclick = () => cmd({ type: 'bgm', action: 'next' }, '⏭ Chuyển bài nhạc nền');
 $('#bBgmStop').onclick = async () => { try { await post('/api/config', { game: { bgmYt: false } }); $('#bgmYt').checked = false; cmd({ type: 'bgm', action: 'stop' }, '⏸ Đã tắt nhạc nền'); } catch (e) { toast('❌ ' + e.message); } };
 document.querySelectorAll('[data-mc]').forEach(b => b.onclick = () => cmd({ type: 'mc', name: b.dataset.mc }, { joke: '🎭 Cậu Cả kể chuyện', hype: '📣 Cậu Cả khuấy động', poll: '📊 Mở bình chọn' }[b.dataset.mc]));
@@ -405,7 +409,7 @@ $('#bSong').onclick = () => sendText('songText', 'song'); $('#songText').onkeydo
 $('#bTest').onclick = () => sendText('testText', 'chat'); $('#testText').onkeydown = e => e.key === 'Enter' && sendText('testText', 'chat');
 $('#bSaveCfg').onclick = async () => {
   const n = id => Number($('#' + id).value);
-  const game = { aiModel: $('#aiModel').value, aiOn: $('#aiOn').checked, aiEvery: n('aiEvery'), aiMax: n('aiMax'), kMin: n('kMin'), kPrio: n('kPrio'), botsOn: $('#botsOn').checked, botMin: n('botMin'), mgAuto: $('#mgAuto').checked, mgEvery: n('mgEvery'), autoOn: $('#autoOn').checked, autoLuckyMin: n('autoLuckyMin'), bgmYt: $('#bgmYt').checked, bgmQuery: $('#bgmQuery').value.trim(), bgmLinks: $('#bgmLinks').value.trim(), bgmShuffle: $('#bgmShuffle').checked, bgmSource: BGM_SRC, bgmVol: n('bgmVol'), camTourEvery: Math.max(0, Number($('#camTourEvery').value) || 0), circusAuto: $('#circusAuto').checked, circusEvery: n('circusEvery'), mcVoice: $('#mcVoice').checked, mcGap: n('mcGap'), jokeOn: $('#jokeOn').checked, jokeEvery: n('jokeEvery') };
+  const game = { aiModel: $('#aiModel').value, aiOn: $('#aiOn').checked, aiEvery: n('aiEvery'), aiMax: n('aiMax'), kMin: n('kMin'), kPrio: n('kPrio'), botsOn: $('#botsOn').checked, botMin: n('botMin'), mgAuto: $('#mgAuto').checked, mgEvery: n('mgEvery'), autoOn: $('#autoOn').checked, autoLuckyMin: n('autoLuckyMin'), bgmYt: $('#bgmYt').checked, bgmQuery: $('#bgmQuery').value.trim(), bgmLinks: $('#bgmLinks').value.trim(), bgmShuffle: $('#bgmShuffle').checked, bgmSource: BGM_SRC, bgmVol: n('bgmVol'), camTourEvery: Math.max(0, Number($('#camTourEvery').value) || 0), stageFx: $('#stageFx').checked, stageCam: $('#stageCam').checked, circusAuto: $('#circusAuto').checked, circusEvery: n('circusEvery'), mcVoice: $('#mcVoice').checked, mcGap: n('mcGap'), jokeOn: $('#jokeOn').checked, jokeEvery: n('jokeEvery') };
   if ($('#ytKey').value.trim()) game.ytKey = $('#ytKey').value.trim();   // ô trống = giữ key đang có
   try { await post('/api/config', { game, tikfinityUrl: $('#tikUrl').value.trim() }); toast('💾 Đã lưu – game cập nhật ngay'); } catch (e) { toast('❌ ' + e.message); }
 };
