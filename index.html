@@ -68,6 +68,14 @@ body.party .vibeBar i{animation:hue 1s linear infinite}
 .kqi.mut{opacity:.7}
 #ktv{position:absolute;left:50%;top:calc(31% + var(--sat));transform:translateX(-50%);width:min(94vw,620px);background:#0d0812;border:2px solid #ff4fb8;border-radius:14px;overflow:hidden;box-shadow:0 10px 40px rgba(255,60,170,.35)}
 #ktv.mini{left:auto;right:calc(62px + var(--sar));top:auto;bottom:calc(12px + var(--sab));transform:none;width:min(52vw,300px)}
+/* đang hát: khung karaoke to hết cỡ để người xem đọc được lời (không cắt video – điều khoản YouTube không cho che/cắt trình phát) */
+@media (orientation:portrait){
+  #ktv:not(.mini){left:0;width:100vw;transform:none;border-left:0;border-right:0;border-radius:0;top:calc(var(--sat) + 112px)}
+}
+@media (orientation:landscape){
+  #ktv:not(.mini){width:min(72vw,calc((100vh - 150px) * 1.7778));top:calc(var(--sat) + 64px)}
+}
+body:has(#ktv:not(.hidden):not(.mini)) #menuList,body:has(#ktv:not(.hidden):not(.mini)) #menuPanel .hint{display:none}   /* thu gọn bảng quà khi đang hát */
 .ktvBar{display:flex;align-items:center;gap:6px;padding:4px 6px 4px 10px;background:linear-gradient(90deg,#7b1fa2,#e91e63);font-size:12.5px;font-weight:800}
 .ktvBar span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ktvBar button{flex:none;width:30px;height:26px;border-radius:8px;border:none;background:rgba(0,0,0,.3);font-size:14px}
@@ -532,7 +540,7 @@ controls.enablePan = false; controls.enableDamping = true; controls.dampingFacto
 controls.minPolarAngle = 0.5; controls.maxPolarAngle = 1.5;
 controls.minAzimuthAngle = 0.25; controls.maxAzimuthAngle = 1.95;
 controls.rotateSpeed = 0.6; controls.zoomSpeed = 0.8;
-const CAM_DIR = new THREE.Vector3(0.86, 0.3516, 0.44).normalize();   // đứng bên này đường, máy nghiêng 20° so với mặt ngang (0.3516 = 0.966·tan20°), nhìn chéo sang quán
+const CAM_DIR = new THREE.Vector3(0.86, 0.2588, 0.44).normalize();   // đứng bên này đường, máy nghiêng 15° so với mặt ngang (0.2588 = 0.966·tan15°), nhìn chéo sang quán
 function fitCamera() {
   const w = innerWidth, h = innerHeight, a = w / h;
   renderer.setSize(w, h);
@@ -540,15 +548,15 @@ function fitCamera() {
   camera.fov = a < 0.8 ? 60 : a < 1.2 ? 54 : 45;
   camera.updateProjectionMatrix();
   const tu = window.__camTune || {};
-  controls.target.set(a < 0.8 ? (tu.tx ?? -9.0) : (tu.lx ?? -7.2), a < 0.8 ? (tu.ty ?? 3.0) : (tu.ly ?? 2.2), a < 0.8 ? (tu.tz ?? 0.6) : -0.4);
+  controls.target.set(a < 0.8 ? (tu.tx ?? -10.0) : (tu.lx ?? -7.2), a < 0.8 ? (tu.ty ?? 4.0) : (tu.ly ?? 2.2), a < 0.8 ? (tu.tz ?? 0.6) : -0.4);
   const tv = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-  const halfW = a < 0.8 ? (tu.halfW ?? 6.2) : (tu.lhalfW ?? 9.5);
+  const halfW = a < 0.8 ? (tu.halfW ?? 6.4) : (tu.lhalfW ?? 9.5);
   const halfV = a < 0.8 ? 5.5 : 6.2;
   const dist = clamp(Math.max(halfW / (tv * a), halfV / tv), 14, 42);
   // điện thoại dọc: nhìn chúc xuống hơn và đẩy khung hình xuống dưới để bảng điều khiển phía trên không che quán
-  const dir = a < 0.8 ? new THREE.Vector3(0.9, tu.elev ?? 0.3454, tu.dz ?? 0.3).normalize() : CAM_DIR;   // máy nghiêng 20° so với mặt ngang (0.3454 = 0.949·tan20°)
+  const dir = a < 0.8 ? new THREE.Vector3(0.9, tu.elev ?? 0.2543, tu.dz ?? 0.3).normalize() : CAM_DIR;   // máy nghiêng 15° so với mặt ngang (0.2543 = 0.949·tan15°)
   camera.position.copy(controls.target).addScaledVector(dir, dist);
-  if (a < 0.8) camera.setViewOffset(w, h, 0, -Math.round(h * (tu.off ?? -0.12)), w, h);   // biển hiệu sát mép trên, đường sát mép dưới else camera.clearViewOffset();
+  if (a < 0.8) camera.setViewOffset(w, h, 0, -Math.round(h * (tu.off ?? -0.2)), w, h);   // biển hiệu sát mép trên, đường sát mép dưới else camera.clearViewOffset();
   controls.minDistance = dist * 0.35; controls.maxDistance = dist * 1.3;
   controls.update();
   scene.fog.near = dist * 1.0; scene.fog.far = dist * 2.8;
@@ -3003,7 +3011,7 @@ const CIRCUS_ACTS = {
 };
 const CIRCUS_KEYS = { tung_hung: /tung hung/, phun_lua: /phun lua|lua/, ca_kheo: /ca kheo/, xoay_dia: /xoay dia|dia/, mua_lan: /mua lan|lan/ };
 const RE_CIRCUS = /(^|\s)(xiec|xem xiec|goi xiec|moi xiec|xiec duong pho|mua lan|phun lua|tung hung|ca kheo|xoay dia)(\s|$|!|\?)/;
-const STAGE = { x: -0.5, z: 1.2 };   // giữa đường, phía phải màn hình – không bị khung tin che
+const STAGE = { x: -0.5, z: 1.8 };   // giữa đường, phía phải màn hình – không bị khung tin che
 const CAM_FACE = Math.atan2(0.86, 0.44);   // quay mặt về phía máy quay (bên kia đường)
 const Circus = {
   cur: null, last: -1e9, cd: 150, tips: 0,
