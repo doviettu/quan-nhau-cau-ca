@@ -778,6 +778,17 @@ const CA = (rad, len, col, p, s) => paint(xf(new THREE.CapsuleGeometry(rad, len,
 const HS = (rad, col, p, s, phS, phL, thS, thL, ws = 14, hs = 5) => paint(xf(new THREE.SphereGeometry(rad, ws, hs, phS, phL, thS, thL), s, null, p), col);
 const toonRamp = (() => { const t = new THREE.DataTexture(new Uint8Array([105, 185, 255]), 3, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
 const toonMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonRamp });
+// viền nhân vật kiểu "inverted hull": vẽ lại lưới, lật mặt, phình theo pháp tuyến.
+// Độ phình nhân với khoảng cách tới máy quay nên viền dày gần như cố định theo pixel (~1,5 px ở khung 960).
+const outlineMat = new THREE.MeshBasicMaterial({ color: 0x2a1712, side: THREE.BackSide });
+outlineMat.onBeforeCompile = (sh) => {
+  sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>',
+    `vec4 mvPosition = modelViewMatrix * vec4( transformed, 1.0 );
+    mvPosition.xyz += normalize( normalMatrix * normal ) * 0.0016 * -mvPosition.z;
+    gl_Position = projectionMatrix * mvPosition;`);
+};
+const noRay = () => {};
+function outlined(mesh) { const h = new THREE.Mesh(mesh.geometry, outlineMat); h.raycast = noRay; mesh.add(h); return mesh; }
 // mảnh mặt: một phần mặt cầu ôm phía trước đầu, dán ảnh mắt/miệng (đổi theo cảm xúc)
 const FACE_PHI = 1.8, FACE_TH = 1.5;
 const faceGeo = new THREE.SphereGeometry(HEAD_R * 1.012, 12, 9, Math.PI / 2 - FACE_PHI / 2, FACE_PHI, Math.PI / 2 - FACE_TH / 2, FACE_TH);
@@ -851,22 +862,22 @@ function buildAvatar(L) {
     default: P.push(cap(1.035, 0.33), back()); break;
   }
   if (L.headphones) P.push(TO(R * 1.12, 0.025, '#111', [0, hy + 0.02, 0], [0, Math.PI / 2, 0]), CY(0.08, 0.08, 0.07, '#222', [-R * 1.08, hy - 0.02, 0], [0, 0, Math.PI / 2], 12), CY(0.08, 0.08, 0.07, '#222', [R * 1.08, hy - 0.02, 0], [0, 0, Math.PI / 2], 12));
-  const body = new THREE.Mesh(merge(P), toonMat);
+  const body = outlined(new THREE.Mesh(merge(P), toonMat));
   const face = new THREE.Mesh(faceGeo, faceMat('idle', L)); face.position.set(0, hy, 0); face.scale.set(...HEAD_S); face.renderOrder = 2;
   const group = new THREE.Group(); group.add(body, face);
   const sleeve = L.singlet ? L.skin : L.shirt;
   const legG = limb('cleg' + L.pants + L.shoe, () => merge([CA(0.07, 0.1, L.pants, [0, -0.11, 0]), SP(0.08, L.shoe, [0, -0.235, 0.03], [0.95, 0.6, 1.35], 8, 5)]));
   const armG = limb('carm' + sleeve + L.skin, () => merge([CA(0.056, 0.08, sleeve, [0, -0.07, 0]), SP(0.062, L.skin, [0, -0.165, 0], null, 8, 5)]));
-  const legL = new THREE.Mesh(legG, toonMat), legR = new THREE.Mesh(legG, toonMat);
+  const legL = outlined(new THREE.Mesh(legG, toonMat)), legR = outlined(new THREE.Mesh(legG, toonMat));
   legL.position.set(0.085, HIP, 0); legR.position.set(-0.085, HIP, 0);
-  const armL = new THREE.Mesh(armG, toonMat), armR = new THREE.Mesh(armG, toonMat);
+  const armL = outlined(new THREE.Mesh(armG, toonMat)), armR = outlined(new THREE.Mesh(armG, toonMat));
   armL.position.set(0.205, HIP + 0.25, 0); armR.position.set(-0.205, HIP + 0.25, 0);
   const mug = new THREE.Mesh(getMugGeo(), vcMat); mug.position.set(0, -0.2, 0.05); mug.scale.setScalar(0.85); mug.visible = false; armR.add(mug);
   const mic = new THREE.Mesh(getMicGeo(), vcMat); mic.position.set(0, -0.19, 0.06); mic.visible = false; armR.add(mic);
   // cặp tay/chân gộp sẵn: dùng khi đứng/ngồi yên để giảm số lệnh vẽ
   const legs2 = new THREE.Mesh(limb('clegs2' + L.pants + L.shoe, () => mergeGeometries([legG.clone().translate(0.085, 0, 0), legG.clone().translate(-0.085, 0, 0)])), toonMat);
-  legs2.position.set(0, HIP, 0);
-  const arms2 = new THREE.Mesh(limb('carms2' + sleeve + L.skin, () => mergeGeometries([armG.clone().translate(0.205, 0, 0), armG.clone().translate(-0.205, 0, 0)])), toonMat);
+  legs2.position.set(0, HIP, 0); outlined(legs2);
+  const arms2 = outlined(new THREE.Mesh(limb('carms2' + sleeve + L.skin, () => mergeGeometries([armG.clone().translate(0.205, 0, 0), armG.clone().translate(-0.205, 0, 0)])), toonMat));
   arms2.position.set(0, HIP + 0.25, 0);
   group.add(legL, legR, armL, armR, legs2, arms2);
   return { group, body, face, legL, legR, armL, armR, mug, mic, legs2, arms2 };

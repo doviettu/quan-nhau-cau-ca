@@ -85,9 +85,10 @@ Các nguồn tìm được chủ yếu là hướng dẫn vẽ chibi 2D. Phần 
 | 7 | Hậu kỳ (bloom, chỉnh màu) | Thấp | Cao về hiệu năng | Để sau cùng, chỉ làm nếu máy Mac mini còn dư sức |
 
 **Tiến độ**
-- Đã làm hạng mục 1, 2, 4. Hạng mục 3 mới làm phần đổ bóng toon cho nhân vật, chưa có viền. Người lái xe máy cũng đã đổi sang chibi.
+- Đã làm hạng mục 1, 2, 3, 4. Hạng mục 3: đổ bóng toon và viền inverted hull cho nhân vật (không thêm viền cho cảnh). Viền dày gần như cố định khoảng 1,5 px ở khung 960, màu nâu đậm như nét vẽ mặt. Người lái xe máy cũng đã đổi sang chibi.
 - Đo khi quán có 52 nhân vật (khung 540×960, trình duyệt không có GPU): số lệnh vẽ tăng từ 297 lên 395, số tam giác từ khoảng 39 nghìn lên khoảng 122 nghìn. Card đồ hoạ của Mac mini dư sức vẽ chừng này, nhưng hãy xem số khung hình mỗi giây trên máy thật trước khi thêm viền.
 - Đo trên Mac mini M4 thật (11/2026, khung 540×960, GPU Apple M4 qua ANGLE Metal, 52 nhân vật): 60 FPS ở độ nét 2, khoảng 315 lệnh vẽ, khoảng 118 nghìn tam giác. Mỗi khung chỉ tốn khoảng 1,5 ms (JS + vẽ, p95 khoảng 3,5 ms), tức dưới 25% ngân sách 16,7 ms, kể cả khi chạy hiệu ứng sân khấu và máy quay xoay. Còn dư nhiều để thêm viền.
+- Sau khi thêm viền (cùng máy, 48 khách, độ nét 2): số lệnh vẽ tăng từ 319 lên 436, số tam giác từ khoảng 122 nghìn lên khoảng 197 nghìn. Vẫn 60 FPS, thời gian vẽ mỗi khung vẫn khoảng 2,5 ms (p95 3,5 ms).
 - Lúc đo phát hiện bộ tự giảm độ nét chỉ giảm, không tăng lại: một lần khựng khi 48 khách vào dồn dập, hoặc cửa sổ game bị che làm trình duyệt bóp khung hình, là hình bị mờ cả buổi live. Đã sửa: đo bằng giờ thật, chậm 2 nhịp 3 giây liền mới giảm, bỏ qua lúc dưới 10 FPS (cửa sổ bị che), mượt khoảng 30 giây thì tăng lại 0,25.
 
 **Thứ tự đề xuất**

@@ -32,6 +32,7 @@ Game 3D tương tác cho live **TikTok**, đọc thêm comment **YouTube Live** 
 - Khi máy quay chạy theo kịch bản (`StageFX`, `CamTour`): tắt `controls.enabled` và không gọi `controls.update()`, vì giới hạn góc của OrbitControls sẽ kéo máy quay về. Xong thì gọi `fitCamera()` để trả máy quay về.
 - Khung dọc dùng `camera.setViewOffset`; phải xoá khi chạy máy quay kịch bản.
 - Vòng lặp chính: `StageFX.camOn()` được ưu tiên hơn `CamTour.on`, rồi mới đến `controls.update()`.
+- Viền nhân vật: `outlined(mesh)` gắn một lưới con dùng chung `outlineMat` (inverted hull). Lưới con tự ẩn hoặc hiện theo lưới cha, nên nếu thêm mảnh nhân vật mới thì bọc mảnh đó bằng `outlined()`.
 - Đo FPS phải dùng cửa sổ đang hiện trên màn hình. Khung trình duyệt của app Claude bị bóp còn 1 FPS khi cửa sổ không hiện, dù `document.hidden` vẫn là `false`. Cách chắc ăn: Playwright headless với `--use-angle=metal` (vẫn dùng GPU M4 thật) và `deviceScaleFactor: 2`.
 - Cấu hình game nằm ở `DEFAULTS.game` trong `server.mjs`, và phải thêm tên khóa vào danh sách của `applyAppConfig` trong `index.html` thì game mới nhận.
 - `config.json` và `.secrets.json` nằm trong `.gitignore`. Không commit chúng.
@@ -45,10 +46,9 @@ Game 3D tương tác cho live **TikTok**, đọc thêm comment **YouTube Live** 
 - Không ghi email hay thông tin cá nhân của người dùng vào code, commit hay dịch vụ bên ngoài.
 
 ## Tình trạng (11/2026)
-Đã gộp vào `main`: nhân vật chibi + mặt biểu cảm + toon shading (chưa có viền), YouTube/Facebook Live, kết nối thông minh, danh sách giọng MC, bộ lọc từ tục, nhạc nền từ link YouTube hoặc thư mục trên máy, máy quay xoay 360° định kỳ, hiệu ứng sân khấu karaoke, OBS + bộ chuyển tiếp 3 nền tảng, `cai-obs.command`.
+Đã gộp vào `main`: nhân vật chibi + mặt biểu cảm + toon shading, YouTube/Facebook Live, kết nối thông minh, danh sách giọng MC, bộ lọc từ tục, nhạc nền từ link YouTube hoặc thư mục trên máy, máy quay xoay 360° định kỳ, hiệu ứng sân khấu karaoke, OBS + bộ chuyển tiếp 3 nền tảng, `cai-obs.command`.
 
 Việc còn mở (xem `docs/nghien-cuu-nang-cap-chibi.md` mục D):
-- Thêm viền nhân vật (hạng mục 3). Đã đo trên Mac mini M4: 48 khách vẫn 60 FPS, mỗi khung khoảng 1,5 ms, còn dư nhiều.
 - Thu gọn bảng quà thành nút.
 - Chạy A/B 2 tuần.
 - Chạy thử `cai-obs.command` trên Mac thật. Chưa chạy lần nào vì môi trường cloud không phải macOS.
