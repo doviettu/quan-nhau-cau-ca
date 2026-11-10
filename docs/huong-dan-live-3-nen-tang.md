@@ -5,8 +5,8 @@ Dành cho máy Mac mini chạy app "Cậu Cả Live". Một cửa sổ game đư
 ```
                 ┌──────────────── Cửa sổ game (Chrome dọc 540×960) ────────────────┐
                 │                                                                  │
-   TikTok LIVE Studio ── chụp cửa sổ ──► TikTok           OBS ── chụp cửa sổ ──► YouTube + Facebook
-                                                                 (plugin Multiple RTMP outputs)
+   OBS ── chụp cửa sổ ──► 1 luồng ──► Bộ chuyển tiếp của app (ffmpeg) ──► YouTube + Facebook (+ TikTok nếu có khóa luồng)
+   TikTok LIVE Studio ── chụp cửa sổ ──► TikTok   (khi tài khoản TikTok chưa có khóa luồng)
 
    App Cậu Cả Live ◄── comment/quà/tim ── TikTok (@tên) · YouTube (API key) · Facebook (Page token)
 ```
@@ -26,8 +26,10 @@ Dành cho máy Mac mini chạy app "Cậu Cả Live". Một cửa sổ game đư
 Làm theo README mục 1: cài Node.js, tải repo, mở `Cau Ca Live.app`. Muốn giọng đọc tự nhiên thì cài thêm VieNeu (README mục 4).
 
 ### A3. TikTok
-- Tài khoản đủ điều kiện live và đã có **TikTok LIVE Studio**.
-- Không cần làm gì thêm cho app: lúc live chỉ cần nhập **@tên**.
+- Tài khoản đủ điều kiện live.
+- **Cách 1 – qua OBS (gọn nhất):** nếu TikTok cấp cho tài khoản **Server URL + khóa luồng** (thường thấy trong LIVE Center / LIVE Producer trên web, chỉ một số tài khoản có), dán hai thông tin này vào thẻ 🎬 OBS của app. OBS phát luôn cả TikTok. **[CXM]**
+- **Cách 2 – LIVE Studio (như cũ):** nếu chưa có khóa luồng, LIVE Studio vẫn chụp cửa sổ game và phát lên TikTok. OBS lo YouTube và Facebook.
+- Với cả hai cách, app đọc comment TikTok bằng **@tên**.
 
 ### A4. YouTube
 1. **Bật tính năng phát trực tiếp:** vào YouTube Studio → **Tạo → Phát trực tiếp**. Lần đầu YouTube có thể yêu cầu xác minh số điện thoại và **chờ tới 24 giờ** mới live được.
@@ -52,60 +54,53 @@ Làm theo README mục 1: cài Node.js, tải repo, mở `Cau Ca Live.app`. Mu�
    - Token giống mật khẩu: chỉ dán vào bảng điều khiển của app, không gửi cho ai.
 3. **Khóa luồng:** mở **Live Producer** (facebook.com/live/producer), chọn đăng với tư cách **Trang**, chọn **Phần mềm phát trực tiếp (Streaming software)**, rồi chép **Khóa luồng**. Nên chọn khóa dùng lại được (persistent).
 
-### A6. OBS Studio (phát lên YouTube + Facebook)
-1. Tải **OBS Studio** bản 30 trở lên tại obsproject.com. Mac chip M thì chọn bản **Apple Silicon**.
-2. Cài plugin **Multiple RTMP outputs** (sorayuki/obs-multi-rtmp trên GitHub):
-   - Chọn bản cho đúng phiên bản OBS và bản **universal** hoặc arm64.
-   - Kiến trúc của plugin phải khớp với OBS (cùng là Apple Silicon), nếu không plugin sẽ không chạy. **[CXM]**
-   - Nếu không cài được plugin: dùng dịch vụ **Restream** (gói miễn phí phát được tới 2 nơi). OBS phát một luồng lên Restream, Restream phát lại lên YouTube và Facebook.
-3. **Settings → Video:**
-   - Base (Canvas) và Output: **720×1280** (dọc).
-   - FPS: **30**.
-   - Cửa sổ game có kích thước 540×960 nên 720×1280 là đủ nét. Muốn 1080×1920 thì phóng to cửa sổ game trước.
-4. **Settings → Output** (chế độ Advanced):
-   - Bộ mã hoá: **Apple VT H264 Hardware Encoder**.
-   - Bitrate: **3500 Kbps**.
-   - Keyframe interval: **2 giây**.
-5. **Settings → Stream:** chọn **YouTube – RTMPS**, dán khóa luồng YouTube.
-6. Mở thẻ **Multiple output** (của plugin) → **Add new target**:
-   - Tên: Facebook.
-   - Server: `rtmps://live-api-s.facebook.com:443/rtmp/`.
-   - Key: khóa luồng Facebook.
-   - Chọn "dùng chung bộ mã hoá với luồng chính" để máy không phải mã hoá thêm một lần. **[CXM]**
-7. **Nguồn (Sources):**
-   - **macOS Screen Capture** → Method: **Window Capture** → chọn cửa sổ game (Chrome) → kéo phủ kín khung.
-   - **macOS Audio Capture** → chọn **Desktop Audio**. Cách này thu cả tiếng game, nhạc YouTube và giọng Cậu Cả, vì giọng Cậu Cả phát ra loa bằng chương trình riêng, không phải từ Chrome.
-   - Không nên chọn "chỉ tiếng của một ứng dụng", vì sẽ mất giọng Cậu Cả.
-   - Cấp quyền khi macOS hỏi: **Cài đặt hệ thống → Quyền riêng tư & Bảo mật → Ghi màn hình & âm thanh hệ thống → OBS**.
+### A6. OBS Studio + nút "Khớp lại OBS"
+App tự cài đặt OBS qua WebSocket nên bạn không phải chỉnh tay từng mục, và không cần plugin.
+1. **Cài OBS Studio** bản 30 trở lên (obsproject.com; Mac chip M chọn bản **Apple Silicon**).
+2. **Cài ffmpeg** cho bộ chuyển tiếp của app: mở Terminal, chạy `brew install ffmpeg`.
+3. **Bật WebSocket trong OBS:**
+   - Vào **Tools → WebSocket Server Settings**, tích **Enable WebSocket server** (cổng 4455).
+   - Bấm **Show Connect Info** để xem mật khẩu.
+4. **Nhập vào app:** bảng điều khiển → thẻ **🎬 OBS – phát YouTube, Facebook, TikTok** → mở **Cài đặt OBS và khóa luồng**.
+   - Dán **mật khẩu WebSocket**.
+   - Tích **YouTube** và dán khóa luồng YouTube (A4).
+   - Tích **Facebook** và dán khóa luồng Facebook (A5).
+   - Nếu TikTok có khóa luồng (A3, cách 1): tích **TikTok**, dán **Server URL** và **khóa luồng**.
+   - Bấm **💾 Lưu**.
+   - Mật khẩu và khóa luồng được cất trong **Keychain** của Mac, không nằm trong `config.json`.
+5. Lần đầu OBS chụp màn hình, macOS sẽ hỏi quyền. Vào **Cài đặt hệ thống → Quyền riêng tư & Bảo mật → Ghi màn hình & âm thanh hệ thống**, bật cho **OBS**, rồi mở lại OBS.
+
+**Nút 🔗 Khớp lại OBS làm những gì:**
+- Khung dọc **720×1280**, 30 FPS (đổi được sang 1080×1920).
+- Tạo cảnh **"Cậu Cả Live"** và chọn cảnh này.
+- Thêm nguồn **macOS Screen Capture** ở chế độ cửa sổ, tự tìm cửa sổ tên *"Quán nhậu vỉa hè Cậu Cả"*, phủ kín khung và **cắt thanh tiêu đề** cửa sổ Chrome.
+- Thêm nguồn **macOS Audio Capture → toàn bộ âm thanh máy**. Nguồn này thu cả nhạc game lẫn giọng Cậu Cả; chỉ thu tiếng Chrome thì sẽ mất giọng Cậu Cả.
+- Đặt **đích phát** của OBS về bộ chuyển tiếp của app (`rtmp://127.0.0.1:19350/live`).
+- Đặt bitrate **3500 Kbps** và bộ mã hoá phần cứng **Apple VT**. **[CXM]** Nếu OBS báo không đặt được, vào **Settings → Output** chỉnh tay.
+
+**Bấm lại "Khớp lại OBS" mỗi khi:** mở lại cửa sổ game, khởi động lại máy, hoặc OBS mất hình game. macOS đổi mã cửa sổ mỗi lần mở, nên cần khớp lại.
+
+**Nếu không muốn dùng bộ chuyển tiếp của app:** dùng plugin *Multiple RTMP outputs* (sorayuki/obs-multi-rtmp) hoặc dịch vụ Restream, rồi cài đặt tay. Nếu đi theo cách này thì đừng bật các nơi phát trong thẻ 🎬 OBS.
 
 ---
 
 ## Phần B. Mỗi buổi live (theo thứ tự)
 
+**Lần đầu (một lần):** thẻ **⚡ Kết nối & phát** → dán từng link kênh rồi bấm **➕ Kết nối**: link TikTok (`tiktok.com/@ten`), link kênh YouTube (`youtube.com/@ten`), link Trang Facebook. App tự nhận ra nền tảng. Ô nào báo thiếu thì bấm nút trên ô đó (**🔑 Dán API key**, **🔑 Dán Page token**).
+
 | # | Việc | Ở đâu |
 |---|---|---|
-| 1 | Mở **Cau Ca Live.app**. Bảng điều khiển tự mở | Mac |
-| 2 | Bấm **🪟 Mở cửa sổ game**. Chỉ mở **một** cửa sổ. Để cửa sổ này cùng màn hình (Space) với OBS và LIVE Studio, không thu nhỏ xuống Dock | Bảng điều khiển |
-| 3 | **TikTok LIVE Studio:** bố cục dọc → Thêm nguồn → *Chụp cửa sổ* (cửa sổ game) → bật **âm thanh máy tính** → **Go LIVE** | LIVE Studio |
-| 4 | **OBS:** bấm **Start Streaming** (YouTube). Trong thẻ *Multiple output*, bấm **Start** cho Facebook | OBS |
-| 5 | **YouTube Studio:** đợi hình hiện lên rồi bấm **Phát trực tiếp** (nếu không bật tự bắt đầu). Bấm *Chia sẻ* để chép **link buổi live** | YouTube Studio |
-| 6 | **Live Producer:** bấm **Phát trực tiếp** khi hình đã lên | Facebook |
-| 7 | Bảng điều khiển → ⚙️ Cấu hình phiên live, kết nối từng nơi (bảng ngay dưới) | Bảng điều khiển |
-| 8 | Kiểm tra mục **📋 Trạng thái**: ba dòng TikTok / YouTube / Facebook đều 🔴 kèm số người xem. Dòng **Phiên live**: "đang live" | Bảng điều khiển |
-| 9 | Dùng điện thoại comment thử "chào quán" trên cả ba nơi. Trong game phải thấy khách mới. Người từ YouTube có nhãn **YT**, từ Facebook có nhãn **FB** | Điện thoại |
+| 1 | Mở **Cau Ca Live.app** và **OBS** (nếu phát YouTube/Facebook) | Mac |
+| 2 | Bắt đầu buổi live trên YouTube Studio / Live Producer (để nơi nhận sẵn sàng). Nếu TikTok chưa có khóa luồng, mở **LIVE Studio** | Các nền tảng |
+| 3 | Bấm **▶️ Bắt đầu buổi live**. App mở cửa sổ game, nối comment, khớp OBS và phát hình. Danh sách ✅/⚠️ hiện ngay bên dưới | Bảng điều khiển |
+| 4 | TikTok bằng LIVE Studio: *Chụp cửa sổ* (cửa sổ game) → bật **âm thanh máy tính** → **Go LIVE** | LIVE Studio |
+| 5 | Xem các ô nền tảng: ô xanh 🔴 kèm số người xem là xong. Ô cam/đỏ thì đọc dòng chữ trên ô hoặc bấm **🩺 Kiểm tra** | Bảng điều khiển |
+| 6 | Dùng điện thoại comment thử "chào quán" trên từng nơi. Trong game phải thấy khách mới; người từ YouTube có nhãn **YT**, từ Facebook có nhãn **FB** | Điện thoại |
 
-**Bước 7, kết nối từng nơi:**
-
-| Nơi | Nhập gì | Bấm |
-|---|---|---|
-| **TikTok** | `@tên` tài khoản đang live | Kết nối |
-| **YouTube** | Link kênh (`https://youtube.com/@tenkenh`) hoặc **link buổi live** vừa chép (chắc ăn hơn). Lần đầu dán thêm *key riêng cho chat* | Kết nối |
-| **Facebook** | Để trống ô Trang, lần đầu dán **Page access token** | Lưu & kết nối |
-
-App nhớ các thông tin này. Lần sau chỉ cần bấm Kết nối, hoặc app tự kết nối khi mở.
+Nếu kênh YouTube không tự nhận ra buổi live: dán thẳng **link buổi live** vào ô Kết nối nhanh.
 
 **Kết thúc buổi live:**
-1. Dừng live trong LIVE Studio, OBS (cả Facebook), YouTube Studio và Live Producer.
+1. Bấm **⏹ Kết thúc phát** (dừng OBS). Dừng LIVE Studio nếu có dùng. Bấm kết thúc trong YouTube Studio và Live Producer.
 2. Nhấn **Ctrl+C** trong cửa sổ Terminal của app.
 3. Nếu chưa tắt app mà các nơi đều đã dừng, app tự ngưng gọi Claude và báo về điện thoại (README mục 4a).
 
@@ -146,12 +141,17 @@ App nhớ các thông tin này. Lần sau chỉ cần bấm Kết nối, hoặc 
 | *Hết hạn mức YouTube* | App tự thử lại sau 30 phút. Dùng key ở project khác hoặc tăng số giây đọc chat |
 | Dòng *Facebook Live* báo token hết hạn hoặc thiếu quyền | Lấy lại Page token với đủ 3 quyền (A5), dán vào rồi bấm **Lưu & kết nối** |
 | Facebook: không thấy buổi live | Kiểm tra bạn đang live với tư cách **Trang** (không phải trang cá nhân) và token là của **đúng Trang đó** |
-| Máy nóng, hình giật | Giảm bitrate xuống 2500 Kbps, giữ 720p 30 FPS, tắt các ứng dụng khác. Nếu vẫn nặng, dùng Restream thay plugin để OBS chỉ phát một luồng |
+| Máy nóng, hình giật | Giảm bitrate xuống 2500 Kbps, giữ 720p 30 FPS, tắt các ứng dụng khác. OBS chỉ mã hoá một lần; bộ chuyển tiếp chép nguyên luồng nên gần như không tốn thêm sức máy, chỉ tốn thêm mạng tải lên |
+| **Khớp lại OBS** báo *"OBS không phản hồi"* / *"Sai mật khẩu"* | Mở OBS, bật **Tools → WebSocket Server Settings → Enable WebSocket server**, chép đúng mật khẩu (Show Connect Info) vào thẻ 🎬 OBS rồi bấm Lưu |
+| *"Chưa thấy cửa sổ game"* | Bấm **🪟 Mở cửa sổ game** trước, cấp quyền **Ghi màn hình** cho OBS, rồi bấm **Khớp lại OBS** lần nữa |
+| Bộ chuyển tiếp báo *"Chưa có ffmpeg"* | Chạy `brew install ffmpeg` rồi mở lại app |
+| Dòng *OBS phát hình* có ❌ ở một nơi, app báo *"Mất luồng …"* | Khóa luồng nơi đó sai hoặc đã hết hạn, hoặc nơi đó chưa sẵn sàng nhận hình. Sửa khóa trong thẻ 🎬 OBS, rồi **Dừng phát** → **Bắt đầu phát**. Các nơi khác vẫn phát bình thường |
 | Game tính đôi khách, quà | Đang mở hai cửa sổ game. Đóng bớt, chỉ giữ cửa sổ mở từ bảng điều khiển |
 
 ## Nguồn
 - YouTube Live chat API: https://developers.google.com/youtube/v3/live/docs/liveChatMessages/list · hạn mức: https://developers.google.com/youtube/v3/determine_quota_cost
 - Facebook Live comments (Graph API): https://developers.facebook.com/docs/graph-api/server-sent-events/endpoints/live-comments/
 - OBS – thu tiếng hệ thống trên macOS: https://obsproject.com/kb/macos-desktop-audio-capture-guide
-- Plugin Multiple RTMP outputs: https://github.com/sorayuki/obs-multi-rtmp · cài trên Mac chip M: https://obsproject.com/forum/threads/help-please-how-to-install-the-obs-multi-rtmp-extension-on-mac-os-m1.159574/latest
+- obs-websocket (điều khiển OBS): https://github.com/obsproject/obs-websocket · ffmpeg tee, nhiều đầu ra: https://trac.ffmpeg.org/wiki/Creating%20multiple%20outputs
+- (Cách khác) Plugin Multiple RTMP outputs: https://github.com/sorayuki/obs-multi-rtmp
 - Hình dọc trên Facebook/YouTube với OBS (diễn đàn): https://obsproject.com/forum/threads/obs-facebook-live-forces-1920%C3%971080-instead-of-1080%C3%971920-vertical-stream-stretched.193930 · https://obsproject.com/forum/threads/bug-%E2%80%93-obs-vertical-video-setting-showing-on-horizontal-format-on-youtube.125306

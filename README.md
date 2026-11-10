@@ -10,7 +10,7 @@ Repo gồm:
 | `Cau Ca Live.app`, `start.command` | App khởi động trên Mac |
 | `app/` | Máy chủ cục bộ: chạy game, cầu nối Claude, kết nối TikTok, bảng điều khiển, mở cửa sổ game cho LIVE Studio |
 | `bridge/` | Cầu nối Claude dùng riêng, khi không chạy app |
-| `docs/huong-dan-live-3-nen-tang.md` | Hướng dẫn từng bước live cùng lúc TikTok, YouTube, Facebook: lấy key/token, cài OBS, thứ tự bật live, sự cố thường gặp |
+| `docs/huong-dan-live-3-nen-tang.md` | Hướng dẫn từng bước live cùng lúc TikTok, YouTube, Facebook: lấy key/token, khóa luồng, nút Khớp lại OBS, thứ tự bật live, sự cố thường gặp |
 | `docs/tang-luot-xem-va-qua.md` | Nghiên cứu cách tăng lượt xem, tương tác và quà trên TikTok LIVE, kèm các rủi ro vi phạm cần tránh |
 
 ---
@@ -38,21 +38,29 @@ Repo gồm:
 Có thể kéo `Cau Ca Live.app` vào thư mục Applications hoặc Dock; app tự nhớ vị trí thư mục repo.
 
 ### Mỗi buổi live
-1. Kết nối TikTok để game nhận comment, tim, quà. Chọn một trong hai cách:
-   - **Kết nối thẳng (không cần TikFinity):** bắt đầu live trên TikTok, rồi trong bảng điều khiển → **⚙️ Cấu hình phiên live** nhập **@tên tài khoản** và bấm **Kết nối**. Dòng *TikTok Live* ở phần Trạng thái hiện 🔴 và số người xem là xong. Nếu bạn bấm trước khi live, app tự thử lại mỗi 30 giây. App nhớ tên, các lần sau tự kết nối.
-   - **Qua TikFinity:** mở TikFinity, kết nối với tài khoản đang live. Nếu đang kết nối thẳng thì bấm **Ngắt** để game quay về dùng TikFinity.
-2. Mở **Cau Ca Live.app**, rồi trong bảng điều khiển bấm **🪟 Mở cửa sổ game**. Game mở trong cửa sổ Chrome dọc 540×960, tự phát tiếng. Chỉ mở **một** cửa sổ game, vì hai bản cùng chạy sẽ tính đôi khách, quà và lượt gọi Claude.
-3. Trong **TikTok LIVE Studio**:
-   - Chọn bố cục **dọc**, rồi **Thêm nguồn → Chụp cửa sổ**, chọn cửa sổ game và kéo phủ kín khung. LIVE Studio không nhận địa chỉ trên máy (`localhost`, `127.0.0.1`) ở nguồn *Liên kết*, nên phải dùng *Chụp cửa sổ*.
-   - Cắt bỏ thanh tiêu đề cửa sổ ở cạnh trên: giữ **⌥ Option** rồi kéo cạnh trên xuống, nếu LIVE Studio hỗ trợ.
-   - Bật **âm thanh máy tính** để người xem nghe nhạc và karaoke.
-   - Bấm **Go LIVE**. Đừng thu nhỏ cửa sổ game xuống Dock; để cửa sổ khác che lên thì được.
+Mọi thứ nằm ở thẻ **⚡ Kết nối & phát**, ngay đầu bảng điều khiển.
+1. **Lần đầu: thêm kênh.** Dán link kênh hoặc `@tên` vào ô trên cùng rồi bấm **➕ Kết nối**. App tự nhận ra đó là TikTok, YouTube hay Trang Facebook. Nếu chỉ có `@tên`, app hỏi bạn đó là kênh của nền tảng nào.
+   - Mỗi nền tảng có một ô riêng, gồm công tắc bật/tắt, tài khoản và trạng thái (🔴 đang live, số người xem).
+   - Thiếu gì thì ô đó hiện nút làm ngay, ví dụ **🔑 Dán API key** cho YouTube, **🔑 Dán Page token** cho Facebook.
+   - App nhớ các kênh. Lần sau mở app, các kênh đang bật tự nối khi bạn bắt đầu live.
+2. **Bấm ▶️ Bắt đầu buổi live.** App lần lượt:
+   - mở cửa sổ game (nếu chưa mở);
+   - nối comment của các nền tảng đang bật;
+   - nếu đã cài OBS (thẻ 🎬 OBS): khớp lại OBS rồi phát hình lên YouTube, Facebook (và TikTok nếu có khóa luồng).
+   
+   Danh sách ✅/⚠️ hiện ngay bên dưới, mục nào ⚠️ đều kèm cách sửa.
+3. **TikTok phát bằng LIVE Studio** (khi chưa có khóa luồng TikTok):
+   - Chọn bố cục **dọc** → **Thêm nguồn → Chụp cửa sổ**, chọn cửa sổ game và kéo phủ kín khung.
+   - Cắt thanh tiêu đề ở cạnh trên (giữ **⌥ Option** rồi kéo cạnh trên xuống), bật **âm thanh máy tính**, rồi bấm **Go LIVE**.
+   - Đừng thu nhỏ cửa sổ game xuống Dock. Chỉ mở **một** cửa sổ game, vì hai cửa sổ sẽ tính đôi khách, quà và lượt gọi Claude.
+- **🩺 Kiểm tra**: soát cửa sổ game, Claude, giọng MC, từng nền tảng (key, token), OBS, ffmpeg và khóa luồng; mục nào hỏng đều kèm cách sửa.
+- Tài khoản từng nền tảng, YouTube API key, Page token và TikFinity nằm trong **⚙️ Nâng cao** của thẻ này. Dùng TikFinity thì tắt công tắc TikTok; app sẽ chuyển tiếp sự kiện TikFinity vào game.
 4. Trong lúc live, điều khiển từ bảng điều khiển:
    - Dzô, bốc thăm, pháo hoa, quẩy.
    - Mở trò chơi nhỏ, cho qua bài karaoke.
    - **Gõ câu cho Cậu Cả nói**, thêm bài hát, gửi comment thử.
    - Bật/tắt Claude MC, đổi model, chỉnh số khách quen…: bấm **Lưu & áp dụng**, cửa sổ game cập nhật ngay.
-5. Kết thúc: dừng live trong LIVE Studio, rồi nhấn **Ctrl+C** trong cửa sổ Terminal để tắt app.
+5. Kết thúc: bấm **⏹ Kết thúc phát** (dừng OBS), dừng LIVE Studio nếu có dùng, rồi nhấn **Ctrl+C** trong cửa sổ Terminal để tắt app.
 
 > Không có Chrome? Cài bằng `brew install --cask google-chrome`. Nếu chưa cài, nút **Mở cửa sổ game** mở game trong trình duyệt mặc định, và cửa sổ đó có thêm thanh địa chỉ.
 
@@ -99,9 +107,14 @@ Nút **"Áp dụng cấu hình Live"** trong ⚙️ của game, hoặc tham số
 ## 4. Cậu Cả dẫn live bằng giọng nói
 
 Cậu Cả nói thành tiếng mọi câu thoại: chào khách, gọi tên người tặng quà, trả lời comment, giới thiệu trò chơi. Tính năng này **bật sẵn** ở cấu hình Live.
+- **Đổi giọng ở thẻ 🎙️ Giọng MC** trên bảng điều khiển:
+  - Thẻ liệt kê đủ **25 giọng VieNeu** và các giọng tiếng Việt của Mac. Mỗi giọng ghi rõ nam/nữ, giọng miền nào, phong cách (tự nhiên, tin tức, kể chuyện, đọc truyện); ⭐ là giọng nên dùng.
+  - Lọc theo **Nữ/Nam**, **Bắc/Trung/Nam**, **VieNeu/Mac**.
+  - Bấm **▶ Nghe** để nghe thử (có thể gõ câu riêng), bấm **Dùng** để đổi ngay, không cần Lưu.
+  - Thanh **Tốc độ** chỉnh từ 0,8× đến 1,3×. Với VieNeu, tốc độ được chỉnh khi phát bằng `afplay` **[CXM: chưa thử trên Mac]**.
 - **Giọng đọc VieNeu-TTS (khuyên dùng):** giọng tiếng Việt tự nhiên, chạy ngay trên máy, có 25 giọng (mặc định *Trúc Ly*: giọng nữ miền Bắc, tự nhiên, hợp kiểu MC hào hứng). Máy đang để giọng mặc định cũ *Hải Đăng* sẽ tự chuyển sang *Trúc Ly* một lần; muốn giọng khác thì chọn lại. Âm thanh ra loa máy, nên trong LIVE Studio phải bật **âm thanh máy tính**.
   - **Cài một lần:** nhấp đúp file **`cai-giong-vieneu.command`** trong thư mục `quan-nhau-cau-ca`. File tự cài Python (nếu máy chưa có) và thư viện VieNeu, rồi tải mô hình giọng khoảng vài trăm MB. Toàn bộ nằm trong `~/Library/Application Support/CauCaLive/vieneu`.
-  - Mở lại app: app tự chạy VieNeu nền ở cổng 8011, lần đầu mất khoảng một phút. Đổi giọng ở **⚙️ Cấu hình → Giọng Cậu Cả**.
+  - Mở lại app: app tự chạy VieNeu nền ở cổng 8011, lần đầu mất khoảng một phút. Đổi giọng ở thẻ **🎙️ Giọng MC**.
   - Nếu VieNeu chưa cài, đang khởi động hoặc bị lỗi, app tạm dùng giọng **Linh** của macOS. Mac chưa có giọng Linh thì cài trong *Cài đặt hệ thống → Trợ năng → Nội dung được đọc → Giọng hệ thống → Quản lý giọng → Tiếng Việt*.
   - Bấm **Thử giọng** trên bảng điều khiển để nghe thử.
   - Thư viện VieNeu dùng giấy phép Apache 2.0. Riêng giấy phép mô hình giọng, hãy xem trang [VieNeu-TTS-v3-Turbo trên Hugging Face](https://huggingface.co/pnnbao-ump/VieNeu-TTS-v3-Turbo) trước khi dùng cho mục đích thương mại.
@@ -140,11 +153,16 @@ Cậu Cả nói thành tiếng mọi câu thoại: chào khách, gọi tên ngư
 Quán nhận comment, quà và lượt thích từ **TikTok, YouTube và Facebook cùng lúc**. Người xem cả ba nơi ngồi chung một quán. Trong khung tin, người từ YouTube có nhãn đỏ **YT**, người từ Facebook có nhãn xanh **FB**. Chỉ cần một nơi còn đang live là app coi phiên live đang chạy, nên Claude vẫn được gọi.
 
 **1. Phát hình lên YouTube, Facebook.** TikTok LIVE Studio chỉ phát lên TikTok. Muốn phát thêm lên YouTube và Facebook, cần một phần mềm phát khác cùng chụp cửa sổ game:
-- **OBS Studio** (miễn phí): thêm nguồn *Chụp cửa sổ* → chọn cửa sổ game, rồi phát bằng *khóa luồng (stream key)* lấy trong YouTube Studio / Facebook Live Producer. OBS mặc định chỉ phát một nơi. Muốn phát cả YouTube lẫn Facebook thì thêm plugin *Multiple RTMP outputs* hoặc dùng dịch vụ phát lại như Restream.
+- **OBS Studio + nút 🔗 Khớp lại OBS** trong thẻ **🎬 OBS** của bảng điều khiển.
+  - App điều khiển OBS qua WebSocket: tạo cảnh dọc, chụp đúng cửa sổ game (cắt thanh tiêu đề), thu toàn bộ âm thanh máy, đặt bitrate và bộ mã hoá Apple VT.
+  - OBS phát **một** luồng về bộ chuyển tiếp của app. Bộ chuyển tiếp dùng ffmpeg chép nguyên luồng lên **YouTube, Facebook và TikTok** (TikTok chỉ khi tài khoản có khóa luồng). Một nơi lỗi thì các nơi khác vẫn phát, và app báo về điện thoại.
+  - Cần `brew install ffmpeg` và bật **Tools → WebSocket Server Settings** trong OBS.
+  - Mật khẩu OBS và khóa luồng được cất trong Keychain.
+  - Bấm **▶️ Bắt đầu phát** / **⏹ Dừng phát** ngay trên bảng điều khiển.
 - Phát nhiều luồng cùng lúc làm Mac nóng và tốn mạng hơn. Hãy thử trước khi live thật.
 - Trên TikTok, đừng kêu người xem chuyển sang YouTube/Facebook: TikTok có thể không đề xuất phiên live chủ yếu kéo người xem sang nền tảng khác.
 
-**2. YouTube Live** (bảng điều khiển → ⚙️ → **▶️ Kết nối YouTube Live**)
+**2. YouTube Live** (dán link kênh vào ô **⚡ Kết nối & phát**; cài đặt chi tiết ở **⚙️ Nâng cao → ▶️ Kết nối YouTube Live**)
 - Dán **link kênh** (`https://youtube.com/@tenkenh`), **@tên kênh** hoặc **link buổi live**, rồi bấm **Kết nối**. Nếu chưa live, app tự tìm lại: mỗi phút trong 10 phút đầu, sau đó mỗi 5 phút.
 - Dùng **YouTube Data API key**: mặc định là key karaoke, có thể dán key riêng.
 - **Hạn mức:**
@@ -158,7 +176,7 @@ Quán nhận comment, quà và lượt thích từ **TikTok, YouTube và Faceboo
   - Lượt thích video (đọc mỗi 90 giây) → tim chung đẩy thanh Không khí.
 - Tin nhắn của chính chủ kênh không được tính là khách.
 
-**3. Facebook Live** (bảng điều khiển → ⚙️ → **📘 Kết nối Facebook Live**)
+**3. Facebook Live** (dán link Trang vào ô **⚡ Kết nối & phát**, rồi bấm **🔑 Dán Page token** trên ô Facebook)
 - **Điều kiện:** chỉ dùng được cho buổi live trên **Trang** bạn quản lý, không dùng được cho trang cá nhân. Cần một **Page access token**.
 - **Lấy token:**
   1. Tạo app tại developers.facebook.com (loại *Business*).
@@ -282,12 +300,20 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 ## 9. Quyền riêng tư và minh bạch
 
 - App chỉ chạy trên máy bạn (`127.0.0.1`) và không có máy chủ trên mạng.
-- Claude API key và Page token Facebook nằm trong Keychain; cấu hình (kể cả YouTube API key) nằm trong `config.json`.
+- Claude API key, Page token Facebook, mật khẩu OBS và khóa luồng nằm trong Keychain; cấu hình (kể cả YouTube API key) nằm trong `config.json`.
 - Nội dung chỉ được gửi ra ngoài khi bạn bật tính năng tương ứng:
   - **Claude MC**: tóm tắt diễn biến phòng live được gửi tới Anthropic.
   - **Karaoke YouTube**: tên bài được gửi tới Google để tìm, và video phát qua `youtube-nocookie.com`.
   - **YouTube Live**: app gửi link/@tên kênh và API key tới Google (YouTube Data API) để đọc chat công khai của buổi live.
   - **Facebook Live**: app dùng Page access token (cất trong Keychain) để đọc comment buổi live trên Trang của bạn qua Graph API của Meta.
+  - **OBS + bộ chuyển tiếp**: luồng hình chỉ đi từ OBS về app trên máy, rồi từ app lên YouTube/Facebook/TikTok bằng khóa luồng của bạn.
   - **Kết nối thẳng TikTok**: app dùng thư viện mã nguồn mở `tiktok-live-connector` để đọc phiên live công khai, không đăng nhập TikTok. Thư viện gửi **tên tài khoản** của bạn tới dịch vụ Euler Stream để ký kết nối. Đây là cách đọc không chính thức, TikTok có thể thay đổi bất cứ lúc nào; khi đó hãy dùng TikFinity.
 - Khách quen 🏠 là nhân vật máy, được đánh dấu rõ, và không tạo tim, quà hay thứ hạng giả.
+- **Lọc từ tục tĩu, xúc phạm** (`app/locfilter.cjs`). Bộ lọc nhận cả chữ có dấu, không dấu, viết tắt, chèn dấu chấm (`đm`, `d.m`, `vcl`…) và một số từ tiếng Anh, nhưng không bắt nhầm "lon bia", "đeo kính".
+  - Comment có từ xấu: chữ trên màn hình bị che thành `***`, app không đọc thành tiếng và không gửi Claude.
+  - Tên người xem có từ xấu được đổi thành "Khách 123".
+  - Câu Claude trả lời mà có từ xấu thì bị bỏ.
+  - App kiểm tra lại một lần nữa ngay trước khi đọc thành tiếng.
+  - Muốn thêm từ thì sửa `app/locfilter.cjs`, chép phần đó sang `index.html`, rồi chạy `npm run check:filter` để kiểm tra hai bản đã khớp.
+- **Không xin quà lặp lại.** Lời dẫn soạn sẵn chỉ nhắc chuyện quà nhiều nhất một lần mỗi 20 phút, giọng nhẹ nhàng, nói rõ không bắt buộc. Lời mời xem xiếc và karaoke chỉ kêu gọi thả tim. Khách quen 🏠 không xin quà. Claude được dặn không xin, không giục và không ép tặng quà. Lý do: TikTok không cho kiếm tiền với nội dung xin quà lặp đi lặp lại.
 - Đồ ăn, bia trong quán là **ảo**. Cậu Cả do AI dẫn được dặn không cổ vũ uống rượu bia thật và luôn nói thật mình là MC ảo khi được hỏi.
