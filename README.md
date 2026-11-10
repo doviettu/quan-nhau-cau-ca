@@ -244,9 +244,16 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
   - Bạn bấm nút trên bảng điều khiển.
 - Ai tặng quà trong lúc đoàn đang diễn thì nghệ sĩ cảm ơn tên người đó và diễn thêm vài giây.
 
-**Nhạc nền remix từ YouTube** (tuỳ chọn, mặc định tắt)
-- Cách bật: trên bảng điều khiển → ⚙️ Cấu hình, tích **📻 Nhạc nền remix từ YouTube**, rồi chỉnh từ khoá (mặc định *nhạc remix vinahouse*) và âm lượng.
-- Game dùng chung YouTube key với karaoke. Mỗi lần tìm 25 bài và nhớ danh sách trong 12 giờ, nên tốn rất ít hạn mức.
+**Nhạc nền từ YouTube** (tuỳ chọn, mặc định tắt). Chỉnh ở thẻ **📻 Nhạc nền** trên bảng điều khiển.
+- **Tự chọn bài:** dán link YouTube vào ô, mỗi dòng một link, rồi bấm **▶️ Lưu & phát**.
+  - Nhận link video (`youtube.com/watch?v=…`, `youtu.be/…`) và link **playlist** (`youtube.com/playlist?list=…`). Cách này **không cần API key**.
+  - Ô bên dưới đếm số video, số playlist và số mục không phải link YouTube (mục đó bị bỏ qua).
+  - Bật 🔀 để phát ngẫu nhiên; tắt thì phát theo đúng thứ tự đã dán.
+  - Playlist được phát hết rồi mới sang link kế tiếp. Nút **⏭ Bài khác** chuyển bài trong playlist trước.
+  - Link "Mix" do YouTube tự tạo (`list=RD…`) không phát được theo kiểu playlist, nên app chỉ phát video đầu của link đó.
+  - Video nào chủ kênh chặn nhúng thì app tự bỏ qua.
+- **Tự tìm theo từ khoá:** để trống ô link, app tìm 25 bài theo từ khoá (mặc định *nhạc remix vinahouse*) bằng YouTube key dùng chung với karaoke. Danh sách được nhớ 12 giờ nên tốn rất ít hạn mức.
+- Thẻ hiện tên bài đang phát. **⏸ Tắt nhạc nền** để tắt.
 - Nhạc tự dừng khi có người hát karaoke hoặc lên mic, rồi phát tiếp sau đó. Khi đang phát nhạc YouTube, nhạc nền tự tạo của quán tạm tắt.
 - Trình phát hiện ở góc trên bên trái, kích thước 200×200 theo quy định của YouTube.
 - ⚠️ **Rủi ro bản quyền:** nhạc trên YouTube (nhất là remix) thường có bản quyền, TikTok có thể **tắt tiếng hoặc dừng** phiên live. An toàn nhất là dùng nhạc nền tự tạo sẵn của quán, hoặc nhạc miễn phí bản quyền có giấy phép phát trực tiếp.

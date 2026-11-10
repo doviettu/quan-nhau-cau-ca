@@ -41,6 +41,7 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
 .steps b{color:#fff}
 .tt{border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:10px;background:rgba(255,201,60,.06)}
 #ttStatus{margin-top:2px}
+#bgmLinks{width:100%;font:13px/1.4 ui-monospace,Menlo,monospace;color:#fff;background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:10px;padding:8px 10px;resize:vertical}
 .wide{grid-column:1/-1}
 .hidden{display:none!important}
 .qin{display:flex;gap:8px;flex-wrap:wrap}.qin input{flex:1;min-width:240px;font-size:15px;padding:11px 12px}
@@ -109,6 +110,17 @@ button.big{font-size:16px;padding:12px 18px}
     <div class="row"><input type="text" id="vText" placeholder="Câu để nghe thử (để trống = câu chào mẫu)" style="flex:1"></div>
     <p class="mut" id="vnHint" style="margin:4px 0"></p>
     <div class="vgrid" id="vList"></div>
+  </section>
+
+  <section class="card bgm">
+    <h2>📻 Nhạc nền</h2>
+    <div class="row"><label><input type="checkbox" id="bgmYt"> Bật nhạc nền YouTube</label><span class="mut" id="bgmNow"></span></div>
+    <textarea id="bgmLinks" rows="5" spellcheck="false" placeholder="Dán link YouTube – mỗi dòng một link&#10;• video: https://www.youtube.com/watch?v=…  hoặc  https://youtu.be/…&#10;• playlist: https://www.youtube.com/playlist?list=…&#10;Để trống = tự tìm theo từ khoá (cần YouTube API key)"></textarea>
+    <div class="mut" id="bgmCount" style="margin:4px 0"></div>
+    <div class="row"><label><input type="checkbox" id="bgmShuffle" checked> 🔀 Phát ngẫu nhiên</label><label style="flex:none">Âm lượng</label><input type="number" id="bgmVol" min="0" max="100"></div>
+    <div class="row"><label>Từ khoá <span class="mut">(khi không dán link)</span></label><input type="text" id="bgmQuery" placeholder="nhạc remix vinahouse"></div>
+    <div class="btns"><button class="pri" id="bBgmSave">▶️ Lưu &amp; phát</button><button id="bBgmNext2">⏭ Bài khác</button><button id="bBgmStop">⏸ Tắt nhạc nền</button></div>
+    <p class="mut" style="margin:2px 0 0">⚠️ Nhạc trên YouTube thường có bản quyền – TikTok/YouTube/Facebook có thể <b>tắt tiếng hoặc dừng</b> phiên live. An toàn nhất là nhạc bạn có quyền dùng: nhạc tự làm, nhạc miễn phí bản quyền có giấy phép phát live. Video nào chủ kênh chặn nhúng sẽ được tự bỏ qua.</p>
   </section>
 
   <section class="card">
@@ -197,9 +209,6 @@ button.big{font-size:16px;padding:12px 18px}
     <div class="row"><label><input type="checkbox" id="jokeOn"> 🎭 Cậu Cả kể chuyện cười độc thoại mỗi</label><input type="number" id="jokeEvery" min="2" max="30"><label>phút (khi sân khấu rảnh)</label></div>
     <p class="mut" style="margin:2px 0 8px">🎙️ Chọn giọng đọc, tốc độ, nghe thử ở thẻ <b>Giọng MC</b>.</p>
     <div class="row"><label><input type="checkbox" id="circusAuto"> Xiếc đường phố tự ghé mỗi</label><input type="number" id="circusEvery" min="2" max="60"><label>phút</label></div>
-    <div class="row"><label><input type="checkbox" id="bgmYt"> 📻 Nhạc nền remix từ YouTube (dùng YouTube key)</label></div>
-    <div class="row"><label>Từ khoá nhạc nền</label><input type="text" id="bgmQuery" placeholder="nhạc remix vinahouse"><label>Âm lượng</label><input type="number" id="bgmVol" min="0" max="100"></div>
-    <p class="mut" style="margin:2px 0 8px">⚠️ Nhạc trên YouTube thường có bản quyền – TikTok có thể <b>tắt tiếng hoặc dừng</b> phiên live. An toàn nhất là nhạc nền tự tạo của quán hoặc nhạc miễn phí bản quyền có giấy phép phát live.</p>
     <div class="row"><label><input type="checkbox" id="mgAuto"> Trò chơi nhỏ mỗi</label><input type="number" id="mgEvery" min="1" max="30"><label>phút</label></div>
     <div class="row"><label><input type="checkbox" id="autoOn"> Tự động dẫn live, bốc thăm mỗi</label><input type="number" id="autoLuckyMin" min="2" max="60"><label>phút</label></div>
     <div class="btns"><button class="pri" id="bSaveCfg">💾 Lưu & áp dụng cho game</button></div>
@@ -248,6 +257,7 @@ async function refresh() {
   const ls = ob.lastSync;
   $('#obsSyncList').innerHTML = ls ? (ls.done || []).map(x => `<li>✅ ${esc(x)}</li>`).join('') + (ls.warnings || []).filter(Boolean).map(x => `<li>⚠️ ${esc(x)}</li>`).join('') : '';
   renderQuick(s);
+  { const gb = s.game && s.game.bgm; const el = $('#bgmNow'); if (el) el.textContent = gb ? (String(gb).startsWith('⚠️') ? gb : '🎵 ' + gb) : ''; }
   const lv = s.live || {};
   set('Live', lv.ok ? 'ok' : 'bad', lv.ok ? '🔴 đang live · Claude MC được phép gọi' : `⏸ ${lv.reason || 'chưa live'} · Claude tạm nghỉ`);
   const v = s.voice || {}, vnS = v.vieneu || {};
@@ -288,6 +298,7 @@ async function refresh() {
     if (oc.tt && oc.tt.server) $('#obsTtServer').value = oc.tt.server;
     for (const k of ['aiModel', 'aiEvery', 'aiMax', 'ytKey', 'kMin', 'kPrio', 'botMin', 'mgEvery', 'autoLuckyMin', 'bgmQuery', 'bgmVol', 'circusEvery']) $('#' + k).value = c[k] ?? '';
     for (const k of ['aiOn', 'botsOn', 'mgAuto', 'autoOn', 'bgmYt']) $('#' + k).checked = !!c[k];
+    $('#bgmLinks').value = c.bgmLinks || ''; $('#bgmShuffle').checked = c.bgmShuffle !== false; bgmCount();
     $('#circusAuto').checked = c.circusAuto !== false; $('#mcVoice').checked = c.mcVoice !== false; $('#mcGap').value = c.mcGap ?? 40; $('#jokeOn').checked = c.jokeOn !== false; $('#jokeEvery').value = c.jokeEvery ?? 4;
   }
 }
@@ -335,6 +346,20 @@ $('#bNtSave').onclick = async () => { try { await post('/api/config', ntCfg()); 
 $('#bNtTest').onclick = async () => { try { await post('/api/config', ntCfg()); const r = await post('/api/notify/test'); toast(r.ok ? '📲 Đã gửi – kiểm tra điện thoại' : '⚠️ ' + r.error, 6000); } catch (e) { toast('❌ ' + e.message); } };
 $('#bVoiceTest').onclick = async () => { try { const r = await post('/api/speak', { text: 'Xin chào cả nhà, Cậu Cả đây! Mời cả nhà vào quán ngồi chơi!' }); toast(r.ok ? '🔊 Đang đọc bằng giọng ' + r.voice : '⚠️ ' + r.error, 6000); } catch (e) { toast('❌ ' + e.message); } };
 $('#bBgmNext').onclick = () => cmd({ type: 'bgm', action: 'next' }, '📻 Chuyển bài nhạc nền');
+// ---- 📻 nhạc nền: đếm link hợp lệ, lưu & phát ngay ----
+const YTV = /(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/))([\w-]{11})/i;
+function bgmParse(t) { let v = 0, pl = 0, bad = 0; for (const x of String(t || '').split(/[\s,]+/)) { if (!x) continue; const l = x.match(/[?&]list=([\w-]{10,})/); if (l && !/^RD/.test(l[1])) pl++; else if (YTV.test(x) || /^[\w-]{11}$/.test(x)) v++; else bad++; } return { v, pl, bad }; }
+function bgmCount() { const r = bgmParse($('#bgmLinks').value); $('#bgmCount').textContent = r.v || r.pl ? `✅ ${r.v} video${r.pl ? ' · ' + r.pl + ' playlist' : ''}${r.bad ? ` · ⚠️ ${r.bad} mục không phải link YouTube (bỏ qua)` : ''}` : (r.bad ? `⚠️ ${r.bad} mục không phải link YouTube` : 'Chưa có link – nhạc nền sẽ tự tìm theo từ khoá (cần YouTube API key)'); }
+$('#bgmLinks').oninput = bgmCount;
+$('#bBgmSave').onclick = async () => {
+  const r = bgmParse($('#bgmLinks').value);
+  try {
+    await post('/api/config', { game: { bgmYt: true, bgmLinks: $('#bgmLinks').value.trim(), bgmShuffle: $('#bgmShuffle').checked, bgmQuery: $('#bgmQuery').value.trim(), bgmVol: Number($('#bgmVol').value) || 35 } });
+    $('#bgmYt').checked = true; await cmd({ type: 'bgm', action: 'play' }, r.v || r.pl ? `📻 Phát ${r.v} video${r.pl ? ' + ' + r.pl + ' playlist' : ''}` : '📻 Phát nhạc theo từ khoá');
+  } catch (e) { toast('❌ ' + e.message); }
+};
+$('#bBgmNext2').onclick = () => cmd({ type: 'bgm', action: 'next' }, '⏭ Chuyển bài nhạc nền');
+$('#bBgmStop').onclick = async () => { try { await post('/api/config', { game: { bgmYt: false } }); $('#bgmYt').checked = false; cmd({ type: 'bgm', action: 'stop' }, '⏸ Đã tắt nhạc nền'); } catch (e) { toast('❌ ' + e.message); } };
 document.querySelectorAll('[data-mc]').forEach(b => b.onclick = () => cmd({ type: 'mc', name: b.dataset.mc }, { joke: '🎭 Cậu Cả kể chuyện', hype: '📣 Cậu Cả khuấy động', poll: '📊 Mở bình chọn' }[b.dataset.mc]));
 document.querySelectorAll('[data-circus]').forEach(b => b.onclick = () => cmd({ type: 'circus', name: b.dataset.circus || null }, b.dataset.circus === 'stop' ? '⏹ Đã dừng xiếc' : '🎪 Mời đoàn xiếc'));
 $('#bAiOn').onclick = () => cmd({ type: 'ai', on: true }); $('#bAiOff').onclick = () => cmd({ type: 'ai', on: false });
@@ -346,7 +371,7 @@ $('#bSong').onclick = () => sendText('songText', 'song'); $('#songText').onkeydo
 $('#bTest').onclick = () => sendText('testText', 'chat'); $('#testText').onkeydown = e => e.key === 'Enter' && sendText('testText', 'chat');
 $('#bSaveCfg').onclick = async () => {
   const n = id => Number($('#' + id).value);
-  const game = { aiModel: $('#aiModel').value, aiOn: $('#aiOn').checked, aiEvery: n('aiEvery'), aiMax: n('aiMax'), kMin: n('kMin'), kPrio: n('kPrio'), botsOn: $('#botsOn').checked, botMin: n('botMin'), mgAuto: $('#mgAuto').checked, mgEvery: n('mgEvery'), autoOn: $('#autoOn').checked, autoLuckyMin: n('autoLuckyMin'), bgmYt: $('#bgmYt').checked, bgmQuery: $('#bgmQuery').value.trim(), bgmVol: n('bgmVol'), circusAuto: $('#circusAuto').checked, circusEvery: n('circusEvery'), mcVoice: $('#mcVoice').checked, mcGap: n('mcGap'), jokeOn: $('#jokeOn').checked, jokeEvery: n('jokeEvery') };
+  const game = { aiModel: $('#aiModel').value, aiOn: $('#aiOn').checked, aiEvery: n('aiEvery'), aiMax: n('aiMax'), kMin: n('kMin'), kPrio: n('kPrio'), botsOn: $('#botsOn').checked, botMin: n('botMin'), mgAuto: $('#mgAuto').checked, mgEvery: n('mgEvery'), autoOn: $('#autoOn').checked, autoLuckyMin: n('autoLuckyMin'), bgmYt: $('#bgmYt').checked, bgmQuery: $('#bgmQuery').value.trim(), bgmLinks: $('#bgmLinks').value.trim(), bgmShuffle: $('#bgmShuffle').checked, bgmVol: n('bgmVol'), circusAuto: $('#circusAuto').checked, circusEvery: n('circusEvery'), mcVoice: $('#mcVoice').checked, mcGap: n('mcGap'), jokeOn: $('#jokeOn').checked, jokeEvery: n('jokeEvery') };
   if ($('#ytKey').value.trim()) game.ytKey = $('#ytKey').value.trim();   // ô trống = giữ key đang có
   try { await post('/api/config', { game, tikfinityUrl: $('#tikUrl').value.trim() }); toast('💾 Đã lưu – game cập nhật ngay'); } catch (e) { toast('❌ ' + e.message); }
 };
