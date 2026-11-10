@@ -91,13 +91,13 @@ Nút **"Áp dụng cấu hình Live"** trong ⚙️ của game, hoặc tham số
 - **Claude MC**: Haiku 5.5, nhịp 20 giây, chi phí khoảng $0,02–0,06 mỗi giờ.
 - **Tự động dẫn live**: bốc thăm, dzô, pháo hoa, dọn bàn.
 - **Khách quen 🏠**: giữ quán luôn có ít nhất 20 người. Đây là nhân vật máy của quán, được đánh dấu rõ; họ không thả tim, không tặng quà, không lên bảng xếp hạng và không thắng trò chơi.
-- **Trò chơi nhỏ**: tự mở mỗi 3 phút. Đố vui có hơn 130 câu: địa lý, lịch sử, ẩm thực, câu đố mẹo, thành ngữ, khoa học, tính nhanh. Karaoke: tặng quà từ 50 xu để đăng ký hát, từ 180 xu để chen hàng.
+- **Trò chơi nhỏ**: tự mở mỗi 3 phút (đố vui, đoán số, nhanh tay, đua bàn, bình chọn). Đố vui có hơn 130 câu: địa lý, lịch sử, ẩm thực, câu đố mẹo, thành ngữ, khoa học, tính nhanh. Karaoke: tặng quà từ 50 xu để đăng ký hát, từ 180 xu để chen hàng.
 - **Xiếc đường phố**: khoảng 6 phút một lần có một tiết mục (đổi được trong bảng điều khiển).
 
 ## 4. Cậu Cả dẫn live bằng giọng nói
 
 Cậu Cả nói thành tiếng mọi câu thoại: chào khách, gọi tên người tặng quà, trả lời comment, giới thiệu trò chơi. Tính năng này **bật sẵn** ở cấu hình Live.
-- **Giọng đọc VieNeu-TTS (khuyên dùng):** giọng tiếng Việt tự nhiên, chạy ngay trên máy, có 25 giọng (mặc định *Hải Đăng*, nam, giọng Bắc). Âm thanh ra loa máy, nên trong LIVE Studio phải bật **âm thanh máy tính**.
+- **Giọng đọc VieNeu-TTS (khuyên dùng):** giọng tiếng Việt tự nhiên, chạy ngay trên máy, có 25 giọng (mặc định *Trúc Ly*: giọng nữ miền Bắc, tự nhiên, hợp kiểu MC hào hứng). Máy đang để giọng mặc định cũ *Hải Đăng* sẽ tự chuyển sang *Trúc Ly* một lần; muốn giọng khác thì chọn lại. Âm thanh ra loa máy, nên trong LIVE Studio phải bật **âm thanh máy tính**.
   - **Cài một lần:** nhấp đúp file **`cai-giong-vieneu.command`** trong thư mục `quan-nhau-cau-ca`. File tự cài Python (nếu máy chưa có) và thư viện VieNeu, rồi tải mô hình giọng khoảng vài trăm MB. Toàn bộ nằm trong `~/Library/Application Support/CauCaLive/vieneu`.
   - Mở lại app: app tự chạy VieNeu nền ở cổng 8011, lần đầu mất khoảng một phút. Đổi giọng ở **⚙️ Cấu hình → Giọng Cậu Cả**.
   - Nếu VieNeu chưa cài, đang khởi động hoặc bị lỗi, app tạm dùng giọng **Linh** của macOS. Mac chưa có giọng Linh thì cài trong *Cài đặt hệ thống → Trợ năng → Nội dung được đọc → Giọng hệ thống → Quản lý giọng → Tiếng Việt*.
@@ -106,6 +106,9 @@ Cậu Cả nói thành tiếng mọi câu thoại: chào khách, gọi tên ngư
 - **Không để quán im lặng:** phòng im quá số giây đã đặt (mặc định 40 giây) thì Cậu Cả tự nói.
   - Nếu đang bật Claude MC, game nhờ Claude nói trước: gọi tên một khách đang ngồi, hỏi han hoặc gợi ý trò chơi.
   - Claude không trả lời thì Cậu Cả nói một câu theo tình huống thật của quán: tên khách, bàn đang ngồi, người dẫn đầu, trò đang mở.
+- **MC dẫn sự kiện:** khi quán im, Cậu Cả xen kẽ lời dẫn theo tình huống với câu khuấy động (điểm danh vùng miền, đếm ngược thả tim, mời lên hát, mời bình chọn).
+- **Hài độc thoại:** khoảng 4 phút một lần, khi sân khấu rảnh (không có người hát, trò chơi hay xiếc), Cậu Cả bước ra micro trên sân khấu karaoke và kể một chuyện cười ngắn (kho gần 20 chuyện, không lặp lại cho tới khi kể hết). Tới câu chốt, giọng VieNeu bật cười và khách trong quán cười theo. Người xem comment `kể chuyện` để nghe thêm (cách nhau ít nhất 1 phút). Bật/tắt và đổi số phút ở **⚙️ Cấu hình**; bảng điều khiển có nút **🎭 Kể chuyện cười**, **📣 Khuấy động**, **📊 Bình chọn 1/2**.
+- **Bình chọn 1/2:** câu hỏi vui (phở hay bún bò, biển hay núi…), người xem comment `1` hoặc `2` trong 40 giây, mỗi người một phiếu. Khách quen 🏠 không bỏ phiếu. Bình chọn nằm chung vòng trò chơi nhỏ tự mở.
 - Trong lúc Cậu Cả nói, nhạc nền tự nhỏ lại.
 - Cậu Cả luôn tự giới thiệu là **MC ảo do AI dẫn**. Trên màn hình có nhãn **AI MC**.
 
@@ -162,6 +165,7 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 - Người xem comment `hát <tên bài>` rồi tặng quà **từ 50 xu** để chốt bài. Quà **từ 180 xu** được chen hàng. Đổi hai mức này trên bảng điều khiển → ⚙️ Cấu hình.
 - **Tự tìm bài**: nhập YouTube Data API key trong bảng điều khiển (hoặc ⚙️ của game – key được lưu lên app). Bấm **🔎 Kiểm tra key** để thử tìm một bài: nếu lỗi, bảng điều khiển nói rõ cách sửa (key sai, chưa bật YouTube Data API v3, key giới hạn trang web, hết hạn mức). Bấm **🎤 Phát thử** để thêm bài vào hàng chờ và nghe thử trong game. Hạn mức miễn phí khoảng 100 lượt tìm mỗi ngày.
 - **Không có key**: dùng 🔎 Tìm và 🔗 Dán link trong ⚙️ của game, hoặc ô **Thêm bài** trên bảng điều khiển.
+- **Sân khấu** nằm sát tường mặt tiền quán: TV treo tường, hai loa hai bên, micro đứng giữa. Người hát đi qua khe giữa bàn 1 và bàn 2 để lên sân khấu; nhân vật tự đi vòng phía trước sân khấu, không đi xuyên loa hay TV.
 - **Lên mic**: người xem comment `xin lên mic`, bạn mời họ làm **Khách mời** trên TikTok. Giọng hát đi thẳng vào phòng live.
 
 ## 6. Xiếc đường phố và nhạc nền
@@ -188,7 +192,7 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 | Comment | Tác dụng |
 |---|---|
 | (bất kỳ) | Vào quán, kéo ghế ngồi, có ly bia trước mặt; lời chat hiện trên đầu nhân vật |
-| `bàn 5` | Ngồi bàn số 5 (dãy sát đường 1–3, dãy trong 4–8) |
+| `bàn 5` | Ngồi bàn số 5 (dãy sát đường 1–5, dãy sát quán 6–8) |
 | `bàn riêng` | Giữ một bàn cho hội bạn |
 | `ghép Tên` / `ngồi với Tên` | Ngồi chung bàn với bạn |
 | `mời Tên` | Rủ bạn qua bàn mình |
@@ -203,7 +207,9 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 | `hát <tên bài>` + tặng quà | Đăng ký hát karaoke |
 | `hát` | Hát mộc với nhạc của quán |
 | `xin lên mic` | Xin làm khách mời để hát |
-| `đố vui`, `đoán số`, `nhanh tay`, `đua bàn` | Mở trò chơi nhỏ |
+| `đố vui`, `đoán số`, `nhanh tay`, `đua bàn`, `bình chọn` | Mở trò chơi nhỏ |
+| `1` / `2` | Bỏ phiếu khi đang bình chọn |
+| `kể chuyện`, `chuyện cười` | Nghe Cậu Cả kể chuyện cười |
 | `xiếc`, `múa lân`, `phun lửa`, `tung hứng`, `cà kheo`, `xoay đĩa` | Mời đoàn xiếc đường phố; tặng quà lúc đoàn đang diễn để thưởng nghệ sĩ |
 | `về nha`, `tính tiền` | Ra về |
 | Thả tim | Đẩy thanh **Không khí**; đủ 100% thì cả quán quẩy |
