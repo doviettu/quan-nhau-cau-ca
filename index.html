@@ -547,7 +547,7 @@ const FACADE_X = 13, CURB_X = 1.7, TABLE_X = 4.3, TABLE_X2 = 8.7;   // vỉa hè
 const ROWS = [6.6, 3.3, 0, -3.3, -6.6];   // vị trí bàn dọc theo phố (trục z = trái ↔ phải màn hình)
 const LANE_IN = 2.9, LANE_MID = 6.5, LANE_OUT = 11.1;   // lối đi: sát lòng đường / giữa 2 dãy bàn / sát mặt tiền quán
 const TOP_DZ = 0.42, SIDE_OFF = 0.62, END_OFF = 1.2, GAP_DZ = 1.65;
-const SEATS_PER = 6, STOOL_H = 0.3, HIP = 0.37;
+const SEATS_PER = 6, STOOL_H = 0.3, HIP = 0.285;   // nhân vật chibi: chân ngắn, hông thấp
 const FRONT_Z = 14, BACK_Z = -14, DOOR_Z = -1.65;   // khách đi vào từ hai đầu phố (trái/phải màn hình)
 const KARAOKE = { x: -11.2, z: 4.35 };   // sân hát karaoke sát tường mặt tiền quán (TV treo tường, quay ra phố)
 const KARA_ROWS = [6.6, 3.3];          // 2 chỗ bàn dãy trong (sát quán) nhường cho sân hát
@@ -769,60 +769,110 @@ function getMugGeo() {
 }
 let micGeo = null;
 function getMicGeo() { if (!micGeo) micGeo = merge([CY(0.025, 0.02, 0.16, '#222', [0, 0, 0], null, 8), SP(0.045, '#bbb', [0, 0.1, 0], null, 8, 6)]); return micGeo; }
+/* ---------- NHÂN VẬT CHIBI: đầu tròn to (~48% chiều cao), mặt vẽ biểu cảm, đổ bóng hoạt hình ---------- */
+const HEAD_R = 0.29, HEAD_S = [1.06, 0.96, 1.0];
+const CA = (rad, len, col, p, s) => paint(xf(new THREE.CapsuleGeometry(rad, len, 2, 8), s, null, p), col);
+const HS = (rad, col, p, s, phS, phL, thS, thL, ws = 14, hs = 5) => paint(xf(new THREE.SphereGeometry(rad, ws, hs, phS, phL, thS, thL), s, null, p), col);
+const toonRamp = (() => { const t = new THREE.DataTexture(new Uint8Array([105, 185, 255]), 3, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
+const toonMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonRamp });
+// mảnh mặt: một phần mặt cầu ôm phía trước đầu, dán ảnh mắt/miệng (đổi theo cảm xúc)
+const FACE_PHI = 1.8, FACE_TH = 1.5;
+const faceGeo = new THREE.SphereGeometry(HEAD_R * 1.012, 12, 9, Math.PI / 2 - FACE_PHI / 2, FACE_PHI, Math.PI / 2 - FACE_TH / 2, FACE_TH);
+const FACE_W = 256, FACE_H = 214, faceMats = new Map();
+function drawFace(g, ex, L) {
+  const W = FACE_W, H = FACE_H, ey = H * 0.585, ex1 = W * 0.33, ex2 = W * 0.67, my = H * 0.76, ink = '#2a1712';
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  // má hồng
+  const bl = ex === 'drunk' ? 'rgba(255,70,70,.75)' : L.blush ? 'rgba(255,120,140,.55)' : 'rgba(255,140,150,.28)';
+  g.fillStyle = bl; for (const x of [W * 0.22, W * 0.78]) { g.beginPath(); g.ellipse(x, H * 0.69, 19, 11, 0, 0, Math.PI * 2); g.fill(); }
+  const openEye = (x, sc = 1) => {
+    g.fillStyle = ink; g.beginPath(); g.ellipse(x, ey, 15 * sc, 21 * sc, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#5b3a2a'; g.beginPath(); g.ellipse(x, ey + 7 * sc, 10 * sc, 11 * sc, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(x - 5 * sc, ey - 8 * sc, 6 * sc, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.arc(x + 5 * sc, ey + 7 * sc, 2.6 * sc, 0, Math.PI * 2); g.fill();
+  };
+  const arcEye = (x, up) => { g.strokeStyle = ink; g.lineWidth = 7; g.beginPath(); if (up) g.arc(x, ey + 8, 14, Math.PI * 1.1, Math.PI * 1.9); else g.arc(x, ey - 6, 14, Math.PI * 0.1, Math.PI * 0.9); g.stroke(); };
+  const star = (x) => { g.fillStyle = '#ffc400'; g.strokeStyle = '#a86a00'; g.lineWidth = 2.5; g.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? 9 : 21, a = -Math.PI / 2 + i * Math.PI / 5; g.lineTo(x + Math.cos(a) * r, ey + Math.sin(a) * r); } g.closePath(); g.fill(); g.stroke(); };
+  const mouth = (kind) => {
+    g.strokeStyle = ink; g.lineWidth = 5; g.fillStyle = '#9c2b2b';
+    if (kind === 'smile') { g.beginPath(); g.arc(W / 2, my - 8, 12, Math.PI * 0.2, Math.PI * 0.8); g.stroke(); }
+    else if (kind === 'open') { g.beginPath(); g.moveTo(W / 2 - 17, my - 6); g.quadraticCurveTo(W / 2, my + 26, W / 2 + 17, my - 6); g.closePath(); g.fill(); g.stroke(); g.fillStyle = '#ff7f8a'; g.beginPath(); g.ellipse(W / 2, my + 7, 8, 5, 0, 0, Math.PI * 2); g.fill(); }
+    else if (kind === 'big') { g.beginPath(); g.moveTo(W / 2 - 24, my - 9); g.quadraticCurveTo(W / 2, my + 34, W / 2 + 24, my - 9); g.closePath(); g.fill(); g.stroke(); g.fillStyle = '#ff7f8a'; g.beginPath(); g.ellipse(W / 2, my + 10, 11, 6, 0, 0, Math.PI * 2); g.fill(); }
+    else if (kind === 'o') { g.beginPath(); g.ellipse(W / 2, my + 2, 9, 12, 0, 0, Math.PI * 2); g.fill(); g.stroke(); }
+    else if (kind === 'wavy') { g.beginPath(); g.moveTo(W / 2 - 16, my); for (let i = 1; i <= 4; i++) g.quadraticCurveTo(W / 2 - 16 + i * 8 - 4, my + (i % 2 ? -6 : 6), W / 2 - 16 + i * 8, my); g.stroke(); }
+  };
+  if (ex === 'blink') { arcEye(ex1, false); arcEye(ex2, false); mouth('smile'); }
+  else if (ex === 'happy') { arcEye(ex1, true); arcEye(ex2, true); mouth('open'); }
+  else if (ex === 'laugh') { g.strokeStyle = ink; g.lineWidth = 7; for (const [x, d] of [[ex1, 1], [ex2, -1]]) { g.beginPath(); g.moveTo(x - 12 * d, ey - 12); g.lineTo(x + 10 * d, ey); g.lineTo(x - 12 * d, ey + 12); g.stroke(); } mouth('big'); }
+  else if (ex === 'drunk') { g.strokeStyle = ink; g.lineWidth = 5; for (const x of [ex1, ex2]) { g.beginPath(); for (let a = 0; a < Math.PI * 5; a += 0.3) { const r = 2 + a * 1.1; g.lineTo(x + Math.cos(a) * r, ey + Math.sin(a) * r); } g.stroke(); } mouth('wavy'); }
+  else if (ex === 'sing') { arcEye(ex1, true); arcEye(ex2, true); mouth('o'); }
+  else if (ex === 'win') { star(ex1); star(ex2); mouth('big'); }
+  else if (ex === 'surprise') { openEye(ex1, 1.1); openEye(ex2, 1.1); mouth('o'); }
+  else { openEye(ex1); openEye(ex2); mouth('smile'); }
+  if (L.glasses) { g.strokeStyle = '#151515'; g.lineWidth = 5; for (const x of [ex1, ex2]) { g.beginPath(); g.arc(x, ey, 27, 0, Math.PI * 2); g.stroke(); } g.beginPath(); g.moveTo(ex1 + 27, ey - 4); g.lineTo(ex2 - 27, ey - 4); g.stroke(); }
+  if (L.mustache) { g.fillStyle = '#1d1410'; g.beginPath(); g.ellipse(W / 2 - 15, my - 18, 17, 7, 0.25, 0, Math.PI * 2); g.ellipse(W / 2 + 15, my - 18, 17, 7, -0.25, 0, Math.PI * 2); g.fill(); }
+}
+function faceMat(ex, L) {
+  const key = ex + (L.glasses ? 'g' : '') + (L.mustache ? 'm' : '') + (L.blush ? 'b' : '');
+  let m = faceMats.get(key);
+  if (!m) {
+    const tex = canvasTex(FACE_W, FACE_H, g => drawFace(g, ex, L)); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+    m = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+    faceMats.set(key, m);
+  }
+  return m;
+}
 function buildAvatar(L) {
-  const hy = HIP + 0.40 + 0.22, hs = 0.22, P = [];
-  const hc = L.hairCol;
-  if (L.singlet) {
-    P.push(B(0.38, 0.40, 0.24, '#f4f1ea', 0, HIP + 0.2, 0));
-    P.push(B(0.36, 0.22, 0.09, '#f4f1ea', 0, HIP + 0.13, 0.12));
-    P.push(B(0.12, 0.09, 0.02, L.skin, 0, HIP + 0.36, 0.122));
-    P.push(B(0.17, 0.025, 0.02, '#ffcc33', 0, HIP + 0.31, 0.168));
-  } else {
-    P.push(B(0.38, 0.40, 0.24, L.shirt, 0, HIP + 0.2, 0));
-    if (L.stripe) P.push(B(0.385, 0.06, 0.245, L.stripe, 0, HIP + 0.24, 0));
-    P.push(B(0.12, 0.05, 0.02, L.skin, 0, HIP + 0.38, 0.121));
-  }
-  if (L.apron) P.push(B(0.3, 0.34, 0.02, '#f6f2ea', 0, HIP + 0.17, 0.125), B(0.3, 0.02, 0.25, '#f6f2ea', 0, HIP + 0.3, 0));
-  P.push(B(0.44, 0.44, 0.44, L.skin, 0, hy, 0));
-  if (L.glasses) P.push(B(0.13, 0.09, 0.02, '#151515', -0.1, hy + 0.02, 0.228), B(0.13, 0.09, 0.02, '#151515', 0.1, hy + 0.02, 0.228), B(0.1, 0.02, 0.02, '#151515', 0, hy + 0.04, 0.228));
-  else P.push(B(0.06, 0.08, 0.02, '#1a1a1a', -0.1, hy + 0.02, 0.225), B(0.06, 0.08, 0.02, '#1a1a1a', 0.1, hy + 0.02, 0.225));
-  P.push(B(0.12, 0.03, 0.02, '#8a3b2a', 0, hy - 0.1, 0.225));
-  if (L.blush) P.push(B(0.06, 0.03, 0.015, '#ff9c9c', -0.155, hy - 0.05, 0.224), B(0.06, 0.03, 0.015, '#ff9c9c', 0.155, hy - 0.05, 0.224));
-  if (L.mustache) P.push(B(0.2, 0.04, 0.02, '#1d1410', 0, hy - 0.055, 0.228));
-  const top = (h = 0.1) => B(0.46, h, 0.46, hc, 0, hy + hs + h / 2 - 0.02, 0);
-  const shortHair = () => P.push(top(), B(0.46, 0.24, 0.06, hc, 0, hy + 0.08, -0.21), B(0.05, 0.12, 0.46, hc, -0.215, hy + 0.15, 0), B(0.05, 0.12, 0.46, hc, 0.215, hy + 0.15, 0));
+  const R = HEAD_R, hy = HIP + 0.56, P = [], hc = L.hairCol;
+  const torso = L.singlet ? '#f4f1ea' : L.shirt;
+  // thân hình giọt nước + quần đùi + tai
+  P.push(SP(0.19, torso, [0, HIP + 0.15, 0], [1.0, 0.95, 0.78], 12, 8));
+  P.push(SP(0.18, L.pants, [0, HIP + 0.035, 0], [1.03, 0.55, 0.81], 12, 5));
+  if (L.singlet) P.push(SP(0.08, L.skin, [0, HIP + 0.27, 0.1], [1.2, 0.7, 0.5], 10, 6), TO(0.085, 0.012, '#ffcc33', [0, HIP + 0.27, 0.05], [Math.PI / 2 - 0.35, 0, 0]));
+  else if (L.stripe) P.push(CY(0.193, 0.193, 0.055, L.stripe, [0, HIP + 0.17, 0], null, 18, [1, 1, 0.79]));
+  if (L.apron) P.push(SP(0.16, '#f6f2ea', [0, HIP + 0.1, 0.09], [1, 1.05, 0.5], 12, 8));
+  P.push(SP(R, L.skin, [0, hy, 0], HEAD_S, 16, 12));
+  P.push(SP(0.06, L.skin, [-R * 1.03, hy - 0.02, 0], [0.6, 1, 0.9], 6, 4), SP(0.06, L.skin, [R * 1.03, hy - 0.02, 0], [0.6, 1, 0.9], 6, 4));
+  // tóc: mảng lớn ôm đỉnh đầu + mái + phần sau gáy
+  const cap = (k = 1.07, th = 0.36) => HS(R * k, hc, [0, hy, 0], HEAD_S, 0, Math.PI * 2, 0, Math.PI * th);
+  const back = (lo = 0.68) => HS(R * 1.055, hc, [0, hy, 0], HEAD_S, Math.PI / 2 + 0.95, Math.PI * 2 - 1.9, Math.PI * 0.3, Math.PI * (lo - 0.3), 12, 4);
+  const bangs = () => [-0.13, -0.045, 0.045, 0.13].map((x, i) => SP(0.075, hc, [x, hy + 0.13 - Math.abs(x) * 0.35, R * 0.86 - Math.abs(x) * 0.25], [1.15, 0.75, 0.6], 6, 4));
+  const hairStd = () => P.push(cap(), back(), ...bangs());
   switch (L.hair) {
-    case 0: shortHair(); break;
-    case 1: P.push(top(0.11), B(0.47, 0.52, 0.08, hc, 0, hy - 0.06, -0.21), B(0.06, 0.4, 0.4, hc, -0.215, hy, -0.03), B(0.06, 0.4, 0.4, hc, 0.215, hy, -0.03), B(0.46, 0.07, 0.05, hc, 0, hy + 0.175, 0.212)); break;
-    case 2: P.push(top(0.12), B(0.46, 0.2, 0.06, hc, 0, hy + 0.1, -0.21), B(0.1, 0.12, 0.1, hc, -0.12, hy + hs + 0.14, 0.05, [0, 0, 0.3]), B(0.1, 0.14, 0.1, hc, 0.02, hy + hs + 0.15, -0.02), B(0.1, 0.12, 0.1, hc, 0.14, hy + hs + 0.13, 0.04, [0, 0, -0.3])); break;
-    case 3: P.push(B(0.47, 0.14, 0.47, L.cap, 0, hy + hs + 0.05, 0), B(0.4, 0.03, 0.2, L.cap, 0, hy + hs - 0.005, 0.3), B(0.46, 0.14, 0.06, hc, 0, hy + 0.06, -0.21)); break;
-    case 4: shortHair(); P.push(CO(0.44, 0.26, '#e9d59b', [0, hy + hs + 0.15, 0], null, 12), CY(0.44, 0.44, 0.015, '#d8c27f', [0, hy + hs + 0.02, 0], null, 12)); break;
-    case 5: shortHair(); P.push(SP(0.11, hc, [0, hy + hs + 0.06, -0.16])); break;
-    default: P.push(B(0.45, 0.05, 0.45, hc, 0, hy + hs, 0)); break;
+    case 0: hairStd(); break;
+    case 1: P.push(cap(), back(0.82), ...bangs(), SP(0.25, hc, [0, hy - 0.2, -0.14], [1.15, 1.25, 0.6], 12, 8)); break;
+    case 2: P.push(cap(), back(), ...bangs(), ...[[-0.13, 0.35], [0, 0], [0.13, -0.35], [0.06, -0.12, -0.13]].map(([x, rz, z = 0]) => CO(0.075, 0.2, hc, [x, hy + R * 0.95, z], [z ? -0.5 : 0, 0, rz], 6))); break;
+    case 3: P.push(back(), HS(R * 1.1, L.cap, [0, hy, 0], HEAD_S, 0, Math.PI * 2, 0, Math.PI * 0.34), CY(0.2, 0.2, 0.03, L.cap, [0, hy + 0.17, 0.25], [0.25, 0, 0], 16, [1, 1, 0.75]), SP(0.035, '#fff', [0, hy + R * 1.05, 0], null, 6, 4)); break;
+    case 4: hairStd(); P.push(CO(0.44, 0.26, '#e9d59b', [0, hy + R * 0.95 + 0.11, 0], null, 18), CY(0.44, 0.44, 0.015, '#d8c27f', [0, hy + R * 0.95 - 0.01, 0], null, 18)); break;
+    case 5: hairStd(); P.push(SP(0.12, hc, [0, hy + 0.25, -0.18], null, 10, 8)); break;
+    default: P.push(cap(1.035, 0.33), back()); break;
   }
-  if (L.headphones) P.push(B(0.5, 0.05, 0.12, '#111', 0, hy + hs + 0.03, 0), B(0.06, 0.16, 0.16, '#222', -0.25, hy, 0), B(0.06, 0.16, 0.16, '#222', 0.25, hy, 0));
-  const body = new THREE.Mesh(merge(P), vcMat);
-  const group = new THREE.Group(); group.add(body);
+  if (L.headphones) P.push(TO(R * 1.12, 0.025, '#111', [0, hy + 0.02, 0], [0, Math.PI / 2, 0]), CY(0.08, 0.08, 0.07, '#222', [-R * 1.08, hy - 0.02, 0], [0, 0, Math.PI / 2], 12), CY(0.08, 0.08, 0.07, '#222', [R * 1.08, hy - 0.02, 0], [0, 0, Math.PI / 2], 12));
+  const body = new THREE.Mesh(merge(P), toonMat);
+  const face = new THREE.Mesh(faceGeo, faceMat('idle', L)); face.position.set(0, hy, 0); face.scale.set(...HEAD_S); face.renderOrder = 2;
+  const group = new THREE.Group(); group.add(body, face);
   const sleeve = L.singlet ? L.skin : L.shirt;
-  const legG = limb('leg' + L.pants + L.shoe, () => merge([B(0.15, 0.3, 0.16, L.pants, 0, -0.15, 0), B(0.16, 0.07, 0.21, L.shoe, 0, -0.335, 0.025)]));
-  const armG = limb('arm' + sleeve + L.skin, () => merge([B(0.12, 0.27, 0.14, sleeve, 0, -0.135, 0), B(0.11, 0.09, 0.12, L.skin, 0, -0.315, 0)]));
-  const legL = new THREE.Mesh(legG, vcMat), legR = new THREE.Mesh(legG, vcMat);
-  legL.position.set(0.095, HIP, 0); legR.position.set(-0.095, HIP, 0);
-  const armL = new THREE.Mesh(armG, vcMat), armR = new THREE.Mesh(armG, vcMat);
-  armL.position.set(0.255, HIP + 0.38, 0); armR.position.set(-0.255, HIP + 0.38, 0);
-  const mug = new THREE.Mesh(getMugGeo(), vcMat); mug.position.set(0, -0.37, 0.05); mug.visible = false; armR.add(mug);
-  const mic = new THREE.Mesh(getMicGeo(), vcMat); mic.position.set(0, -0.36, 0.07); mic.visible = false; armR.add(mic);
+  const legG = limb('cleg' + L.pants + L.shoe, () => merge([CA(0.07, 0.1, L.pants, [0, -0.11, 0]), SP(0.08, L.shoe, [0, -0.235, 0.03], [0.95, 0.6, 1.35], 8, 5)]));
+  const armG = limb('carm' + sleeve + L.skin, () => merge([CA(0.056, 0.08, sleeve, [0, -0.07, 0]), SP(0.062, L.skin, [0, -0.165, 0], null, 8, 5)]));
+  const legL = new THREE.Mesh(legG, toonMat), legR = new THREE.Mesh(legG, toonMat);
+  legL.position.set(0.085, HIP, 0); legR.position.set(-0.085, HIP, 0);
+  const armL = new THREE.Mesh(armG, toonMat), armR = new THREE.Mesh(armG, toonMat);
+  armL.position.set(0.205, HIP + 0.25, 0); armR.position.set(-0.205, HIP + 0.25, 0);
+  const mug = new THREE.Mesh(getMugGeo(), vcMat); mug.position.set(0, -0.2, 0.05); mug.scale.setScalar(0.85); mug.visible = false; armR.add(mug);
+  const mic = new THREE.Mesh(getMicGeo(), vcMat); mic.position.set(0, -0.19, 0.06); mic.visible = false; armR.add(mic);
   // cặp tay/chân gộp sẵn: dùng khi đứng/ngồi yên để giảm số lệnh vẽ
-  const legs2 = new THREE.Mesh(limb('legs2' + L.pants + L.shoe, () => mergeGeometries([legG.clone().translate(0.095, 0, 0), legG.clone().translate(-0.095, 0, 0)])), vcMat);
+  const legs2 = new THREE.Mesh(limb('clegs2' + L.pants + L.shoe, () => mergeGeometries([legG.clone().translate(0.085, 0, 0), legG.clone().translate(-0.085, 0, 0)])), toonMat);
   legs2.position.set(0, HIP, 0);
-  const arms2 = new THREE.Mesh(limb('arms2' + sleeve + L.skin, () => mergeGeometries([armG.clone().translate(0.255, 0, 0), armG.clone().translate(-0.255, 0, 0)])), vcMat);
-  arms2.position.set(0, HIP + 0.38, 0);
+  const arms2 = new THREE.Mesh(limb('carms2' + sleeve + L.skin, () => mergeGeometries([armG.clone().translate(0.205, 0, 0), armG.clone().translate(-0.205, 0, 0)])), toonMat);
+  arms2.position.set(0, HIP + 0.25, 0);
   group.add(legL, legR, armL, armR, legs2, arms2);
-  return { group, body, legL, legR, armL, armR, mug, mic, legs2, arms2 };
+  return { group, body, face, legL, legR, armL, armR, mug, mic, legs2, arms2 };
 }
 
 const pickables = [];
 let partyOn = false;
+const spotRingGeo = new THREE.RingGeometry(0.36, 0.5, 40).rotateX(-Math.PI / 2);
+const spotRingMat = new THREE.MeshBasicMaterial({ color: 0xffd54f, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
 class Actor {
   constructor(look, o = {}) {
     this.look = look; this.av = buildAvatar(look); this.g = this.av.group;
@@ -833,11 +883,20 @@ class Actor {
     this.state = 'stand'; this.rot = 0; this.baseY = o.baseY || 0;
     this.toastT = 0; this.toastDelay = 0; this.danceT = 0; this.waveT = 0; this.carry = null; this.dj = false;
     this.phase = Math.random() * 6.28; this.tagUntil = Infinity; this.label = null; this.bubble = null; this.bubbleT = 0; this.idleT = rand(2, 6);
+    this.faceKey = 'idle'; this.emo = null; this.emoT = 0; this.blinkT = rand(1.5, 5); this.hopT = 0; this.ring = null; this.ringT = 0;
+  }
+  emote(ex, sec = 2.5) { this.emo = ex; this.emoT = sec; }
+  hop() { if (this.state !== 'sit' || this.hopT <= 0) this.hopT = 0.55; }
+  // "đây là bạn": vòng sáng dưới chân + nảy lên + hiện tên, để người xem vừa comment nhận ra nhân vật của mình
+  spotlight(sec = 8) {
+    if (!this.ring) { this.ring = new THREE.Mesh(spotRingGeo, spotRingMat.clone()); this.ring.renderOrder = 3; this.g.add(this.ring); }
+    this.ringT = sec; this.hop(); this.emote('surprise', 1.2);
+    if (this.showTag) this.showTag(sec);
   }
   setLabel(text, st) { disposeSprite(this.label); this.label = textSprite(text, st); this.label.visible = this.tagShown(); this.g.add(this.label); this.placeLabel(); }
   tagShown() { return this.tagUntil > now(); }
   placeLabel() {
-    const y = this.state === 'sit' ? 1.24 : 1.42;
+    const y = 1.3;   // ngay trên đỉnh đầu chibi (ngồi hay đứng đầu gần như cùng độ cao)
     if (this.label) this.label.position.y = y;
     if (this.bubble) this.bubble.position.y = y + (this.label && this.label.visible ? this.label.scale.y : 0) + 0.04;
   }
@@ -888,7 +947,25 @@ class Actor {
     if (legsSame) a.legs2.rotation.x = lL; else { a.legL.rotation.x = lL; a.legR.rotation.x = lR; }
     a.arms2.visible = armsSame; a.armL.visible = a.armR.visible = !armsSame;
     if (armsSame) a.arms2.rotation.x = (aL + aR) / 2; else { a.armL.rotation.set(aL, 0, aLz); a.armR.rotation.set(aR, 0, aRz); }
+    if (this.hopT > 0) { const ph = 1 - this.hopT / 0.55; y += Math.sin(ph * Math.PI) * 0.32; this.hopT -= dt; }
     g.position.y = y;
+    // co giãn nhẹ kiểu hoạt hình: thở khi đứng yên, nén lúc tiếp đất khi nảy
+    const sc = this.look.scale || 1, sq = this.hopT > 0 ? Math.cos((1 - this.hopT / 0.55) * Math.PI * 2) * 0.06 : walking ? Math.cos(t * 24 + this.phase * 2) * 0.025 : Math.sin(t * 2.2 + this.phase) * 0.012;
+    g.scale.set(sc * (1 - sq * 0.5), sc * (1 + sq), sc * (1 - sq * 0.5));
+    // nét mặt theo trạng thái
+    let ex = 'idle';
+    if (this.emoT > 0) { this.emoT -= dt; ex = this.emo; }
+    else if (this.singing) ex = 'sing';
+    else if (this.toastT > 0 || dancing) ex = 'happy';
+    else if (this.drunk) ex = 'drunk';
+    this.blinkT -= dt; if (this.blinkT <= 0) this.blinkT = rand(2.2, 5.5);
+    if (ex === 'idle' && this.blinkT < 0.13) ex = 'blink';
+    if (ex !== this.faceKey) { this.faceKey = ex; a.face.material = faceMat(ex, this.look); }
+    if (this.ring) {
+      this.ringT -= dt; const k = clamp(this.ringT / 0.6, 0, 1), pul = 1 + Math.sin(t * 7) * 0.08;
+      this.ring.position.y = (0.025 - y) / (sc * (1 + sq)); this.ring.scale.set(pul, 1, pul); this.ring.material.opacity = 0.95 * k;
+      if (this.ringT <= 0) { this.ring.removeFromParent(); this.ring.material.dispose(); this.ring = null; }
+    }
     if (this.drunk && !walking) { wig += Math.sin(t * 1.8 + this.phase) * 0.25; g.rotation.z = Math.sin(t * 1.3 + this.phase) * 0.1; } else g.rotation.z = 0;
     let dr = this.rot + wig - g.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr));
     g.rotation.y += dr * Math.min(1, dt * 10);
@@ -900,6 +977,7 @@ class Actor {
     disposeSprite(this.label); disposeSprite(this.bubble); this.label = this.bubble = null;
     const i = pickables.indexOf(this.av.body); if (i >= 0) pickables.splice(i, 1);
     if (this.carry) { this.carry.removeFromParent(); }
+    if (this.ring) { this.ring.material.dispose(); this.ring = null; }
   }
 }
 
@@ -1585,7 +1663,7 @@ function serveOrders() {
   for (const w of waiters) {
     if (w.busy || !orders.length) continue;
     const o = orders.shift(); w.busy = true;
-    const dish = makeDish(o.item.id, o.big); dish.position.set(0, 0.8, 0.4); dish.scale.setScalar(o.big ? 1.15 : 0.9); w.g.add(dish); w.carry = dish;
+    const dish = makeDish(o.item.id, o.big); dish.position.set(0, 0.62, 0.34); dish.scale.setScalar(o.big ? 1.15 : 0.9); w.g.add(dish); w.carry = dish;
     const t = o.table;
     let go;
     if (t.col) go = [{ x: -LANE_OUT, z: w.home.z }, { x: -LANE_OUT, z: t.z }];
@@ -1740,6 +1818,7 @@ function ensureGuest(uid, name, npc) {
   const seat = findSeat() || evictSeat(); if (!seat) return null;
   g = new Guest(uid, name || 'Khách', npc); guests.set(uid, g); actors.push(g);
   seat.guest = g; g.seat = seat; g.enter();
+  if (!npc && !isBotUid(uid)) g.spotlight(8);   // người xem thật vừa vào: vòng sáng + nảy lên + hiện tên
   if (!npc) visitorsTotal++;
   return g;
 }
@@ -2271,12 +2350,19 @@ function orderTea(g) {
 const traffic = []; let trafficT = 2;
 const headMat = new THREE.SpriteMaterial({ map: null, color: 0xfff0b0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
 const VENDORS = [{ name: 'BÁNH MÌ', col: '#c62828', call: 'Bánh mì nóng giòn đâyyy!' }, { name: 'KEM', col: '#1e88e5', call: 'Kem đây kem đâyyy!' }, { name: 'BẮP NƯỚNG', col: '#ef6c00', call: 'Bắp nướng mỡ hành đây!' }];
-function riderGeo(r) {
+function riderGeo(r) {   // người lái xe máy kiểu chibi: đầu tròn đội mũ bảo hiểm, ngồi khom về tay lái
   const p = a => a[Math.floor(r() * a.length)];
-  const skin = p(SKINS), shirt = p(SHIRTS), helm = p(['#e53935', '#fdd835', '#ffffff', '#1e88e5', '#212121', '#ff80ab']), pants = p(PANTS);
-  return merge([B(0.34, 0.4, 0.22, shirt, 0, 0.98, -0.12, [0.2, 0, 0]), B(0.32, 0.32, 0.32, skin, 0, 1.36, -0.08), B(0.36, 0.2, 0.36, helm, 0, 1.5, -0.08), B(0.3, 0.03, 0.12, helm, 0, 1.42, 0.12),
-  B(0.1, 0.1, 0.36, shirt, -0.2, 0.95, 0.12, [0.4, 0, 0]), B(0.1, 0.1, 0.36, shirt, 0.2, 0.95, 0.12, [0.4, 0, 0]),
-  B(0.13, 0.13, 0.38, pants, -0.12, 0.72, 0.05), B(0.13, 0.13, 0.38, pants, 0.12, 0.72, 0.05), B(0.12, 0.3, 0.12, pants, -0.13, 0.5, 0.22), B(0.12, 0.3, 0.12, pants, 0.13, 0.5, 0.22)]);
+  const skin = p(SKINS), shirt = p(SHIRTS), helm = p(['#e53935', '#fdd835', '#ffffff', '#1e88e5', '#212121', '#ff80ab']), pants = p(PANTS), R = HEAD_R, hy = 1.3;
+  const cap = (rad, len, col, rot, pos) => paint(xf(new THREE.CapsuleGeometry(rad, len, 3, 8), null, rot, pos), col);
+  return merge([SP(0.19, shirt, [0, 0.88, -0.1], [1, 0.95, 0.78], 14, 9), SP(0.18, pants, [0, 0.76, -0.1], [1.03, 0.55, 0.81], 14, 7),
+    SP(R, skin, [0, hy, -0.08], HEAD_S, 18, 12), HS(R * 1.1, helm, [0, hy, -0.08], HEAD_S, 0, Math.PI * 2, 0, Math.PI * 0.42), CY(0.2, 0.2, 0.025, helm, [0, hy + 0.12, 0.17], [0.3, 0, 0], 14, [1, 1, 0.6]),
+    cap(0.055, 0.2, shirt, [1.1, 0, 0], [-0.2, 0.9, 0.08]), cap(0.055, 0.2, shirt, [1.1, 0, 0], [0.2, 0.9, 0.08]), SP(0.06, skin, [-0.2, 0.86, 0.22]), SP(0.06, skin, [0.2, 0.86, 0.22]),
+    cap(0.07, 0.16, pants, [Math.PI / 2, 0, 0], [-0.1, 0.7, 0.05]), cap(0.07, 0.16, pants, [Math.PI / 2, 0, 0], [0.1, 0.7, 0.05]), cap(0.065, 0.16, pants, null, [-0.11, 0.52, 0.18]), cap(0.065, 0.16, pants, null, [0.11, 0.52, 0.18])]);
+}
+function riderMesh(r) {
+  const m = new THREE.Mesh(riderGeo(r), toonMat); m.userData.own = true;
+  const f = new THREE.Mesh(faceGeo, faceMat(r() < 0.3 ? 'happy' : 'idle', { blush: r() < 0.4, glasses: r() < 0.1 })); f.position.set(0, 1.3, -0.08); f.scale.set(...HEAD_S); f.renderOrder = 2; m.add(f);
+  return m;
 }
 const cartGeoCache = {};
 function cartGeo(col) {
@@ -2300,8 +2386,8 @@ function spawnVehicle(kind) {
     v.speed = 1.25;
   } else {
     g.add(new THREE.Mesh(bikeGeoC(pick(BIKE_COLS)), vcMat));
-    const rider = new THREE.Mesh(riderGeo(r), vcMat); rider.userData.own = true; g.add(rider);
-    if (r() < 0.35) { const p = new THREE.Mesh(riderGeo(r), vcMat); p.userData.own = true; p.position.set(0, 0.03, -0.36); g.add(p); }
+    g.add(riderMesh(r));
+    if (r() < 0.35) { const p = riderMesh(r); p.position.set(0, 0.03, -0.36); g.add(p); }
     if (!headMat.map) headMat.map = dotTex;
     const hl = new THREE.Sprite(headMat); hl.scale.set(0.9, 0.9, 1); hl.position.set(0, 0.7, 0.58); g.add(hl);
     v.speed = rand(4.5, 7.5);
@@ -2507,7 +2593,7 @@ function onGift(uid, name, giftName, count, diamonds) {
   count = clamp(Number(count) || 1, 1, 999); diamonds = Math.max(1, Number(diamonds) || 1);
   const g = ensureGuest(uid, name); if (!g) return;
   const item = mapGift(giftName, diamonds); const big = count >= 2; const total = diamonds * count;
-  g.showTag(12);
+  g.showTag(12); g.emote(total >= 100 ? 'win' : 'happy', 3); if (total >= 10) g.hop();
   g.points += total * 10; g.giftsN += count; addVibe(6 + total * 1.5);
   songGift(g, total); MG.score(g, total * 2); Circus.tip(g, total);
   G.revenue += item.price * (big ? 2 : 1) * (count > 2 ? Math.ceil(count / 2) : 1);
@@ -2532,13 +2618,14 @@ function onGift(uid, name, giftName, count, diamonds) {
 function onFollow(uid, name) {
   const g = ensureGuest(uid, name); if (!g) return;
   if (!g.fan) { g.fan = true; g.refreshLabel(); }
+  g.emote('happy', 3); g.hop(); g.showTag(6);
   g.points += 20; addVibe(8);
   feed(`⭐ ${pfTag(uid)}<b>${esc(name)}</b> ${PLATFORM.get(String(uid)) === 'youtube' ? 'vừa thành hội viên kênh' : 'đã theo dõi quán'}`, 'sys'); Snd.sparkle();
   ownerSay(pickLine('follow', { n: trunc(name, 14) }), true);
 }
 function onShare(uid, name) {
   const g = ensureGuest(uid, name); if (!g) return;
-  g.points += 10; addVibe(5); g.say('Rủ thêm anh em vào quán nè!', 3);
+  g.points += 10; addVibe(5); g.say('Rủ thêm anh em vào quán nè!', 3); g.emote('happy', 3); g.hop(); g.showTag(6);
   feed(`📣 <b>${esc(name)}</b> đã chia sẻ quán`, 'sys'); Snd.ding();
   ownerSay(pickLine('share', { n: trunc(name, 14) }), true);
 }
@@ -3073,7 +3160,7 @@ const MG = {
     const c = this.cur; this.stop();
     banner(`🏆 ${esc(g.name)} thắng ${c.title}!${extra ? '<br>' + extra : ''}`, 'gold', 3500);
     feed(`🏆 <b>${esc(g.name)}</b> thắng <b>${c.title}</b>${extra ? ' – ' + extra : ''}`, 'gift');
-    g.points += 30; g.danceT = 4; g.say('Thắng rồi! 🎉', 3);
+    g.points += 30; g.danceT = 4; g.say('Thắng rồi! 🎉', 3); g.emote('win', 4); g.hop();
     if (g.seat) { orderDish(g.seat.table, MENU_BY.muc, false, g); tableToast(g.seat.table, g); }
     explode(new THREE.Vector3(g.pos.x, 2.2, g.pos.z), 80, 0.2, 2.4, 1.4); Snd.fanfare(); Snd.cheer(1.4); addVibe(10);
     ownerSay(`Chúc mừng ${trunc(g.name, 12)}! Tặng đĩa khô mực nha!`, true);
@@ -3220,7 +3307,7 @@ const Circus = {
         return pl;
       });
     } else if (c.kind === 'mua_lan') {
-      const head = new THREE.Group(); head.position.set(0, HIP + 0.66, 0.1); p.g.add(head); c.props.push(head); c.head = head;
+      const head = new THREE.Group(); head.position.set(0, HIP + 0.56, 0.1); p.g.add(head); c.props.push(head); c.head = head;
       const H = [B(0.78, 0.6, 0.66, '#d32f2f', 0, 0, 0), B(0.8, 0.12, 0.68, '#fdd835', 0, 0.3, 0), B(0.7, 0.16, 0.2, '#fdd835', 0, -0.2, 0.3),
         SP(0.11, '#ffffff', [-0.2, 0.12, 0.34]), SP(0.11, '#ffffff', [0.2, 0.12, 0.34]), SP(0.05, '#111', [-0.2, 0.12, 0.43]), SP(0.05, '#111', [0.2, 0.12, 0.43]),
         CO(0.07, 0.28, '#ffeb3b', [0, 0.48, 0.05], null, 8), B(0.22, 0.06, 0.04, '#43a047', 0, 0.22, 0.34), B(0.5, 0.05, 0.1, '#ffffff', 0, -0.33, 0.34),
@@ -3664,7 +3751,8 @@ function tellJoke(by, g) {
     MCX.timers.push(setTimeout(() => {
       ownerSay(line, true);
       if (/\[cười\]/.test(line)) {   // câu chốt: khách trong quán cười theo
-        actors.forEach(a => { if (a !== owner && a.state === 'sit' && Math.random() < 0.55) setTimeout(() => !a.leaving && a.say(pick(['😂', 'Ha ha ha!', '🤣', 'Trời ơi 😆', 'Hết nói nổi 😂']), 2.4), rand(300, 1400)); });
+        actors.forEach(a => { if (a !== owner && a.state === 'sit' && Math.random() < 0.55) setTimeout(() => { if (a.leaving) return; a.say(pick(['😂', 'Ha ha ha!', '🤣', 'Trời ơi 😆', 'Hết nói nổi 😂']), 2.4); a.emote('laugh', 2.6); }, rand(300, 1400)); });
+        owner.emote('laugh', 2);
         Snd.cheer(0.9, 0.6); addVibe(5);
       }
       if (i === lines.length - 1) MCX.timers.push(setTimeout(() => {
@@ -3881,7 +3969,7 @@ addEventListener('resize', fitCamera);
 fitCamera();
 drawLED(0);
 window.__gameReady = true;
-window.__cc = { renderer, guests, handle, runEvent, tables, camera, THREE, karaoke, traffic, Mic, YTK, MG, opts, Circus, BGM, TRIVIA, approach, KARAOKE, STAGE_BOX, routeAround, owner, LANES: { LANE_IN, LANE_MID, LANE_OUT, FACADE_X } };
+window.__cc = { renderer, guests, handle, Actor, lookFor, controls, actors, runEvent, tables, camera, THREE, karaoke, traffic, Mic, YTK, MG, opts, Circus, BGM, TRIVIA, approach, KARAOKE, STAGE_BOX, routeAround, owner, LANES: { LANE_IN, LANE_MID, LANE_OUT, FACADE_X } };
 document.getElementById('loadErr').style.display = 'none';
 loop();
 
