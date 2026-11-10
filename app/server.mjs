@@ -32,7 +32,7 @@ const DEFAULTS = {
   obsLive: { url: 'ws://127.0.0.1:4455', res: '720x1280', bitrate: 3500, relayPort: 19350, relayKey: '', auto: false,
     yt: { on: false, server: 'rtmps://a.rtmps.youtube.com/live2' }, fb: { on: false, server: 'rtmps://live-api-s.facebook.com:443/rtmp/' }, tt: { on: false, server: '' } },
   notify: { on: true, topic: '', server: 'https://ntfy.sh', idleMin: 10 },   // báo về điện thoại qua app ntfy
-  game: { aiOn: true, aiModel: 'claude-haiku-5-5', aiEvery: 20, aiMax: 180, ytKey: '', kMin: 50, kPrio: 180, kMax: 5, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, autoOn: true, autoLuckyMin: 8, bgmYt: false, bgmQuery: '', bgmLinks: '', bgmShuffle: true, bgmVol: 35, circusAuto: true, circusEvery: 6, mcVoice: true, mcGap: 40, jokeOn: true, jokeEvery: 4, voiceEngine: 'auto', vieneuVoice: 'Trúc Ly', macVoice: '', voiceRate: 1 },
+  game: { aiOn: true, aiModel: 'claude-haiku-5-5', aiEvery: 20, aiMax: 180, ytKey: '', kMin: 50, kPrio: 180, kMax: 5, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, autoOn: true, autoLuckyMin: 8, bgmYt: false, bgmSource: 'youtube', bgmFolder: '', bgmScanVer: 0, bgmQuery: '', bgmLinks: '', bgmShuffle: true, bgmVol: 35, camTourEvery: 8, circusAuto: true, circusEvery: 6, mcVoice: true, mcGap: 40, jokeOn: true, jokeEvery: 4, voiceEngine: 'auto', vieneuVoice: 'Trúc Ly', macVoice: '', voiceRate: 1 },
 };
 const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
 const merge = (a, b) => { const o = { ...a }; for (const k of Object.keys(b || {})) o[k] = isObj(a[k]) && isObj(b[k]) ? merge(a[k], b[k]) : b[k]; return o; };
@@ -218,6 +218,48 @@ async function body(req) { let raw = ''; for await (const c of req) { raw += c; 
 function sendFile(res, file, type) {
   fs.readFile(file, (err, data) => { if (err) return json(res, 404, { error: 'Không thấy ' + path.basename(file) }); res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' }); res.end(data); });
 }
+// ---- 📁 nhạc nền từ thư mục trên máy: quét file nhạc/video, phát cho game qua /media/bgm/<số> (chỉ file trong danh sách đã quét) ----
+const MEDIA_TYPES = { '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.oga': 'audio/ogg', '.opus': 'audio/ogg', '.flac': 'audio/flac',
+  '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.mkv': 'video/x-matroska' };
+let bgmFiles = [];
+function bgmScan() {
+  const dir = String(config.game.bgmFolder || ''); const out = [];
+  const walk = (d, depth) => {
+    let ents = []; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const e of ents) {
+      if (e.name.startsWith('.')) continue;
+      const fp = path.join(d, e.name);
+      if (e.isDirectory() && depth < 2) walk(fp, depth + 1);
+      else if (e.isFile() && MEDIA_TYPES[path.extname(e.name).toLowerCase()] && out.length < 2000) out.push({ name: path.relative(dir, fp), path: fp });
+    }
+  };
+  if (dir) walk(dir, 0);
+  out.sort((a, b) => a.name.localeCompare(b.name, 'vi', { numeric: true }));
+  bgmFiles = out; return out;
+}
+function bgmSetFolder(folder) {
+  folder = path.resolve(String(folder || '').trim().replace(/^~(?=\/|$)/, os.homedir()));
+  let st; try { st = fs.statSync(folder); } catch { throw new Error('Không thấy thư mục: ' + folder); }
+  if (!st.isDirectory()) throw new Error('Đây không phải thư mục: ' + folder);
+  config.game.bgmFolder = folder; config.game.bgmSource = 'folder'; config.game.bgmScanVer = (Number(config.game.bgmScanVer) || 0) + 1;
+  const files = bgmScan(); saveConfig(); broadcast({ type: 'config', config: publicConfig() });
+  return { ok: true, folder, count: files.length, sample: files.slice(0, 8).map(f => f.name) };
+}
+function sendMedia(req, res, f) {
+  let st; try { st = fs.statSync(f.path); } catch { return json(res, 404, { error: 'File đã bị xoá hoặc đổi tên – bấm Quét lại' }); }
+  const type = MEDIA_TYPES[path.extname(f.path).toLowerCase()] || 'application/octet-stream', size = st.size;
+  const m = String(req.headers.range || '').match(/bytes=(\d*)-(\d*)/);
+  if (m) {
+    let a = m[1] ? Number(m[1]) : size - Number(m[2]), b = m[1] && m[2] ? Number(m[2]) : size - 1;
+    if (!(a >= 0 && a < size)) { res.writeHead(416, { 'content-range': `bytes */${size}` }); return res.end(); }
+    b = Math.min(b, size - 1);
+    res.writeHead(206, { 'content-type': type, 'content-length': b - a + 1, 'content-range': `bytes ${a}-${b}/${size}`, 'accept-ranges': 'bytes', 'cache-control': 'no-store' });
+    return fs.createReadStream(f.path, { start: a, end: b }).pipe(res);
+  }
+  res.writeHead(200, { 'content-type': type, 'content-length': size, 'accept-ranges': 'bytes', 'cache-control': 'no-store' });
+  fs.createReadStream(f.path).pipe(res);
+}
+bgmScan();
 const publicConfig = () => ({ game: config.game, claudeReady: claudeReady(), tikfinityUrl: eventsUrl(), live: { ok: live.ok, reason: live.reason },
   platforms: { tiktok: config.tiktok.on || !appSources(), youtube: !!config.youtube.on, facebook: !!config.facebook.on } });
 
@@ -455,6 +497,8 @@ const server = http.createServer(async (req, res) => {
       return claude(req, res);
     }
     if (req.method === 'GET' && (p === '/' || p === '/index.html')) return sendFile(res, path.join(ROOT, 'index.html'), 'text/html; charset=utf-8');
+    if (req.method === 'GET' && p.startsWith('/media/bgm/')) { const f = bgmFiles[Number(p.slice(11))]; return f ? sendMedia(req, res, f) : json(res, 404, { error: 'Không có bài này' }); }
+    if (req.method === 'GET' && p === '/api/bgm/files') return json(res, 200, { folder: config.game.bgmFolder, ver: config.game.bgmScanVer, files: bgmFiles.map((f, i) => ({ i, name: f.name })) });
     if (req.method === 'GET' && p === '/panel') return sendFile(res, path.join(ROOT, 'app', 'panel.html'), 'text/html; charset=utf-8');
     if (req.method === 'GET' && p === '/api/config') return json(res, 200, publicConfig());
     if (req.method === 'GET' && p === '/api/control') {
@@ -592,6 +636,15 @@ const server = http.createServer(async (req, res) => {
       if (g.voiceEngine !== prevEng) { if (g.voiceEngine === 'mac') vnStop(); else vnStart(); }
       broadcast({ type: 'config', config: publicConfig() });
       return json(res, 200, { ok: true, current: currentVoice(), rate: voiceRate() });
+    }
+    if (p === '/api/bgm/folder') { try { return json(res, 200, bgmSetFolder(b.folder)); } catch (e) { return json(res, 200, { ok: false, error: e.message }); } }
+    if (p === '/api/bgm/rescan') { config.game.bgmScanVer = (Number(config.game.bgmScanVer) || 0) + 1; const files = bgmScan(); saveConfig(); broadcast({ type: 'config', config: publicConfig() }); return json(res, 200, { ok: true, folder: config.game.bgmFolder, count: files.length, sample: files.slice(0, 8).map(f => f.name) }); }
+    if (p === '/api/bgm/pick') {
+      // mở hộp chọn thư mục của macOS (chờ bạn chọn, tối đa 5 phút)
+      if (process.platform !== 'darwin') return json(res, 200, { ok: false, error: 'Chỉ chọn bằng hộp thoại được trên Mac – hãy gõ đường dẫn thư mục' });
+      const r = await new Promise(resolve => execFile('osascript', ['-e', 'POSIX path of (choose folder with prompt "Chọn thư mục nhạc nền cho quán Cậu Cả")'], { timeout: 300000 }, (e, out) => resolve(e ? null : String(out).trim())));
+      if (!r) return json(res, 200, { ok: false, error: 'Chưa chọn thư mục' });
+      try { return json(res, 200, bgmSetFolder(r)); } catch (e) { return json(res, 200, { ok: false, error: e.message }); }
     }
     if (p === '/api/connect/smart') return json(res, 200, await smartConnect(String(b.text || '').trim(), b.as));
     if (p === '/api/session/start') return json(res, 200, await sessionStart());

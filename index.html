@@ -1198,7 +1198,7 @@ const beams = [];
   board.position.set(-FACADE_X + 0.75, 0.75, -8.2); board.rotation.set(0, Math.PI / 2 - 0.3, 0); scene.add(board);
   // băng rôn ngang phố
   const banTex = signTexture([{ t: 'QUÁN NHẬU VỈA HÈ CẬU CẢ', size: 92, color: '#ffe14d', glow: '#ff6d00', y: 80 }, { t: 'Dzô cho tới bến  •  Không say không về', size: 40, color: '#ffffff', glow: '#000', blur: 4, y: 142 }], { w: 1300, h: 180, bg: '#c62828', border: '#ffd54f', bw: 8, r: 6 });
-  const ban = new THREE.Mesh(new THREE.PlaneGeometry(12.6, 1.66), new THREE.MeshBasicMaterial({ map: banTex, side: THREE.DoubleSide }));
+  const ban = new THREE.Mesh(new THREE.PlaneGeometry(12.6, 1.66), new THREE.MeshBasicMaterial({ map: banTex }));   // chỉ mặt trước: khi máy quay vòng ra sau quán không thấy chữ ngược
   ban.position.set(-FACADE_X - 1.2, 9.4, 0); ban.rotation.y = Math.PI / 2; scene.add(ban);   // biển quảng cáo trên mái quán
   for (const sz of [-5.6, 5.6]) { const pole = new THREE.Mesh(CY(0.07, 0.09, 2.2, '#555', [0, 1.1, 0], null, 8), vcMat); pole.position.set(-FACADE_X - 1.2, 8.0, sz); scene.add(pole); }
 }
@@ -2198,10 +2198,27 @@ const BGM = {
   player: null, ready: false, list: [], i: 0, playing: false, title: '', err: '', loading: false, fails: 0, q: '',
   // nguồn nhạc: link YouTube chủ quán dán (video/playlist, không cần key) – trống thì tự tìm theo từ khoá (cần key)
   links() { return parseBgmLinks(opts.bgmLinks); },
-  want() { return !!opts.bgmYt && !!opts.music && (this.links().length > 0 || !!String(opts.ytKey || '').trim()) && /^https?:$/.test(location.protocol) && gameStarted && !Mic.on && !karaoke.cur; },
+  // 📁 nhạc từ thư mục trên máy (qua app): phát ngầm bằng thẻ <audio>, không hiện khung video
+  isFolder() { return opts.bgmSource === 'folder' && APP && APP.on; },
+  want() { return !!opts.bgmYt && !!opts.music && (this.isFolder() ? !!opts.bgmFolder : (this.links().length > 0 || !!String(opts.ytKey || '').trim()) && /^https?:$/.test(location.protocol)) && gameStarted && !Mic.on && !karaoke.cur; },
+  au() {
+    if (this.audio) return this.audio;
+    const a = this.audio = new Audio(); a.preload = 'auto';
+    a.addEventListener('ended', () => this.next(true));
+    a.addEventListener('playing', () => { this.playing = true; this.fails = 0; Snd.setMusic(opts.music); });
+    a.addEventListener('error', () => { if (!this.isFolder()) return; this.fails++; if (this.fails < Math.min(8, this.list.length + 1)) this.next(true); else this.fail('Không phát được file nào trong thư mục (định dạng không hỗ trợ?)'); });
+    return a;
+  },
   query() { return String(opts.bgmQuery || '').trim() || BGM_DEF_Q; },
-  sig() { const l = this.links(); return l.length ? 'L:' + l.map(x => x.id || 'p' + x.list).join(',') + (opts.bgmShuffle === false ? '' : ':s') : 'Q:' + this.query(); },
+  sig() { if (this.isFolder()) return 'F:' + opts.bgmFolder + ':' + (opts.bgmScanVer || 0) + (opts.bgmShuffle === false ? '' : ':s'); const l = this.links(); return l.length ? 'L:' + l.map(x => x.id || 'p' + x.list).join(',') + (opts.bgmShuffle === false ? '' : ':s') : 'Q:' + this.query(); },
   async loadList(force) {
+    if (this.isFolder()) {
+      const j = await (await fetch('/api/bgm/files', { cache: 'no-store' })).json();
+      const items = (j.files || []).map(f => ({ file: f.i, title: String(f.name).split('/').pop().replace(/\.[^.]+$/, '') }));
+      if (!items.length) throw new Error('Thư mục nhạc nền chưa có file nhạc/video nào');
+      if (opts.bgmShuffle !== false) for (let k = items.length - 1; k > 0; k--) { const m = Math.floor(Math.random() * (k + 1)); [items[k], items[m]] = [items[m], items[k]]; }
+      this.list = items; this.q = this.sig(); this.i = 0; return;
+    }
     const L = this.links();
     if (L.length) {   // danh sách chủ quán tự dán
       const items = L.map(x => ({ ...x }));
@@ -2223,6 +2240,15 @@ const BGM = {
     if (this.loading) return; this.loading = true;
     try {
       if (!this.list.length || this.q !== this.sig()) await this.loadList();
+      if (this.isFolder()) {   // phát ngầm, không hiện khung
+        if (this.player && this.ready) { try { this.player.pauseVideo(); } catch { } }
+        $('#bgmBox').classList.add('hidden');
+        const it = this.list[this.i % this.list.length]; this.cur = it; this.title = it.title; this.err = '';
+        const a = this.au(); a.src = '/media/bgm/' + it.file + '?v=' + (opts.bgmScanVer || 0); a.volume = clamp(Number(opts.bgmVol ?? 35) / 100, 0, 1);
+        await a.play().catch(e => { if (e && e.name === 'NotAllowedError') this.fail('Trình duyệt chặn tự phát – bấm vào cửa sổ game một lần'); });
+        this.loading = false; return;
+      }
+      if (this.audio) this.audio.pause();
       await YTK.load();
       const it = this.list[this.i % this.list.length]; this.cur = it; this.title = it.title || (it.list ? 'Playlist YouTube' : 'Nhạc nền YouTube'); this.err = '';
       $('#bgmBox').classList.remove('hidden'); $('#bgmTitle').textContent = '📻 ' + this.title;
@@ -2256,21 +2282,23 @@ const BGM = {
   },
   inPlaylistMid() { try { if (!this.cur || !this.cur.list) return false; const pl = this.player.getPlaylist() || [], ix = this.player.getPlaylistIndex(); return pl.length > 0 && ix >= 0 && ix < pl.length - 1; } catch { return false; } },
   next(auto) {
+    if (this.isFolder()) { this.i++; if (this.i >= this.list.length) { this.i = 0; if (opts.bgmShuffle !== false) this.list.sort(() => Math.random() - 0.5); } return this.play(); }
     if (!auto && this.inPlaylistMid()) { try { this.player.nextVideo(); return; } catch { } }   // "bài khác" trong playlist
     this.i++; if (this.i >= this.list.length) { this.i = 0; if (this.links().length && opts.bgmShuffle !== false) this.list.sort(() => Math.random() - 0.5); } this.play();
   },
-  pause() { if (this.player && this.ready) { try { this.player.pauseVideo(); } catch { } } this.playing = false; $('#bgmBox').classList.add('hidden'); Snd.setMusic(opts.music); },
+  pause() { if (this.audio) this.audio.pause(); if (this.player && this.ready) { try { this.player.pauseVideo(); } catch { } } this.playing = false; $('#bgmBox').classList.add('hidden'); Snd.setMusic(opts.music); },
   fail(msg) {
     this.err = msg; this.playing = false; Snd.setMusic(opts.music); $('#bgmBox').classList.add('hidden');
     if (!this.warned) { this.warned = true; feed('⚠️ Nhạc nền YouTube: ' + esc(trunc(msg, 90)) + ' – dùng nhạc nền của quán', 'sys'); }
     this.retryAt = now() + 5 * 60000;
   },
-  setVolume(v) { try { this.player && this.ready && this.player.setVolume(v); } catch { } },
+  setVolume(v) { if (this.audio) this.audio.volume = clamp(Number(v) / 100, 0, 1); try { this.player && this.ready && this.player.setVolume(v); } catch { } },
   tick() {
     const w = this.want();
     if (w && !this.playing && !this.loading && (!this.retryAt || now() > this.retryAt)) {
       this.retryAt = 0;
-      if (this.player && this.ready && this.title && this.q === this.sig()) { try { this.player.playVideo(); this.playing = true; $('#bgmBox').classList.remove('hidden'); Snd.setMusic(opts.music); } catch { this.play(); } }
+      if (this.isFolder() && this.audio && this.audio.src && this.title && this.q === this.sig()) { this.audio.play().then(() => { this.playing = true; Snd.setMusic(opts.music); }).catch(() => this.play()); }
+      else if (!this.isFolder() && this.player && this.ready && this.title && this.q === this.sig()) { try { this.player.playVideo(); this.playing = true; $('#bgmBox').classList.remove('hidden'); Snd.setMusic(opts.music); } catch { this.play(); } }
       else this.play();
     } else if (!w && (this.playing || !$('#bgmBox').classList.contains('hidden'))) this.pause();
   }
@@ -2991,7 +3019,7 @@ for (const [id, key] of [['ytKey', 'ytKey'], ['kMin', 'kMin'], ['kPrio', 'kPrio'
   if (el.type === 'range') el.addEventListener('input', () => { opts[key] = Number(el.value); if (key === 'ytVol') YTK.setVolume(opts.ytVol); else Mic.apply(); });
 }
 bindToggle('optKSuffix', 'kSuffix');
-Object.assign(opts, Object.assign({ bgmYt: false, bgmQuery: '', bgmLinks: '', bgmShuffle: true, bgmVol: 35, circusAuto: true, circusEvery: 6, mcVoice: false, mcGap: 40, jokeOn: true, jokeEvery: 4 }, opts));
+Object.assign(opts, Object.assign({ bgmYt: false, bgmSource: 'youtube', bgmFolder: '', bgmScanVer: 0, bgmQuery: '', bgmLinks: '', bgmShuffle: true, bgmVol: 35, camTourEvery: 8, circusAuto: true, circusEvery: 6, mcVoice: false, mcGap: 40, jokeOn: true, jokeEvery: 4 }, opts));
 bindToggle('optBgmYt', 'bgmYt', () => BGM.tick());
 $('#bgmQuery').value = opts.bgmQuery || ''; $('#bgmQuery').placeholder = 'Từ khoá nhạc nền (mặc định: ' + BGM_DEF_Q + ')';
 $('#bgmQuery').addEventListener('change', e => { opts.bgmQuery = e.target.value.trim(); saveOpts(); if (BGM.playing) BGM.play(); });
@@ -3953,6 +3981,55 @@ function drawLED(t) {
   }
   g.shadowBlur = 0; ledTex.needsUpdate = true;
 }
+/* ---------- 🎥 Máy quay xoay 360° định kỳ quanh quán cho đỡ nhàm ---------- */
+const CamTour = {
+  on: false, t: 0, dur: 28, nextAt: 0, near: null,
+  // dãy nhà bên này đường: chỉ hiện khi máy quay vòng ra phía sau (bình thường máy đứng sau dãy này)
+  buildNear() {
+    if (this.near) return; this.near = [];
+    const before = new Set(scene.children);
+    [[14.5, 8.8, 9], [8.8, 2.6, 11], [2.6, -3.2, 8], [-3.2, -8.8, 10], [-8.8, -14.5, 12], [20.5, 14.5, 8.5], [-14.5, -20.5, 9.5]].forEach(([zo, zi, h], i) => {
+      addBuilding(1, zo, zi, h, 301 + i * 11);
+      const sn = SIGN_NAMES[(i + 3) % SIGN_NAMES.length];
+      addFlatSign(1, zo - Math.sign(zo || 1) * 0.3, zi + Math.sign(zo || 1) * 0.3, 3.35, 0.7, [{ t: sn[0], size: 40, color: sn[1], y: 32 }], { bg: sn[2], r: 6 });
+    });
+    for (const o of scene.children) if (!before.has(o)) { o.visible = false; this.near.push(o); }
+  },
+  start() {
+    if (this.on) return false;
+    this.buildNear(); this.on = true; this.t = 0; controls.enabled = false;
+    this.p0 = camera.position.clone(); this.t0 = controls.target.clone();
+    this.c = new THREE.Vector3(-6.5, 0.8, 0); this.R = 17; this.H = 14.5;
+    this.a0 = Math.atan2(this.p0.z - this.c.z, this.p0.x - this.c.x);
+    camera.clearViewOffset(); camera.updateProjectionMatrix();
+    return true;
+  },
+  orbitPos(a, out) { return out.set(this.c.x + Math.cos(a) * this.R, this.H, this.c.z + Math.sin(a) * this.R); },
+  update(dt) {
+    this.t += dt;
+    const T = this.t, D = this.dur, IN = 3, OUT = 3, ease = x => x < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x);
+    const pos = new THREE.Vector3(), tgt = new THREE.Vector3();
+    if (T < IN) { const k = ease(T / IN); this.orbitPos(this.a0, pos); pos.lerpVectors(this.p0, pos, k); tgt.lerpVectors(this.t0, this.c, k); }
+    else if (T < D - OUT) { const k = ease((T - IN) / (D - IN - OUT)); this.orbitPos(this.a0 + Math.PI * 2 * k, pos); tgt.copy(this.c); }
+    else { const k = ease((T - (D - OUT)) / OUT); this.orbitPos(this.a0, pos); pos.lerp(this.p0, k); tgt.lerpVectors(this.c, this.t0, k); }
+    camera.position.copy(pos); camera.lookAt(tgt);
+    const showNear = camera.position.x < 11;
+    for (const o of this.near) o.visible = showNear;
+    if (T >= D) this.stop();
+  },
+  stop() {
+    if (!this.on) return; this.on = false; controls.enabled = true;
+    for (const o of this.near || []) o.visible = false;
+    fitCamera(); this.nextAt = now() + Math.max(1, Number(opts.camTourEvery) || 8) * 60000;
+  },
+  tick() {
+    const every = Number(opts.camTourEvery) || 0; if (!every || !gameStarted) return;
+    if (!this.nextAt) this.nextAt = now() + every * 60000;
+    if (now() < this.nextAt) return;
+    if (karaoke.cur || Circus.cur || G.cdBusy || (MG.cur && MG.cur.t > 8)) { this.nextAt = now() + 30000; return; }   // đang có tiết mục thì chờ
+    this.start();
+  }
+};
 function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(clock.getDelta(), 0.05); T += dt;
@@ -3995,7 +4072,7 @@ function loop() {
     for (const g of guests.values()) if (!g.npc && !g.leaving && !g.singing && g.rank === 0 && tnow - g.lastActive > (full ? 240000 : 600000) && Math.random() < 0.35) g.leave();
     for (const g of guests.values()) if (g.drinks > 0) { g.drinks--; if (g.drunk && g.drinks < 4) { g.drunk = false; g.refreshLabel(); } }
   }
-  controls.update();
+  if (CamTour.on) CamTour.update(dt); else { CamTour.tick(); controls.update(); }
   renderer.render(scene, camera);
   // tự giảm độ phân giải nếu máy yếu
   perfT += dt; perfAcc += dt; perfN++;
@@ -4005,11 +4082,11 @@ function loop() {
 /* =====================================================================
    KHỞI ĐỘNG
    ===================================================================== */
-addEventListener('resize', fitCamera);
+addEventListener('resize', () => { if (CamTour.on) CamTour.stop(); fitCamera(); });
 fitCamera();
 drawLED(0);
 window.__gameReady = true;
-window.__cc = { renderer, guests, handle, Actor, lookFor, controls, actors, runEvent, tables, camera, THREE, karaoke, traffic, Mic, YTK, MG, opts, Circus, BGM, TRIVIA, approach, KARAOKE, STAGE_BOX, routeAround, owner, LANES: { LANE_IN, LANE_MID, LANE_OUT, FACADE_X } };
+window.__cc = { CamTour, renderer, guests, handle, Actor, lookFor, controls, actors, runEvent, tables, camera, THREE, karaoke, traffic, Mic, YTK, MG, opts, Circus, BGM, TRIVIA, approach, KARAOKE, STAGE_BOX, routeAround, owner, LANES: { LANE_IN, LANE_MID, LANE_OUT, FACADE_X } };
 document.getElementById('loadErr').style.display = 'none';
 loop();
 
@@ -4057,7 +4134,7 @@ function applyAppConfig(c) {
   if (!c) return;
   if (c.platforms) { const pf = c.platforms, n = []; if (pf.youtube) n.push('<span class="pf yt">YT</span>Super Chat = gọi món theo số tiền'); if (pf.facebook) n.push('<span class="pf fb">FB</span>comment, thả cảm xúc'); $('#platNote').innerHTML = n.length ? ' · ' + n.join(' · ') : ''; }
   const g = c.game || {};
-  for (const k of ['aiModel', 'aiEvery', 'aiMax', 'kMin', 'kPrio', 'kMax', 'botsOn', 'botMin', 'mgAuto', 'mgEvery', 'autoOn', 'autoLuckyMin', 'bgmYt', 'bgmQuery', 'bgmLinks', 'bgmShuffle', 'bgmVol', 'circusAuto', 'circusEvery', 'mcVoice', 'mcGap', 'jokeOn', 'jokeEvery']) if (g[k] !== undefined) opts[k] = g[k];
+  for (const k of ['aiModel', 'aiEvery', 'aiMax', 'kMin', 'kPrio', 'kMax', 'botsOn', 'botMin', 'mgAuto', 'mgEvery', 'autoOn', 'autoLuckyMin', 'bgmYt', 'bgmSource', 'bgmFolder', 'bgmScanVer', 'bgmQuery', 'bgmLinks', 'bgmShuffle', 'bgmVol', 'camTourEvery', 'circusAuto', 'circusEvery', 'mcVoice', 'mcGap', 'jokeOn', 'jokeEvery']) if (g[k] !== undefined) opts[k] = g[k];
   BGM.setVolume(Number(opts.bgmVol ?? 35)); setTimeout(() => BGM.tick(), 50);
   // key YouTube: app có key thì dùng key app; app chưa có mà game đã có (dán trong ⚙️ game) thì gửi lên app, không xoá
   if (g.ytKey) { if (g.ytKey !== opts.ytKey) { opts.ytKey = g.ytKey; karaoke.queue.forEach(it => { if (it.kind === 'song' && !it.link && it.vstatus !== 'ok') resolveVideo(it); }); } }
@@ -4074,7 +4151,8 @@ function appCmd(c) {
   switch (c && c.type) {
     case 'event': if (['dzo', 'lucky', 'fire', 'party', 'clearDish', 'reset', 'circus'].includes(c.name)) runEvent(c.name); break;
     case 'live': setAppLive(!!c.ok, c.reason); break;
-    case 'bgm': if (c.action === 'next') { if (BGM.playing) BGM.next(); else BGM.tick(); } else if (c.action === 'play') { opts.bgmYt = true; saveOpts(); BGM.retryAt = 0; BGM.warned = false; BGM.tick(); } else if (c.action === 'stop') { opts.bgmYt = false; saveOpts(); BGM.pause(); } break;
+    case 'camtour': CamTour.start(); break;
+    case 'bgm': if (c.action === 'next') { if (BGM.playing) BGM.next(); else BGM.tick(); } else if (c.action === 'play') { opts.bgmYt = true; saveOpts(); BGM.retryAt = 0; BGM.warned = false; BGM.list = []; BGM.playing = false; BGM.tick(); } else if (c.action === 'stop') { opts.bgmYt = false; saveOpts(); BGM.pause(); } break;
     case 'circus': if (c.name === 'stop') Circus.stop(); else if (!Circus.cur) Circus.start(c.name, 'host'); break;
     case 'mg': if (c.name === 'stop') MG.stop('⏹ Chủ quán dừng trò chơi'); else if (MG_INFO[c.name] && !MG.start(c.name, 'host')) feed('Đang có trò chơi chạy', 'sys'); break;
     case 'skip': if (karaoke.cur) { feed('⏭️ Chủ quán cho qua bài', 'sys'); endSing(); } break;

@@ -244,7 +244,16 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
   - Bạn bấm nút trên bảng điều khiển.
 - Ai tặng quà trong lúc đoàn đang diễn thì nghệ sĩ cảm ơn tên người đó và diễn thêm vài giây.
 
-**Nhạc nền từ YouTube** (tuỳ chọn, mặc định tắt). Chỉnh ở thẻ **📻 Nhạc nền** trên bảng điều khiển.
+**Nhạc nền** (tuỳ chọn, mặc định tắt). Chỉnh ở thẻ **📻 Nhạc nền** trên bảng điều khiển. Có hai nguồn:
+
+**📁 Thư mục trên máy** (khuyên dùng, phát ngầm, không hiện khung video che màn hình)
+- Bấm **📂 Chọn thư mục**: hộp chọn thư mục của macOS hiện ra. Cũng có thể gõ thẳng đường dẫn, ví dụ `~/Music/NhacQuan`.
+- App đọc file nhạc và video trong thư mục và thư mục con (tối đa 2 tầng): mp3, m4a, aac, wav, ogg, opus, flac, mp4, m4v, mov, webm, mkv. Với video, game chỉ phát phần tiếng.
+- Bấm **▶️ Lưu & phát**. Có thể phát ngẫu nhiên hoặc theo thứ tự tên file. Hết bài tự sang bài; **⏭ Bài khác** để chuyển bài.
+- Thêm hoặc xoá file trong thư mục thì bấm **🔄 Quét lại**.
+- File chỉ được phát qua app trên máy (`127.0.0.1`), không gửi ra ngoài. Cách này chỉ chạy khi mở game qua app.
+
+**▶️ YouTube**
 - **Tự chọn bài:** dán link YouTube vào ô, mỗi dòng một link, rồi bấm **▶️ Lưu & phát**.
   - Nhận link video (`youtube.com/watch?v=…`, `youtu.be/…`) và link **playlist** (`youtube.com/playlist?list=…`). Cách này **không cần API key**.
   - Ô bên dưới đếm số video, số playlist và số mục không phải link YouTube (mục đó bị bỏ qua).
@@ -254,6 +263,11 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
   - Video nào chủ kênh chặn nhúng thì app tự bỏ qua.
 - **Tự tìm theo từ khoá:** để trống ô link, app tìm 25 bài theo từ khoá (mặc định *nhạc remix vinahouse*) bằng YouTube key dùng chung với karaoke. Danh sách được nhớ 12 giờ nên tốn rất ít hạn mức.
 - Thẻ hiện tên bài đang phát. **⏸ Tắt nhạc nền** để tắt.
+
+**🎥 Máy quay xoay 360°.** Cứ mỗi 8 phút (đổi ở ⚙️ Cấu hình; 0 = tắt), máy quay bay một vòng quanh quán trong khoảng 28 giây rồi về chỗ cũ, cho người xem đỡ nhàm.
+- Khi đang có người hát, xiếc hay đếm ngược dzô, máy quay chờ xong tiết mục mới xoay.
+- Lúc máy quay vòng ra phía sau, dãy nhà bên này đường mới hiện ra (bình thường dãy nhà này được ẩn để không che quán).
+- Nút **🎥 Xoay thử** ở ⚙️ Cấu hình để xem ngay.
 - Nhạc tự dừng khi có người hát karaoke hoặc lên mic, rồi phát tiếp sau đó. Khi đang phát nhạc YouTube, nhạc nền tự tạo của quán tạm tắt.
 - Trình phát hiện ở góc trên bên trái, kích thước 200×200 theo quy định của YouTube.
 - ⚠️ **Rủi ro bản quyền:** nhạc trên YouTube (nhất là remix) thường có bản quyền, TikTok có thể **tắt tiếng hoặc dừng** phiên live. An toàn nhất là dùng nhạc nền tự tạo sẵn của quán, hoặc nhạc miễn phí bản quyền có giấy phép phát trực tiếp.
