@@ -97,9 +97,12 @@ Nút **"Áp dụng cấu hình Live"** trong ⚙️ của game, hoặc tham số
 ## 4. Cậu Cả dẫn live bằng giọng nói
 
 Cậu Cả nói thành tiếng mọi câu thoại: chào khách, gọi tên người tặng quà, trả lời comment, giới thiệu trò chơi. Tính năng này **bật sẵn** ở cấu hình Live.
-- **Giọng đọc:** app dùng giọng tiếng Việt của macOS qua lệnh `say`, âm thanh ra loa máy. Trong LIVE Studio phải bật **âm thanh máy tính** thì người xem mới nghe được.
-  - Mac chưa có giọng tiếng Việt thì cài giọng **Linh**: *Cài đặt hệ thống → Trợ năng → Nội dung được đọc → Giọng hệ thống → Quản lý giọng → Tiếng Việt*.
+- **Giọng đọc VieNeu-TTS (khuyên dùng):** giọng tiếng Việt tự nhiên, chạy ngay trên máy, có 25 giọng (mặc định *Hải Đăng*, nam, giọng Bắc). Âm thanh ra loa máy, nên trong LIVE Studio phải bật **âm thanh máy tính**.
+  - **Cài một lần:** nhấp đúp file **`cai-giong-vieneu.command`** trong thư mục `quan-nhau-cau-ca`. File tự cài Python (nếu máy chưa có) và thư viện VieNeu, rồi tải mô hình giọng khoảng vài trăm MB. Toàn bộ nằm trong `~/Library/Application Support/CauCaLive/vieneu`.
+  - Mở lại app: app tự chạy VieNeu nền ở cổng 8011, lần đầu mất khoảng một phút. Đổi giọng ở **⚙️ Cấu hình → Giọng Cậu Cả**.
+  - Nếu VieNeu chưa cài, đang khởi động hoặc bị lỗi, app tạm dùng giọng **Linh** của macOS. Mac chưa có giọng Linh thì cài trong *Cài đặt hệ thống → Trợ năng → Nội dung được đọc → Giọng hệ thống → Quản lý giọng → Tiếng Việt*.
   - Bấm **Thử giọng** trên bảng điều khiển để nghe thử.
+  - Thư viện VieNeu dùng giấy phép Apache 2.0. Riêng giấy phép mô hình giọng, hãy xem trang [VieNeu-TTS-v3-Turbo trên Hugging Face](https://huggingface.co/pnnbao-ump/VieNeu-TTS-v3-Turbo) trước khi dùng cho mục đích thương mại.
 - **Không để quán im lặng:** phòng im quá số giây đã đặt (mặc định 40 giây) thì Cậu Cả tự nói.
   - Nếu đang bật Claude MC, game nhờ Claude nói trước: gọi tên một khách đang ngồi, hỏi han hoặc gợi ý trò chơi.
   - Claude không trả lời thì Cậu Cả nói một câu theo tình huống thật của quán: tên khách, bàn đang ngồi, người dẫn đầu, trò đang mở.
@@ -185,7 +188,7 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 | Comment | Tác dụng |
 |---|---|
 | (bất kỳ) | Vào quán, kéo ghế ngồi, có ly bia trước mặt; lời chat hiện trên đầu nhân vật |
-| `bàn 5` | Ngồi bàn số 5 (dãy ngoài 1–4, dãy trong 5–9) |
+| `bàn 5` | Ngồi bàn số 5 (dãy sát đường 1–3, dãy trong 4–8) |
 | `bàn riêng` | Giữ một bàn cho hội bạn |
 | `ghép Tên` / `ngồi với Tên` | Ngồi chung bàn với bạn |
 | `mời Tên` | Rủ bạn qua bàn mình |

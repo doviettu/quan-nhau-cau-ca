@@ -472,13 +472,14 @@ function saveOpts() { store.set(opts); }
 /* =====================================================================
    BỐ CỤC QUÁN – hai dãy vỉa hè kê bàn, lòng đường ở giữa cho xe qua lại
    ===================================================================== */
-const FACADE_X = 9.6, CURB_X = 1.7, TABLE_X = 3.6, TABLE_X2 = 6.6;   // vỉa hè trước quán rộng, 2 dãy bàn
+const FACADE_X = 10.8, CURB_X = 1.7, TABLE_X = 3.9, TABLE_X2 = 7.6;   // vỉa hè trước quán rộng, 2 dãy bàn giãn xa nhau
 const ROWS = [6.6, 3.3, 0, -3.3, -6.6];   // vị trí bàn dọc theo phố (trục z = trái ↔ phải màn hình)
-const LANE_IN = 2.3, LANE_MID = 5.1, LANE_OUT = 8.1;   // lối đi: sát lòng đường / giữa 2 dãy bàn / sát mặt tiền quán
+const LANE_IN = 2.55, LANE_MID = 5.75, LANE_OUT = 9.4;   // lối đi: sát lòng đường / giữa 2 dãy bàn / sát mặt tiền quán
 const TOP_DZ = 0.42, SIDE_OFF = 0.62, END_OFF = 1.2, GAP_DZ = 1.65;
 const SEATS_PER = 6, STOOL_H = 0.3, HIP = 0.37;
 const FRONT_Z = 14, BACK_Z = -14, DOOR_Z = -1.65;   // khách đi vào từ hai đầu phố (trái/phải màn hình)
-const KARAOKE = { x: -3.45, z: 6.6 };   // góc karaoke thế chỗ bàn đầu dãy bên quán (đối diện)
+const KARAOKE = { x: -3.7, z: 3.6 };   // sân hát karaoke: thế chỗ 2 bàn đầu dãy sát đường, nằm trong khung hình dọc
+const KARA_ROWS = [6.6, 3.3];         // các chỗ bàn dãy ngoài nhường cho sân hát
 
 /* =====================================================================
    THỰC ĐƠN: QUÀ → MÓN
@@ -538,15 +539,16 @@ function fitCamera() {
   camera.aspect = a;
   camera.fov = a < 0.8 ? 60 : a < 1.2 ? 54 : 45;
   camera.updateProjectionMatrix();
-  controls.target.set(a < 0.8 ? -5.6 : -5.2, a < 0.8 ? 2.4 : 2.2, a < 0.8 ? -0.2 : -0.4);
+  const tu = window.__camTune || {};
+  controls.target.set(a < 0.8 ? (tu.tx ?? -6.6) : -5.8, a < 0.8 ? (tu.ty ?? 1.9) : 2.2, a < 0.8 ? (tu.tz ?? 0.6) : -0.4);
   const tv = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-  const halfW = a < 0.8 ? 6.2 : 9.5;
+  const halfW = a < 0.8 ? (tu.halfW ?? 6.8) : 9.5;
   const halfV = a < 0.8 ? 5.5 : 6.2;
   const dist = clamp(Math.max(halfW / (tv * a), halfV / tv), 14, 42);
   // điện thoại dọc: nhìn chúc xuống hơn và đẩy khung hình xuống dưới để bảng điều khiển phía trên không che quán
-  const dir = a < 0.8 ? new THREE.Vector3(0.9, 0.36, 0.3).normalize() : CAM_DIR;
+  const dir = a < 0.8 ? new THREE.Vector3(0.9, tu.elev ?? 0.36, tu.dz ?? 0.3).normalize() : CAM_DIR;
   camera.position.copy(controls.target).addScaledVector(dir, dist);
-  if (a < 0.8) camera.setViewOffset(w, h, 0, -Math.round(h * 0.07), w, h); else camera.clearViewOffset();
+  if (a < 0.8) camera.setViewOffset(w, h, 0, -Math.round(h * (tu.off ?? -0.07)), w, h);   // âm: đẩy cảnh lên, biển hiệu sát mép trên, không còn khoảng trời trống else camera.clearViewOffset();
   controls.minDistance = dist * 0.35; controls.maxDistance = dist * 1.3;
   controls.update();
   scene.fog.near = dist * 1.0; scene.fog.far = dist * 2.8;
@@ -1002,8 +1004,8 @@ const beams = [];
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.29, 0.025, 6, 24), stageStrip); ring.position.set(0, 0.65, 0.3); loa.add(ring);
   const mic = new THREE.Mesh(merge([CY(0.15, 0.18, 0.03, '#222', [0, 0.015, 0], null, 10), CY(0.015, 0.015, 1.3, '#999', [0, 0.65, 0], null, 6), CY(0.03, 0.02, 0.12, '#111', [0, 1.33, 0.04], [0.5, 0, 0], 8), SP(0.04, '#aaa', [0, 1.4, 0.07])]), vcMat);
   mic.position.set(KARAOKE.x + 0.25, 0, KARAOKE.z - 0.8); scene.add(mic);
-  const rug = new THREE.Mesh(merge([B(1.5, 0.01, 1.3, '#8e1b3a', 0, 0.007, 0), B(1.3, 0.012, 1.1, '#b5294e', 0, 0.008, 0)]), vcMat);
-  rug.position.set(KARAOKE.x, 0, KARAOKE.z); scene.add(rug);
+  const rug = new THREE.Mesh(merge([B(2.3, 0.01, 3.4, '#8e1b3a', 0, 0.007, 0), B(2.1, 0.012, 3.2, '#b5294e', 0, 0.008, 0), B(1.9, 0.014, 0.06, '#ffd54f', 0, 0.009, 1.45), B(1.9, 0.014, 0.06, '#ffd54f', 0, 0.009, -1.45)]), vcMat);
+  rug.position.set(KARAOKE.x - 0.1, 0, KARAOKE.z + 0.3); scene.add(rug);
   ledCanvas = document.createElement('canvas'); ledCanvas.width = 320; ledCanvas.height = 160; ledCtx = ledCanvas.getContext('2d');
   ledTex = new THREE.CanvasTexture(ledCanvas); ledTex.colorSpace = THREE.SRGBColorSpace;
   const tv = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.95), new THREE.MeshBasicMaterial({ map: ledTex }));
@@ -1024,9 +1026,9 @@ const beams = [];
 /* ---------- Đèn ---------- */
 scene.add(new THREE.HemisphereLight(0xffd2a8, 0x2a1830, 1.9));
 const moon = new THREE.DirectionalLight(0xa8b4ff, 0.9); moon.position.set(6, 14, 8); scene.add(moon);
-const warm1 = new THREE.PointLight(0xffb066, 40, 16, 1.6); warm1.position.set(-4.5, 4.6, 4); scene.add(warm1);
-const warm2 = new THREE.PointLight(0xffb066, 40, 16, 1.6); warm2.position.set(-4.5, 4.6, -4); scene.add(warm2);
-const shopLight = new THREE.PointLight(0xff9a3c, 40, 14, 1.6); shopLight.position.set(-7.6, 2.8, 0); scene.add(shopLight);
+const warm1 = new THREE.PointLight(0xffb066, 40, 16, 1.6); warm1.position.set(-5.2, 4.6, 4); scene.add(warm1);
+const warm2 = new THREE.PointLight(0xffb066, 40, 16, 1.6); warm2.position.set(-5.2, 4.6, -4); scene.add(warm2);
+const shopLight = new THREE.PointLight(0xff9a3c, 40, 14, 1.6); shopLight.position.set(-8.6, 2.8, 0); scene.add(shopLight);
 const stageLight = new THREE.PointLight(0xff3d9a, 35, 13, 1.6); stageLight.position.set(KARAOKE.x + 1.6, 3.0, KARAOKE.z); scene.add(stageLight);
 // dây đèn bóng tròn giăng ngang phố
 {
@@ -1118,7 +1120,7 @@ const bikeGeoC = c => bikeGeoCache[c] || (bikeGeoCache[c] = bikeGeo(c));
    ===================================================================== */
 const tables = []; const seats = [];
 const plasticMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-const NT = ROWS.length * 2 - 1;   // 2 dãy × 5, trừ chỗ góc karaoke
+const NT = ROWS.length * 2 - KARA_ROWS.length;   // 2 dãy × 5, trừ chỗ sân hát karaoke
 const topGeo = new THREE.BoxGeometry(0.82, 0.05, 0.82).translate(0, 0.53, 0);
 const tableTops = new THREE.InstancedMesh(topGeo, plasticMat, NT * 2);
 const tableLegs = new THREE.InstancedMesh(new THREE.BoxGeometry(0.05, 0.52, 0.05).translate(0, 0.26, 0), plasticMat, NT * 8);
@@ -1132,7 +1134,7 @@ const blobs = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.0, 3.0).rotateX(
   const r = mulberry32(42);
   let ti = 0, li = 0, si = 0;
   [0, 1].forEach((col, k) => [...ROWS].sort((p, q) => q - p).forEach((z, ri) => {
-    if (col === 0 && z === KARAOKE.z) return;
+    if (col === 0 && KARA_ROWS.includes(z)) return;
     const sd = -1, x = -(col ? TABLE_X2 : TABLE_X), n = tables.length + 1;
     const base = (ri + k) % 2 ? BLUE : RED;
     for (const dz of [-TOP_DZ, TOP_DZ]) {

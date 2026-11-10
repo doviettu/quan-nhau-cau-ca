@@ -121,6 +121,8 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
     <div class="row"><label>Quà tối thiểu chốt bài (xu)</label><input type="number" id="kMin" min="0"><label>Chen hàng (xu)</label><input type="number" id="kPrio" min="1"></div>
     <div class="row"><label><input type="checkbox" id="botsOn"> Khách quen 🏠, tối thiểu</label><input type="number" id="botMin" min="0" max="50"><label>khách</label></div>
     <div class="row"><label><input type="checkbox" id="mcVoice"> 🔊 Cậu Cả nói thành tiếng, không để quán im quá</label><input type="number" id="mcGap" min="20" max="180"><label>giây</label><button id="bVoiceTest">Thử giọng</button></div>
+    <div class="row"><label>Giọng Cậu Cả</label><select id="voiceEngine"><option value="auto">Tự động (VieNeu nếu đã cài, không thì giọng Mac)</option><option value="vieneu">VieNeu-TTS</option><option value="mac">Giọng Linh của Mac</option></select><select id="vieneuVoice"><option value="Hải Đăng">Hải Đăng</option></select></div>
+    <p class="mut" id="vnHint" style="margin:2px 0 8px"></p>
     <div class="row"><label><input type="checkbox" id="circusAuto"> Xiếc đường phố tự ghé mỗi</label><input type="number" id="circusEvery" min="2" max="60"><label>phút</label></div>
     <div class="row"><label><input type="checkbox" id="bgmYt"> 📻 Nhạc nền remix từ YouTube (dùng YouTube key)</label></div>
     <div class="row"><label>Từ khoá nhạc nền</label><input type="text" id="bgmQuery" placeholder="nhạc remix vinahouse"><label>Âm lượng</label><input type="number" id="bgmVol" min="0" max="100"></div>
@@ -139,7 +141,7 @@ async function post(p, b = {}) { const r = await fetch(p, { method: 'POST', head
 async function cmd(c, okMsg) { try { const r = await post('/api/cmd', c); toast(r.delivered ? (okMsg || 'Đã gửi tới game') : '⚠️ Chưa thấy cửa sổ game – bấm “Mở cửa sổ game” trước'); } catch (e) { toast('❌ ' + e.message); } }
 const set = (id, cls, txt) => { $('#d' + id).className = 'dot ' + cls; $('#s' + id).textContent = txt; };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-let loaded = false;
+let loaded = false, G_vnVoice = 'Hải Đăng';
 async function refresh() {
   let s; try { s = await (await fetch('/api/status', { cache: 'no-store' })).json(); } catch { set('Game', 'bad', 'App đã tắt'); return; }
   set('Claude', s.claudeReady ? 'ok' : 'warn', s.claudeReady ? `sẵn sàng · ${s.claudeCalls} lượt/giờ` : 'chưa có key – Cậu Cả theo kịch bản');
@@ -154,8 +156,13 @@ async function refresh() {
   }
   const lv = s.live || {};
   set('Live', lv.ok ? 'ok' : 'bad', lv.ok ? '🔴 đang live · Claude MC được phép gọi' : `⏸ ${lv.reason || 'chưa live'} · Claude tạm nghỉ`);
-  const v = s.voice || {};
+  const v = s.voice || {}, vnS = v.vieneu || {};
+  const vl = vnS.voices || [];
+  if (vl.length && $('#vieneuVoice').options.length !== vl.length) { $('#vieneuVoice').innerHTML = vl.map(x => `<option value="${esc(x.id)}">${esc(x.id)}${x.desc ? ' – ' + esc(x.desc) : ''}</option>`).join(''); $('#vieneuVoice').value = G_vnVoice; }
+  $('#vnHint').textContent = !vnS.installed ? 'Chưa cài VieNeu: nhấp đúp file cai-giong-vieneu.command trong thư mục quan-nhau-cau-ca (một lần), rồi mở lại app.' : vnS.state === 'ready' ? `VieNeu đang chạy · ${vl.length} giọng` : vnS.state === 'starting' ? 'VieNeu đang khởi động…' : vnS.err ? '⚠️ ' + vnS.err : '';
   if (!v.on) set('Voice', 'warn', 'đang tắt – bật ở phần Cấu hình');
+  else if (vnS.state === 'ready' && v.engine !== 'mac') set('Voice', 'ok', `VieNeu · ${vnS.voice || 'mặc định'}` + (s.game && s.game.mc ? ` · im lặng ${s.game.mc.quiet}s` : ''));
+  else if (vnS.state === 'starting' && v.engine !== 'mac') set('Voice', 'warn', 'VieNeu đang khởi động…');
   else if (!v.mac) set('Voice', 'warn', 'dùng giọng của trình duyệt (không chạy trên Mac)');
   else if (v.name) set('Voice', 'ok', `giọng ${v.name}` + (s.game && s.game.mc ? ` · im lặng ${s.game.mc.quiet}s` : ''));
   else set('Voice', 'bad', v.checked ? 'Mac chưa có giọng tiếng Việt – cài giọng Linh (xem README)' : 'đang kiểm tra…');
@@ -183,6 +190,7 @@ async function refresh() {
     for (const k of ['aiModel', 'aiEvery', 'aiMax', 'ytKey', 'kMin', 'kPrio', 'botMin', 'mgEvery', 'autoLuckyMin', 'bgmQuery', 'bgmVol', 'circusEvery']) $('#' + k).value = c[k] ?? '';
     for (const k of ['aiOn', 'botsOn', 'mgAuto', 'autoOn', 'bgmYt']) $('#' + k).checked = !!c[k];
     $('#circusAuto').checked = c.circusAuto !== false; $('#mcVoice').checked = c.mcVoice !== false; $('#mcGap').value = c.mcGap ?? 40;
+    $('#voiceEngine').value = c.voiceEngine || 'auto'; G_vnVoice = c.vieneuVoice || 'Hải Đăng'; if (![...$('#vieneuVoice').options].some(o => o.value === G_vnVoice)) $('#vieneuVoice').add(new Option(G_vnVoice, G_vnVoice)); $('#vieneuVoice').value = G_vnVoice;
   }
 }
 setInterval(refresh, 2000); refresh();
@@ -213,7 +221,7 @@ $('#bSong').onclick = () => sendText('songText', 'song'); $('#songText').onkeydo
 $('#bTest').onclick = () => sendText('testText', 'chat'); $('#testText').onkeydown = e => e.key === 'Enter' && sendText('testText', 'chat');
 $('#bSaveCfg').onclick = async () => {
   const n = id => Number($('#' + id).value);
-  const game = { aiModel: $('#aiModel').value, aiOn: $('#aiOn').checked, aiEvery: n('aiEvery'), aiMax: n('aiMax'), kMin: n('kMin'), kPrio: n('kPrio'), botsOn: $('#botsOn').checked, botMin: n('botMin'), mgAuto: $('#mgAuto').checked, mgEvery: n('mgEvery'), autoOn: $('#autoOn').checked, autoLuckyMin: n('autoLuckyMin'), bgmYt: $('#bgmYt').checked, bgmQuery: $('#bgmQuery').value.trim(), bgmVol: n('bgmVol'), circusAuto: $('#circusAuto').checked, circusEvery: n('circusEvery'), mcVoice: $('#mcVoice').checked, mcGap: n('mcGap') };
+  const game = { aiModel: $('#aiModel').value, aiOn: $('#aiOn').checked, aiEvery: n('aiEvery'), aiMax: n('aiMax'), kMin: n('kMin'), kPrio: n('kPrio'), botsOn: $('#botsOn').checked, botMin: n('botMin'), mgAuto: $('#mgAuto').checked, mgEvery: n('mgEvery'), autoOn: $('#autoOn').checked, autoLuckyMin: n('autoLuckyMin'), bgmYt: $('#bgmYt').checked, bgmQuery: $('#bgmQuery').value.trim(), bgmVol: n('bgmVol'), circusAuto: $('#circusAuto').checked, circusEvery: n('circusEvery'), mcVoice: $('#mcVoice').checked, mcGap: n('mcGap'), voiceEngine: $('#voiceEngine').value, vieneuVoice: $('#vieneuVoice').value };
   if ($('#ytKey').value.trim()) game.ytKey = $('#ytKey').value.trim();   // ô trống = giữ key đang có
   try { await post('/api/config', { game, tikfinityUrl: $('#tikUrl').value.trim() }); toast('💾 Đã lưu – game cập nhật ngay'); } catch (e) { toast('❌ ' + e.message); }
 };
