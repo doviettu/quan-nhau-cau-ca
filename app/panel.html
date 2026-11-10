@@ -53,6 +53,8 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
     <h2>📋 Trạng thái</h2>
     <div class="st"><span><span class="dot" id="dClaude"></span>Claude MC</span><span class="mut" id="sClaude">…</span></div>
     <div class="st"><span><span class="dot" id="dTik"></span>TikTok Live</span><span class="mut" id="sTik">…</span></div>
+    <div class="st"><span><span class="dot" id="dYt"></span>YouTube Live</span><span class="mut" id="sYt">…</span></div>
+    <div class="st"><span><span class="dot" id="dFb"></span>Facebook Live</span><span class="mut" id="sFb">…</span></div>
     <div class="st"><span><span class="dot" id="dLive"></span>Phiên live</span><span class="mut" id="sLive">…</span></div>
     <div class="st"><span><span class="dot" id="dVoice"></span>Giọng Cậu Cả</span><span class="mut" id="sVoice">…</span></div>
     <div class="st"><span><span class="dot" id="dGame"></span>Cửa sổ game</span><span class="mut" id="sGame">…</span></div>
@@ -112,6 +114,19 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
       <div class="row"><input type="text" id="ttUser" placeholder="@tennick" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:2"><button class="pri" id="bTtConnect">Kết nối</button><button id="bTtStop">Ngắt</button></div>
       <div class="mut" id="ttStatus">Chưa kết nối</div>
     </div>
+    <div class="tt">
+      <div class="row"><label><b>▶️ Kết nối YouTube Live</b><br><span class="mut">Dán link buổi live, link kênh hoặc @tên kênh. Dùng YouTube Data API key (mặc định là key karaoke bên dưới)</span></label></div>
+      <div class="row"><input type="text" id="ytInput" placeholder="https://youtube.com/@tenkenh hoặc link buổi live" autocomplete="off" spellcheck="false" style="flex:2"><button class="pri" id="bYtConnect">Kết nối</button><button id="bYtStop">Ngắt</button></div>
+      <div class="row"><label>Key riêng cho chat <span class="mut">(tuỳ chọn)</span></label><input type="password" id="ytChatKey" placeholder="để trống = dùng key karaoke" autocomplete="off"></div>
+      <div class="row"><label>Đọc chat mỗi (giây)</label><input type="number" id="ytPoll" min="5" max="60" value="8"><span class="mut" id="ytQuota"></span></div>
+      <div class="mut" id="ytStatus">Chưa kết nối</div>
+    </div>
+    <div class="tt">
+      <div class="row"><label><b>📘 Kết nối Facebook Live (Trang)</b><br><span class="mut">Cần Page access token của Trang bạn quản lý – xem hướng dẫn trong README. Token được cất trong Keychain của Mac, không hiện lại ở đây.</span></label></div>
+      <div class="row"><input type="text" id="fbPage" placeholder="Tên hoặc ID Trang (để trống = Trang của token)" autocomplete="off" spellcheck="false" style="flex:2"><input type="password" id="fbToken" placeholder="Page access token" autocomplete="off" style="flex:2"></div>
+      <div class="row"><button class="pri" id="bFbConnect">Lưu &amp; kết nối</button><button id="bFbStop">Ngắt</button><button id="bFbForget">Xóa token</button></div>
+      <div class="mut" id="fbStatus">Chưa kết nối</div>
+    </div>
     <div class="row"><label>TikFinity WebSocket <span class="mut">(dùng khi không kết nối trực tiếp)</span></label><input type="text" id="tikUrl"></div>
     <div class="row"><label>Model Claude</label><select id="aiModel"><option value="claude-haiku-5-5">Haiku 5.5 – rẻ nhất (~$0.02–0.06/giờ)</option><option value="claude-sonnet-5-5">Sonnet 5.5 (~$0.4–1.2/giờ)</option><option value="claude-opus-5-5">Opus 5.5 (~$0.7–2.3/giờ)</option></select></div>
     <div class="row"><label><input type="checkbox" id="aiOn"> Tự bật Claude MC khi mở game</label></div>
@@ -156,6 +171,18 @@ async function refresh() {
     set('Tik', s.tikfinity ? 'ok' : 'bad', s.tikfinity ? 'qua TikFinity' : 'chưa kết nối – nhập @tên ở phần Cấu hình');
     $('#ttStatus').textContent = 'Chưa kết nối trực tiếp' + (s.tikfinity ? ' · đang dùng TikFinity' : '');
   }
+  const yt = s.youtube || {}, fb = s.facebook || {};
+  const pfLabel = (o, name, live) => ({ live, connecting: `đang kết nối ${name}…`, offline: o.error, error: o.error }[o.state] || o.state);
+  if (yt.on) {
+    const l = pfLabel(yt, 'YouTube', `🔴 ${yt.title ? '“' + yt.title.slice(0, 40) + '”' : yt.videoId} · ${yt.viewers || 0} người xem`);
+    set('Yt', yt.state === 'live' ? 'ok' : yt.state === 'connecting' || yt.state === 'offline' ? 'warn' : 'bad', l);
+    $('#ytStatus').textContent = (yt.state === 'live' ? '✅ ' : '') + l + ` · hạn mức đã dùng hôm nay ~${yt.unitsToday || 0}/10.000` + (yt.hasKey ? '' : ' · ⚠️ chưa có API key');
+  } else { set('Yt', '', 'chưa bật'); $('#ytStatus').textContent = yt.hasKey ? 'Chưa kết nối' : 'Chưa kết nối · cần YouTube Data API key (ô key karaoke hoặc key riêng)'; }
+  if (fb.on) {
+    const l = pfLabel(fb, 'Facebook', `🔴 ${fb.pageName || 'Trang'}${fb.title ? ' · “' + fb.title.slice(0, 30) + '”' : ''} · ${fb.viewers || 0} người xem`);
+    set('Fb', fb.state === 'live' ? 'ok' : fb.state === 'connecting' || fb.state === 'offline' ? 'warn' : 'bad', l);
+    $('#fbStatus').textContent = (fb.state === 'live' ? '✅ ' : '') + l;
+  } else { set('Fb', '', 'chưa bật'); $('#fbStatus').textContent = fb.hasToken ? 'Đã lưu token · chưa kết nối' : 'Chưa có token'; }
   const lv = s.live || {};
   set('Live', lv.ok ? 'ok' : 'bad', lv.ok ? '🔴 đang live · Claude MC được phép gọi' : `⏸ ${lv.reason || 'chưa live'} · Claude tạm nghỉ`);
   const v = s.voice || {}, vnS = v.vieneu || {};
@@ -189,6 +216,9 @@ async function refresh() {
     $('#tikUrl').value = s.config.tikfinityUrl;
     if (s.notify) { $('#ntTopic').value = s.notify.topic || ''; $('#ntOn').checked = s.notify.on !== false; $('#ntIdle').value = s.notify.idleMin ?? 10; }
     if (tt.saved) $('#ttUser').value = '@' + tt.saved;
+    if (yt.saved) $('#ytInput').value = yt.saved; if (yt.minPoll) $('#ytPoll').value = yt.minPoll; $('#ytChatKey').placeholder = yt.ownKey ? 'đã lưu key riêng – dán key mới để thay' : 'để trống = dùng key karaoke';
+    if (fb.saved) $('#fbPage').value = fb.saved; $('#fbToken').placeholder = fb.hasToken ? 'đã lưu trong Keychain – dán token mới để thay' : 'Page access token';
+    ytQuota();
     for (const k of ['aiModel', 'aiEvery', 'aiMax', 'ytKey', 'kMin', 'kPrio', 'botMin', 'mgEvery', 'autoLuckyMin', 'bgmQuery', 'bgmVol', 'circusEvery']) $('#' + k).value = c[k] ?? '';
     for (const k of ['aiOn', 'botsOn', 'mgAuto', 'autoOn', 'bgmYt']) $('#' + k).checked = !!c[k];
     $('#circusAuto').checked = c.circusAuto !== false; $('#mcVoice').checked = c.mcVoice !== false; $('#mcGap').value = c.mcGap ?? 40; $('#jokeOn').checked = c.jokeOn !== false; $('#jokeEvery').value = c.jokeEvery ?? 4;
@@ -200,6 +230,18 @@ const ttConnect = async () => {
   const u = $('#ttUser').value.trim(); if (!u) { $('#ttUser').focus(); return toast('Nhập tên TikTok, ví dụ @tenban'); }
   try { const r = await post('/api/tiktok/connect', { username: u }); $('#ttUser').value = '@' + r.username; toast('📡 Đang kết nối @' + r.username + '…'); refresh(); } catch (e) { toast('❌ ' + e.message, 5000); }
 };
+const ytQuota = () => { const sec = Math.max(5, Number($('#ytPoll').value) || 8), perH = Math.round(3600 / sec * 5 + 40); $('#ytQuota').textContent = `≈ ${perH} đơn vị/giờ → hạn mức 10.000/ngày đủ khoảng ${(10000 / perH).toFixed(1)} giờ live`; };
+$('#ytPoll').oninput = ytQuota;
+$('#bYtConnect').onclick = async () => {
+  const input = $('#ytInput').value.trim(); if (!input) { $('#ytInput').focus(); return toast('Dán link kênh hoặc link buổi live YouTube'); }
+  try { await post('/api/youtube/connect', { input, key: $('#ytChatKey').value.trim(), minPoll: Number($('#ytPoll').value) || 8 }); $('#ytChatKey').value = ''; toast('▶️ Đang tìm buổi live YouTube…'); refresh(); } catch (e) { toast('❌ ' + e.message, 5000); }
+};
+$('#bYtStop').onclick = async () => { try { await post('/api/youtube/disconnect'); toast('Đã ngắt YouTube'); refresh(); } catch (e) { toast('❌ ' + e.message); } };
+$('#bFbConnect').onclick = async () => {
+  try { await post('/api/facebook/connect', { page: $('#fbPage').value.trim(), token: $('#fbToken').value.trim() }); $('#fbToken').value = ''; toast('📘 Đang tìm buổi live trên Trang…'); refresh(); } catch (e) { toast('❌ ' + e.message, 5000); }
+};
+$('#bFbStop').onclick = async () => { try { await post('/api/facebook/disconnect'); toast('Đã ngắt Facebook'); refresh(); } catch (e) { toast('❌ ' + e.message); } };
+$('#bFbForget').onclick = async () => { if (!confirm('Xóa Page access token đã lưu?')) return; try { await post('/api/facebook/forget'); toast('Đã xóa token Facebook'); refresh(); } catch (e) { toast('❌ ' + e.message); } };
 $('#bTtConnect').onclick = ttConnect; $('#ttUser').onkeydown = e => e.key === 'Enter' && ttConnect();
 $('#bTtStop').onclick = async () => { try { await post('/api/tiktok/disconnect'); toast('Đã ngắt – quay lại dùng TikFinity'); refresh(); } catch (e) { toast('❌ ' + e.message); } };
 $('#bOpenWin').onclick = async () => { try { const r = await post('/api/window/open'); toast(r.ok ? (r.warning ? '⚠️ ' + r.warning : '🪟 Đã mở cửa sổ game – thêm nguồn “Chụp cửa sổ” trong LIVE Studio') : '❌ ' + r.error, 6000); } catch (e) { toast('❌ ' + e.message); } };

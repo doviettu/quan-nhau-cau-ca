@@ -1,6 +1,6 @@
 # 🍻 Quán nhậu vỉa hè Cậu Cả
 
-Game web 3D tương tác cho **TikTok Live**. Người xem comment, thả tim, tặng quà để vào quán, chọn bàn, gọi món, hát karaoke và chơi trò nhỏ. Cậu Cả (chủ quán) có thể do **Claude** điều khiển để tự dẫn live.
+Game web 3D tương tác cho **TikTok Live**, đọc thêm được comment từ **YouTube Live** và **Facebook Live** (mục 4c). Người xem comment, thả tim, tặng quà để vào quán, chọn bàn, gọi món, hát karaoke và chơi trò nhỏ. Cậu Cả (chủ quán) có thể do **Claude** điều khiển để tự dẫn live.
 
 Repo gồm:
 
@@ -10,6 +10,7 @@ Repo gồm:
 | `Cau Ca Live.app`, `start.command` | App khởi động trên Mac |
 | `app/` | Máy chủ cục bộ: chạy game, cầu nối Claude, kết nối TikTok, bảng điều khiển, mở cửa sổ game cho LIVE Studio |
 | `bridge/` | Cầu nối Claude dùng riêng, khi không chạy app |
+| `docs/huong-dan-live-3-nen-tang.md` | Hướng dẫn từng bước live cùng lúc TikTok, YouTube, Facebook: lấy key/token, cài OBS, thứ tự bật live, sự cố thường gặp |
 | `docs/tang-luot-xem-va-qua.md` | Nghiên cứu cách tăng lượt xem, tương tác và quà trên TikTok LIVE, kèm các rủi ro vi phạm cần tránh |
 
 ---
@@ -132,6 +133,50 @@ Cậu Cả nói thành tiếng mọi câu thoại: chào khách, gọi tên ngư
 - **Tin gửi qua ntfy.sh** chỉ gồm trạng thái live, không có thông tin cá nhân.
 - **Giới hạn:** app không nhìn thấy màn hình LIVE Studio, nên không phát hiện được captcha ngay lúc nó hiện ra. App chỉ báo khi phiên live có dấu hiệu dừng. Nhận được thông báo, bạn tự mở máy kiểm tra và giải captcha.
 
+## 4c. Live cùng lúc trên YouTube và Facebook
+
+> Hướng dẫn chi tiết từng bước (OBS, khóa luồng, thứ tự bật live, sự cố): **[docs/huong-dan-live-3-nen-tang.md](docs/huong-dan-live-3-nen-tang.md)**
+
+Quán nhận comment, quà và lượt thích từ **TikTok, YouTube và Facebook cùng lúc**. Người xem cả ba nơi ngồi chung một quán. Trong khung tin, người từ YouTube có nhãn đỏ **YT**, người từ Facebook có nhãn xanh **FB**. Chỉ cần một nơi còn đang live là app coi phiên live đang chạy, nên Claude vẫn được gọi.
+
+**1. Phát hình lên YouTube, Facebook.** TikTok LIVE Studio chỉ phát lên TikTok. Muốn phát thêm lên YouTube và Facebook, cần một phần mềm phát khác cùng chụp cửa sổ game:
+- **OBS Studio** (miễn phí): thêm nguồn *Chụp cửa sổ* → chọn cửa sổ game, rồi phát bằng *khóa luồng (stream key)* lấy trong YouTube Studio / Facebook Live Producer. OBS mặc định chỉ phát một nơi. Muốn phát cả YouTube lẫn Facebook thì thêm plugin *Multiple RTMP outputs* hoặc dùng dịch vụ phát lại như Restream.
+- Phát nhiều luồng cùng lúc làm Mac nóng và tốn mạng hơn. Hãy thử trước khi live thật.
+- Trên TikTok, đừng kêu người xem chuyển sang YouTube/Facebook: TikTok có thể không đề xuất phiên live chủ yếu kéo người xem sang nền tảng khác.
+
+**2. YouTube Live** (bảng điều khiển → ⚙️ → **▶️ Kết nối YouTube Live**)
+- Dán **link kênh** (`https://youtube.com/@tenkenh`), **@tên kênh** hoặc **link buổi live**, rồi bấm **Kết nối**. Nếu chưa live, app tự tìm lại: mỗi phút trong 10 phút đầu, sau đó mỗi 5 phút.
+- Dùng **YouTube Data API key**: mặc định là key karaoke, có thể dán key riêng.
+- **Hạn mức:**
+  - Mỗi lần đọc chat tốn 5 đơn vị. Mỗi project Google có khoảng 10.000 đơn vị/ngày.
+  - Đọc mỗi 8 giây (mặc định) tốn khoảng 2.300 đơn vị/giờ, đủ khoảng 4 giờ live. Bảng điều khiển tính sẵn theo số giây bạn chọn.
+  - Nên tạo **key ở project riêng** cho chat live, để karaoke (100 đơn vị mỗi lần tìm bài) không giành hạn mức.
+- **Quy đổi:**
+  - Chat → comment vào quán.
+  - **Super Chat / Super Sticker** → quà. Số tiền đổi ra "xu" (khoảng 270 đ một xu) để chọn món.
+  - Hội viên mới → như theo dõi kênh.
+  - Lượt thích video (đọc mỗi 90 giây) → tim chung đẩy thanh Không khí.
+- Tin nhắn của chính chủ kênh không được tính là khách.
+
+**3. Facebook Live** (bảng điều khiển → ⚙️ → **📘 Kết nối Facebook Live**)
+- **Điều kiện:** chỉ dùng được cho buổi live trên **Trang** bạn quản lý, không dùng được cho trang cá nhân. Cần một **Page access token**.
+- **Lấy token:**
+  1. Tạo app tại developers.facebook.com (loại *Business*).
+  2. Mở **Graph API Explorer**, chọn app vừa tạo, thêm các quyền `pages_show_list`, `pages_read_engagement`, `pages_read_user_content`, rồi bấm *Generate Access Token*.
+  3. Ở ô *User or Page*, chọn **Trang của bạn** để lấy Page token.
+  4. Muốn token lâu hết hạn hơn: vào *Access Token Debugger* → *Extend Access Token* cho user token, rồi lấy lại Page token.
+- **Kết nối:**
+  - Dán token vào ô **Page access token**, để trống ô Trang (hoặc nhập tên/ID Trang), rồi bấm **Lưu & kết nối**.
+  - Token được cất trong **Keychain** của Mac, không nằm trong `config.json` và không hiện lại trên bảng điều khiển. Bấm **Xóa token** để gỡ.
+- **Quy đổi:**
+  - Comment → vào quán.
+  - Lượt bày tỏ cảm xúc → tim chung đẩy thanh Không khí.
+  - Comment của chính Trang không được tính là khách.
+- **Chưa xác minh** (mình chưa thử với Facebook thật, chỉ thử với máy chủ giả lập):
+  - Luồng lượt bày tỏ cảm xúc (`live_reactions`) có thể không có với mọi app. Nếu không có, app bỏ qua, comment vẫn chạy bình thường.
+  - Tên người comment có thể bị ẩn tuỳ quyền của app. Khi đó khách hiện tên "Khách Facebook".
+  - **Sao (Stars)** của Facebook chưa đọc được qua API này, nên chưa đổi thành món.
+
 ## 4b. Claude MC và chi phí
 
 **Gọi Claude ít nhất có thể:**
@@ -228,16 +273,21 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 | Không nhận được comment | Kết nối thẳng: kiểm tra đúng **@tên** và tài khoản đang live (dòng *TikTok Live* trong bảng điều khiển báo lỗi cụ thể). Dùng TikFinity: kiểm tra địa chỉ WebSocket (thử `ws://127.0.0.1:21213/`) |
 | *"Dịch vụ ký kết nối đang giới hạn lượt"* | Gói miễn phí của Euler Stream bị giới hạn; app tự thử lại sau 60 giây. Live thường xuyên thì lấy API key tại eulerstream.com rồi chạy app với biến `EULER_API_KEY`, hoặc dùng TikFinity |
 | Cài giọng VieNeu báo *"External data path escapes model directory"* | Lỗi của bản cũ khi chạy với ONNX Runtime mới. Cập nhật (`git pull`) rồi nhấp đúp lại `cai-giong-vieneu.command`: mô hình được tải lại vào thư mục thường |
+| Dòng *YouTube Live* báo lỗi key / hạn mức | Bật **YouTube Data API v3** cho project của key. Hết hạn mức thì app tự thử lại sau 30 phút; nên dùng key riêng cho chat live và tăng số giây đọc chat |
+| YouTube báo *"Kênh chưa có buổi live đang phát"* dù đang live | Dán thẳng **link buổi live** (`youtube.com/live/...` hoặc `watch?v=...`) thay cho link kênh |
+| Dòng *Facebook Live* báo token hết hạn hoặc thiếu quyền | Lấy lại Page token với đủ 3 quyền ở mục 4c, dán vào rồi bấm **Lưu & kết nối** |
 | YouTube báo lỗi 153 | Chạy game qua app hoặc GitHub Pages, không mở file trực tiếp |
 | Claude MC tự tắt | Key sai hoặc hết hạn mức; chạy `./start.command --reset-key` để nhập key mới |
 
 ## 9. Quyền riêng tư và minh bạch
 
 - App chỉ chạy trên máy bạn (`127.0.0.1`) và không có máy chủ trên mạng.
-- Claude API key nằm trong Keychain; cấu hình nằm trong `config.json`.
+- Claude API key và Page token Facebook nằm trong Keychain; cấu hình (kể cả YouTube API key) nằm trong `config.json`.
 - Nội dung chỉ được gửi ra ngoài khi bạn bật tính năng tương ứng:
   - **Claude MC**: tóm tắt diễn biến phòng live được gửi tới Anthropic.
   - **Karaoke YouTube**: tên bài được gửi tới Google để tìm, và video phát qua `youtube-nocookie.com`.
+  - **YouTube Live**: app gửi link/@tên kênh và API key tới Google (YouTube Data API) để đọc chat công khai của buổi live.
+  - **Facebook Live**: app dùng Page access token (cất trong Keychain) để đọc comment buổi live trên Trang của bạn qua Graph API của Meta.
   - **Kết nối thẳng TikTok**: app dùng thư viện mã nguồn mở `tiktok-live-connector` để đọc phiên live công khai, không đăng nhập TikTok. Thư viện gửi **tên tài khoản** của bạn tới dịch vụ Euler Stream để ký kết nối. Đây là cách đọc không chính thức, TikTok có thể thay đổi bất cứ lúc nào; khi đó hãy dùng TikFinity.
 - Khách quen 🏠 là nhân vật máy, được đánh dấu rõ, và không tạo tim, quà hay thứ hạng giả.
 - Đồ ăn, bia trong quán là **ảo**. Cậu Cả do AI dẫn được dặn không cổ vũ uống rượu bia thật và luôn nói thật mình là MC ảo khi được hỏi.
