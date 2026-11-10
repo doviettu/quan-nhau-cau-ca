@@ -86,31 +86,21 @@ App tự cài đặt OBS qua WebSocket nên bạn không phải chỉnh tay từ
 
 ## Phần B. Mỗi buổi live (theo thứ tự)
 
+**Lần đầu (một lần):** thẻ **⚡ Kết nối & phát** → dán từng link kênh rồi bấm **➕ Kết nối**: link TikTok (`tiktok.com/@ten`), link kênh YouTube (`youtube.com/@ten`), link Trang Facebook. App tự nhận ra nền tảng. Ô nào báo thiếu thì bấm nút trên ô đó (**🔑 Dán API key**, **🔑 Dán Page token**).
+
 | # | Việc | Ở đâu |
 |---|---|---|
-| 1 | Mở **Cau Ca Live.app**. Bảng điều khiển tự mở | Mac |
-| 2 | Bấm **🪟 Mở cửa sổ game**. Chỉ mở **một** cửa sổ. Để cửa sổ này cùng màn hình (Space) với OBS và LIVE Studio, không thu nhỏ xuống Dock | Bảng điều khiển |
-| 3 | Mở **OBS**, rồi trong thẻ 🎬 OBS bấm **🔗 Khớp lại OBS**. Danh sách bên dưới nút phải toàn ✅; mục nào ⚠️ thì làm theo lời nhắc | Bảng điều khiển |
-| 4 | Bấm **▶️ Bắt đầu phát**. Dòng *OBS phát hình* hiện 🔴 kèm ✅ YouTube · ✅ Facebook (· ✅ TikTok) | Bảng điều khiển |
-| 4b | Nếu TikTok chưa có khóa luồng: **TikTok LIVE Studio** → bố cục dọc → *Chụp cửa sổ* (cửa sổ game) → bật **âm thanh máy tính** → **Go LIVE** | LIVE Studio |
-| 5 | **YouTube Studio:** đợi hình hiện lên rồi bấm **Phát trực tiếp** (nếu không bật tự bắt đầu). Bấm *Chia sẻ* để chép **link buổi live** | YouTube Studio |
-| 6 | **Live Producer:** bấm **Phát trực tiếp** khi hình đã lên | Facebook |
-| 7 | Bảng điều khiển → ⚙️ Cấu hình phiên live, kết nối từng nơi (bảng ngay dưới) | Bảng điều khiển |
-| 8 | Kiểm tra mục **📋 Trạng thái**: ba dòng TikTok / YouTube / Facebook đều 🔴 kèm số người xem. Dòng **Phiên live**: "đang live" | Bảng điều khiển |
-| 9 | Dùng điện thoại comment thử "chào quán" trên cả ba nơi. Trong game phải thấy khách mới. Người từ YouTube có nhãn **YT**, từ Facebook có nhãn **FB** | Điện thoại |
+| 1 | Mở **Cau Ca Live.app** và **OBS** (nếu phát YouTube/Facebook) | Mac |
+| 2 | Bắt đầu buổi live trên YouTube Studio / Live Producer (để nơi nhận sẵn sàng). Nếu TikTok chưa có khóa luồng, mở **LIVE Studio** | Các nền tảng |
+| 3 | Bấm **▶️ Bắt đầu buổi live**. App mở cửa sổ game, nối comment, khớp OBS và phát hình. Danh sách ✅/⚠️ hiện ngay bên dưới | Bảng điều khiển |
+| 4 | TikTok bằng LIVE Studio: *Chụp cửa sổ* (cửa sổ game) → bật **âm thanh máy tính** → **Go LIVE** | LIVE Studio |
+| 5 | Xem các ô nền tảng: ô xanh 🔴 kèm số người xem là xong. Ô cam/đỏ thì đọc dòng chữ trên ô hoặc bấm **🩺 Kiểm tra** | Bảng điều khiển |
+| 6 | Dùng điện thoại comment thử "chào quán" trên từng nơi. Trong game phải thấy khách mới; người từ YouTube có nhãn **YT**, từ Facebook có nhãn **FB** | Điện thoại |
 
-**Bước 7, kết nối từng nơi:**
-
-| Nơi | Nhập gì | Bấm |
-|---|---|---|
-| **TikTok** | `@tên` tài khoản đang live | Kết nối |
-| **YouTube** | Link kênh (`https://youtube.com/@tenkenh`) hoặc **link buổi live** vừa chép (chắc ăn hơn). Lần đầu dán thêm *key riêng cho chat* | Kết nối |
-| **Facebook** | Để trống ô Trang, lần đầu dán **Page access token** | Lưu & kết nối |
-
-App nhớ các thông tin này. Lần sau chỉ cần bấm Kết nối, hoặc app tự kết nối khi mở.
+Nếu kênh YouTube không tự nhận ra buổi live: dán thẳng **link buổi live** vào ô Kết nối nhanh.
 
 **Kết thúc buổi live:**
-1. Bấm **⏹ Dừng phát** trong thẻ 🎬 OBS (hoặc Stop Streaming trong OBS). Dừng LIVE Studio nếu có dùng. Bấm kết thúc trong YouTube Studio và Live Producer.
+1. Bấm **⏹ Kết thúc phát** (dừng OBS). Dừng LIVE Studio nếu có dùng. Bấm kết thúc trong YouTube Studio và Live Producer.
 2. Nhấn **Ctrl+C** trong cửa sổ Terminal của app.
 3. Nếu chưa tắt app mà các nơi đều đã dừng, app tự ngưng gọi Claude và báo về điện thoại (README mục 4a).
 

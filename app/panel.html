@@ -41,6 +41,22 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
 .steps b{color:#fff}
 .tt{border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:10px;background:rgba(255,201,60,.06)}
 #ttStatus{margin-top:2px}
+.wide{grid-column:1/-1}
+.hidden{display:none!important}
+.qin{display:flex;gap:8px;flex-wrap:wrap}.qin input{flex:1;min-width:240px;font-size:15px;padding:11px 12px}
+.pfs{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin:12px 0}
+.pf{border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:rgba(0,0,0,.18);display:flex;flex-direction:column;gap:4px;min-height:96px}
+.pf .hd{display:flex;align-items:center;gap:8px;font-weight:800}.pf .hd .ic{font-size:18px}.pf .acc{color:#fff;font-size:13px;word-break:break-all}
+.pf .msg{font-size:12px;color:var(--mut)}.pf .act{margin-top:auto;display:flex;gap:6px;flex-wrap:wrap}.pf .act button{padding:5px 9px;font-size:12px}
+.pf.ok{border-color:rgba(67,160,71,.7);background:rgba(67,160,71,.08)}.pf.warn{border-color:rgba(251,140,0,.6)}.pf.bad{border-color:rgba(229,57,53,.7)}
+.sw{margin-left:auto;position:relative;width:40px;height:22px;flex:none}.sw input{opacity:0;width:0;height:0}.sw span{position:absolute;inset:0;background:#555;border-radius:22px;transition:.2s;cursor:pointer}
+.sw span:before{content:"";position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}.sw input:checked+span{background:var(--ok)}.sw input:checked+span:before{transform:translateX(18px)}
+button.big{font-size:16px;padding:12px 18px}
+.chk{list-style:none;padding:0;margin:8px 0}.chk li{padding:4px 0;border-bottom:1px dashed rgba(255,255,255,.06);font-size:13px}.chk li .fix{display:block;color:var(--yel);font-size:12px;margin-left:24px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}.chips button{padding:5px 10px;font-size:12px;border-radius:20px}.chips button.on{background:var(--yel);color:#2a1a00;border-color:transparent}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-top:10px;max-height:420px;overflow:auto;padding-right:4px}
+.vc{border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:rgba(0,0,0,.18)}.vc.cur{border-color:var(--ok);background:rgba(67,160,71,.12)}
+.vc b{font-size:14px}.vc .tg{font-size:11.5px;color:var(--mut);margin:2px 0 6px}.vc .act{display:flex;gap:6px}.vc .act button{padding:4px 9px;font-size:12px}
 </style>
 </head>
 <body>
@@ -50,13 +66,54 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
   <span class="live" id="liveTag">CHƯA PHÁT</span>
 </header>
 <main>
+  <section class="card wide quick">
+    <h2>⚡ Kết nối &amp; phát</h2>
+    <div class="qin"><input type="text" id="qInput" placeholder="Dán link kênh TikTok / YouTube / Trang Facebook, hoặc @tên – app tự nhận ra" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="pri" id="bQAdd">➕ Kết nối</button></div>
+    <div class="chips hidden" id="qAsk" style="margin-top:8px"></div>
+    <div id="qNeed" class="tt hidden" style="margin-top:8px"></div>
+    <div class="pfs" id="pfs"></div>
+    <div class="btns"><button class="pri big" id="bSessStart">▶️ Bắt đầu buổi live</button><button class="big" id="bSessStop">⏹ Kết thúc phát</button><button class="big" id="bCheck">🩺 Kiểm tra</button></div>
+    <ul class="chk" id="qSteps"></ul>
+    <details style="margin-top:6px"><summary class="mut"><b>⚙️ Nâng cao</b>: tài khoản từng nền tảng, YouTube API key, Page token, TikFinity</summary>
+    <div class="tt">
+      <div class="row"><label><b>📡 Kết nối TikTok LIVE</b><br><span class="mut">Nhập tên tài khoản đang live – không cần TikFinity</span></label></div>
+      <div class="row"><input type="text" id="ttUser" placeholder="@tennick" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:2"><button class="pri" id="bTtConnect">Kết nối</button><button id="bTtStop">Ngắt</button></div>
+      <div class="mut" id="ttStatus">Chưa kết nối</div>
+    </div>
+    <div class="tt">
+      <div class="row"><label><b>▶️ Kết nối YouTube Live</b><br><span class="mut">Dán link buổi live, link kênh hoặc @tên kênh. Dùng YouTube Data API key (mặc định là key karaoke bên dưới)</span></label></div>
+      <div class="row"><input type="text" id="ytInput" placeholder="https://youtube.com/@tenkenh hoặc link buổi live" autocomplete="off" spellcheck="false" style="flex:2"><button class="pri" id="bYtConnect">Kết nối</button><button id="bYtStop">Ngắt</button></div>
+      <div class="row"><label>Key riêng cho chat <span class="mut">(tuỳ chọn)</span></label><input type="password" id="ytChatKey" placeholder="để trống = dùng key karaoke" autocomplete="off"></div>
+      <div class="row"><label>Đọc chat mỗi (giây)</label><input type="number" id="ytPoll" min="5" max="60" value="8"><span class="mut" id="ytQuota"></span></div>
+      <div class="mut" id="ytStatus">Chưa kết nối</div>
+    </div>
+    <div class="tt">
+      <div class="row"><label><b>📘 Kết nối Facebook Live (Trang)</b><br><span class="mut">Cần Page access token của Trang bạn quản lý – xem hướng dẫn trong README. Token được cất trong Keychain của Mac, không hiện lại ở đây.</span></label></div>
+      <div class="row"><input type="text" id="fbPage" placeholder="Tên hoặc ID Trang (để trống = Trang của token)" autocomplete="off" spellcheck="false" style="flex:2"><input type="password" id="fbToken" placeholder="Page access token" autocomplete="off" style="flex:2"></div>
+      <div class="row"><button class="pri" id="bFbConnect">Lưu &amp; kết nối</button><button id="bFbStop">Ngắt</button><button id="bFbForget">Xóa token</button></div>
+      <div class="mut" id="fbStatus">Chưa kết nối</div>
+    </div>
+    <div class="row"><label>TikFinity WebSocket <span class="mut">(dùng khi không kết nối trực tiếp)</span></label><input type="text" id="tikUrl"></div>
+    </details>
+  </section>
+
+  <section class="card wide voice">
+    <h2>🎙️ Giọng MC</h2>
+    <div class="row" style="flex-wrap:wrap"><span id="vCur" style="flex:1;min-width:220px">Đang dùng: …</span>
+      <label style="flex:none">Tốc độ</label><input type="range" id="vRate" min="0.8" max="1.3" step="0.05" style="width:150px"><b id="vRateV" style="width:44px">1.0×</b></div>
+    <div class="row" style="flex-wrap:wrap;gap:12px">
+      <div class="chips" id="vfG"><button data-v="">Tất cả</button><button data-v="nữ">👩 Nữ</button><button data-v="nam">👨 Nam</button></div>
+      <div class="chips" id="vfR"><button data-v="">Mọi miền</button><button data-v="Bắc">Bắc</button><button data-v="Trung">Trung</button><button data-v="Nam">Nam</button></div>
+      <div class="chips" id="vfE"><button data-v="">Mọi nguồn</button><button data-v="vieneu">VieNeu (tự nhiên)</button><button data-v="mac">Giọng Mac</button></div>
+    </div>
+    <div class="row"><input type="text" id="vText" placeholder="Câu để nghe thử (để trống = câu chào mẫu)" style="flex:1"></div>
+    <p class="mut" id="vnHint" style="margin:4px 0"></p>
+    <div class="vgrid" id="vList"></div>
+  </section>
+
   <section class="card">
     <h2>📋 Trạng thái</h2>
     <div class="st"><span><span class="dot" id="dClaude"></span>Claude MC</span><span class="mut" id="sClaude">…</span></div>
-    <div class="st"><span><span class="dot" id="dTik"></span>TikTok Live</span><span class="mut" id="sTik">…</span></div>
-    <div class="st"><span><span class="dot" id="dYt"></span>YouTube Live</span><span class="mut" id="sYt">…</span></div>
-    <div class="st"><span><span class="dot" id="dFb"></span>Facebook Live</span><span class="mut" id="sFb">…</span></div>
-    <div class="st"><span><span class="dot" id="dObs"></span>OBS phát hình</span><span class="mut" id="sObs">…</span></div>
     <div class="st"><span><span class="dot" id="dLive"></span>Phiên live</span><span class="mut" id="sLive">…</span></div>
     <div class="st"><span><span class="dot" id="dVoice"></span>Giọng Cậu Cả</span><span class="mut" id="sVoice">…</span></div>
     <div class="st"><span><span class="dot" id="dGame"></span>Cửa sổ game</span><span class="mut" id="sGame">…</span></div>
@@ -128,25 +185,6 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
 
   <section class="card">
     <h2>⚙️ Cấu hình phiên live</h2>
-    <div class="tt">
-      <div class="row"><label><b>📡 Kết nối TikTok LIVE</b><br><span class="mut">Nhập tên tài khoản đang live – không cần TikFinity</span></label></div>
-      <div class="row"><input type="text" id="ttUser" placeholder="@tennick" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:2"><button class="pri" id="bTtConnect">Kết nối</button><button id="bTtStop">Ngắt</button></div>
-      <div class="mut" id="ttStatus">Chưa kết nối</div>
-    </div>
-    <div class="tt">
-      <div class="row"><label><b>▶️ Kết nối YouTube Live</b><br><span class="mut">Dán link buổi live, link kênh hoặc @tên kênh. Dùng YouTube Data API key (mặc định là key karaoke bên dưới)</span></label></div>
-      <div class="row"><input type="text" id="ytInput" placeholder="https://youtube.com/@tenkenh hoặc link buổi live" autocomplete="off" spellcheck="false" style="flex:2"><button class="pri" id="bYtConnect">Kết nối</button><button id="bYtStop">Ngắt</button></div>
-      <div class="row"><label>Key riêng cho chat <span class="mut">(tuỳ chọn)</span></label><input type="password" id="ytChatKey" placeholder="để trống = dùng key karaoke" autocomplete="off"></div>
-      <div class="row"><label>Đọc chat mỗi (giây)</label><input type="number" id="ytPoll" min="5" max="60" value="8"><span class="mut" id="ytQuota"></span></div>
-      <div class="mut" id="ytStatus">Chưa kết nối</div>
-    </div>
-    <div class="tt">
-      <div class="row"><label><b>📘 Kết nối Facebook Live (Trang)</b><br><span class="mut">Cần Page access token của Trang bạn quản lý – xem hướng dẫn trong README. Token được cất trong Keychain của Mac, không hiện lại ở đây.</span></label></div>
-      <div class="row"><input type="text" id="fbPage" placeholder="Tên hoặc ID Trang (để trống = Trang của token)" autocomplete="off" spellcheck="false" style="flex:2"><input type="password" id="fbToken" placeholder="Page access token" autocomplete="off" style="flex:2"></div>
-      <div class="row"><button class="pri" id="bFbConnect">Lưu &amp; kết nối</button><button id="bFbStop">Ngắt</button><button id="bFbForget">Xóa token</button></div>
-      <div class="mut" id="fbStatus">Chưa kết nối</div>
-    </div>
-    <div class="row"><label>TikFinity WebSocket <span class="mut">(dùng khi không kết nối trực tiếp)</span></label><input type="text" id="tikUrl"></div>
     <div class="row"><label>Model Claude</label><select id="aiModel"><option value="claude-haiku-5-5">Haiku 5.5 – rẻ nhất (~$0.02–0.06/giờ)</option><option value="claude-sonnet-5-5">Sonnet 5.5 (~$0.4–1.2/giờ)</option><option value="claude-opus-5-5">Opus 5.5 (~$0.7–2.3/giờ)</option></select></div>
     <div class="row"><label><input type="checkbox" id="aiOn"> Tự bật Claude MC khi mở game</label></div>
     <div class="row"><label>Nhịp Claude (giây)</label><input type="number" id="aiEvery" min="8" max="120"><label>Tối đa lượt/giờ</label><input type="number" id="aiMax" min="10" max="1000"></div>
@@ -157,8 +195,7 @@ code{background:rgba(0,0,0,.35);padding:2px 6px;border-radius:6px;font-size:12px
     <div class="row"><label><input type="checkbox" id="botsOn"> Khách quen 🏠, tối thiểu</label><input type="number" id="botMin" min="0" max="50"><label>khách</label></div>
     <div class="row"><label><input type="checkbox" id="mcVoice"> 🔊 Cậu Cả nói thành tiếng, không để quán im quá</label><input type="number" id="mcGap" min="20" max="180"><label>giây</label><button id="bVoiceTest">Thử giọng</button></div>
     <div class="row"><label><input type="checkbox" id="jokeOn"> 🎭 Cậu Cả kể chuyện cười độc thoại mỗi</label><input type="number" id="jokeEvery" min="2" max="30"><label>phút (khi sân khấu rảnh)</label></div>
-    <div class="row"><label>Giọng Cậu Cả</label><select id="voiceEngine"><option value="auto">Tự động (VieNeu nếu đã cài, không thì giọng Mac)</option><option value="vieneu">VieNeu-TTS</option><option value="mac">Giọng Linh của Mac</option></select><select id="vieneuVoice"><option value="Trúc Ly">Trúc Ly</option></select></div>
-    <p class="mut" id="vnHint" style="margin:2px 0 8px"></p>
+    <p class="mut" style="margin:2px 0 8px">🎙️ Chọn giọng đọc, tốc độ, nghe thử ở thẻ <b>Giọng MC</b>.</p>
     <div class="row"><label><input type="checkbox" id="circusAuto"> Xiếc đường phố tự ghé mỗi</label><input type="number" id="circusEvery" min="2" max="60"><label>phút</label></div>
     <div class="row"><label><input type="checkbox" id="bgmYt"> 📻 Nhạc nền remix từ YouTube (dùng YouTube key)</label></div>
     <div class="row"><label>Từ khoá nhạc nền</label><input type="text" id="bgmQuery" placeholder="nhạc remix vinahouse"><label>Âm lượng</label><input type="number" id="bgmVol" min="0" max="100"></div>
@@ -175,7 +212,7 @@ const $ = s => document.querySelector(s);
 const toast = (m, ms = 2800) => { const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', ms); };
 async function post(p, b = {}) { const r = await fetch(p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }
 async function cmd(c, okMsg) { try { const r = await post('/api/cmd', c); toast(r.delivered ? (okMsg || 'Đã gửi tới game') : '⚠️ Chưa thấy cửa sổ game – bấm “Mở cửa sổ game” trước'); } catch (e) { toast('❌ ' + e.message); } }
-const set = (id, cls, txt) => { $('#d' + id).className = 'dot ' + cls; $('#s' + id).textContent = txt; };
+const set = (id, cls, txt) => { const d = $('#d' + id), s = $('#s' + id); if (d) d.className = 'dot ' + cls; if (s) s.textContent = txt; };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let loaded = false, G_vnVoice = 'Trúc Ly';
 async function refresh() {
@@ -210,12 +247,11 @@ async function refresh() {
   $('#obsStatus').textContent = (ob.connected ? '✅ Đã kết nối OBS' : '⚪ Chưa kết nối OBS') + ' · Bộ chuyển tiếp: ' + ({ off: 'tắt', listening: 'đang chờ OBS phát', streaming: 'đang phát ' + (rl.time || ''), error: '⚠️ ' + rl.error }[rl.state] || rl.state) + (tgt ? ' · ' + tgt : '');
   const ls = ob.lastSync;
   $('#obsSyncList').innerHTML = ls ? (ls.done || []).map(x => `<li>✅ ${esc(x)}</li>`).join('') + (ls.warnings || []).filter(Boolean).map(x => `<li>⚠️ ${esc(x)}</li>`).join('') : '';
+  renderQuick(s);
   const lv = s.live || {};
   set('Live', lv.ok ? 'ok' : 'bad', lv.ok ? '🔴 đang live · Claude MC được phép gọi' : `⏸ ${lv.reason || 'chưa live'} · Claude tạm nghỉ`);
   const v = s.voice || {}, vnS = v.vieneu || {};
   const vl = vnS.voices || [];
-  if (vl.length && $('#vieneuVoice').options.length !== vl.length) { $('#vieneuVoice').innerHTML = vl.map(x => `<option value="${esc(x.id)}">${esc(x.id)}${x.desc ? ' – ' + esc(x.desc) : ''}</option>`).join(''); $('#vieneuVoice').value = G_vnVoice; }
-  $('#vnHint').textContent = !vnS.installed ? 'Chưa cài VieNeu: nhấp đúp file cai-giong-vieneu.command trong thư mục quan-nhau-cau-ca (một lần), rồi mở lại app.' : vnS.state === 'ready' ? `VieNeu đang chạy · ${vl.length} giọng` : vnS.state === 'starting' ? 'VieNeu đang khởi động…' : vnS.err ? '⚠️ ' + vnS.err : '';
   if (!v.on) set('Voice', 'warn', 'đang tắt – bật ở phần Cấu hình');
   else if (vnS.state === 'ready' && v.engine !== 'mac') set('Voice', 'ok', `VieNeu · ${vnS.voice || 'mặc định'}` + (s.game && s.game.mc ? ` · im lặng ${s.game.mc.quiet}s` : ''));
   else if (vnS.state === 'starting' && v.engine !== 'mac') set('Voice', 'warn', 'VieNeu đang khởi động…');
@@ -253,7 +289,6 @@ async function refresh() {
     for (const k of ['aiModel', 'aiEvery', 'aiMax', 'ytKey', 'kMin', 'kPrio', 'botMin', 'mgEvery', 'autoLuckyMin', 'bgmQuery', 'bgmVol', 'circusEvery']) $('#' + k).value = c[k] ?? '';
     for (const k of ['aiOn', 'botsOn', 'mgAuto', 'autoOn', 'bgmYt']) $('#' + k).checked = !!c[k];
     $('#circusAuto').checked = c.circusAuto !== false; $('#mcVoice').checked = c.mcVoice !== false; $('#mcGap').value = c.mcGap ?? 40; $('#jokeOn').checked = c.jokeOn !== false; $('#jokeEvery').value = c.jokeEvery ?? 4;
-    $('#voiceEngine').value = c.voiceEngine || 'auto'; G_vnVoice = c.vieneuVoice || 'Trúc Ly'; if (![...$('#vieneuVoice').options].some(o => o.value === G_vnVoice)) $('#vieneuVoice').add(new Option(G_vnVoice, G_vnVoice)); $('#vieneuVoice').value = G_vnVoice;
   }
 }
 setInterval(refresh, 2000); refresh();
@@ -311,7 +346,7 @@ $('#bSong').onclick = () => sendText('songText', 'song'); $('#songText').onkeydo
 $('#bTest').onclick = () => sendText('testText', 'chat'); $('#testText').onkeydown = e => e.key === 'Enter' && sendText('testText', 'chat');
 $('#bSaveCfg').onclick = async () => {
   const n = id => Number($('#' + id).value);
-  const game = { aiModel: $('#aiModel').value, aiOn: $('#aiOn').checked, aiEvery: n('aiEvery'), aiMax: n('aiMax'), kMin: n('kMin'), kPrio: n('kPrio'), botsOn: $('#botsOn').checked, botMin: n('botMin'), mgAuto: $('#mgAuto').checked, mgEvery: n('mgEvery'), autoOn: $('#autoOn').checked, autoLuckyMin: n('autoLuckyMin'), bgmYt: $('#bgmYt').checked, bgmQuery: $('#bgmQuery').value.trim(), bgmVol: n('bgmVol'), circusAuto: $('#circusAuto').checked, circusEvery: n('circusEvery'), mcVoice: $('#mcVoice').checked, mcGap: n('mcGap'), jokeOn: $('#jokeOn').checked, jokeEvery: n('jokeEvery'), voiceEngine: $('#voiceEngine').value, vieneuVoice: $('#vieneuVoice').value };
+  const game = { aiModel: $('#aiModel').value, aiOn: $('#aiOn').checked, aiEvery: n('aiEvery'), aiMax: n('aiMax'), kMin: n('kMin'), kPrio: n('kPrio'), botsOn: $('#botsOn').checked, botMin: n('botMin'), mgAuto: $('#mgAuto').checked, mgEvery: n('mgEvery'), autoOn: $('#autoOn').checked, autoLuckyMin: n('autoLuckyMin'), bgmYt: $('#bgmYt').checked, bgmQuery: $('#bgmQuery').value.trim(), bgmVol: n('bgmVol'), circusAuto: $('#circusAuto').checked, circusEvery: n('circusEvery'), mcVoice: $('#mcVoice').checked, mcGap: n('mcGap'), jokeOn: $('#jokeOn').checked, jokeEvery: n('jokeEvery') };
   if ($('#ytKey').value.trim()) game.ytKey = $('#ytKey').value.trim();   // ô trống = giữ key đang có
   try { await post('/api/config', { game, tikfinityUrl: $('#tikUrl').value.trim() }); toast('💾 Đã lưu – game cập nhật ngay'); } catch (e) { toast('❌ ' + e.message); }
 };
@@ -324,6 +359,125 @@ $('#bYtTest').onclick = async () => {
   } catch (e) { $('#ytResult').textContent = '❌ ' + e.message; }
 };
 $('#bYtPlay').onclick = () => { const q = $('#ytQ').value.trim() || 'Diễm xưa'; cmd({ type: 'song', text: q }, `🎤 Đã thêm “${q}” vào hàng chờ karaoke – xem màn hình game`); };
+
+// ===== ⚡ Kết nối & phát =====
+const PF = {
+  tiktok: { ic: '🎵', name: 'TikTok', on: s => s.tiktok.on, acc: s => s.tiktok.saved ? '@' + s.tiktok.saved : (s.tikfinity ? 'qua TikFinity' : ''), st: s => s.tiktok.on ? s.tiktok : { state: s.tikfinity ? 'live' : 'off', error: '' },
+    live: o => `🔴 đang live · ${o.viewers || 0} người xem`, connect: s => post('/api/tiktok/connect', { username: s.tiktok.saved }), off: () => post('/api/tiktok/disconnect') },
+  youtube: { ic: '▶️', name: 'YouTube', on: s => s.youtube.on, acc: s => s.youtube.saved || '', st: s => s.youtube,
+    live: o => `🔴 ${o.title ? '“' + o.title.slice(0, 28) + '”' : 'đang live'} · ${o.viewers || 0} người xem`, need: s => !s.youtube.hasKey && 'ytKey',
+    connect: s => post('/api/youtube/connect', { input: s.youtube.saved }), off: () => post('/api/youtube/disconnect') },
+  facebook: { ic: '📘', name: 'Facebook', on: s => s.facebook.on, acc: s => s.facebook.pageName || s.facebook.saved || (s.facebook.hasToken ? 'Trang của token' : ''), st: s => s.facebook,
+    live: o => `🔴 ${o.pageName || ''} · ${o.viewers || 0} người xem`, need: s => !s.facebook.hasToken && 'fbToken',
+    connect: s => post('/api/facebook/connect', { page: s.facebook.saved || '' }), off: () => post('/api/facebook/disconnect') },
+};
+let lastS = null;
+function pfMsg(o, def) { return { live: def, connecting: 'đang kết nối…', offline: o.error || 'chờ bạn bắt đầu live – app tự nối', error: '⚠️ ' + (o.error || 'lỗi') }[o.state] || 'đã tắt'; }
+function renderQuick(s) {
+  lastS = s; const box = $('#pfs'); if (!box) return;
+  const tiles = Object.entries(PF).map(([k, P]) => {
+    const on = P.on(s), o = P.st(s) || {}, acc = P.acc(s), need = P.need && on && P.need(s);
+    const cls = need ? 'bad' : !on ? '' : o.state === 'live' ? 'ok' : o.state === 'error' ? 'bad' : 'warn';
+    const msg = need === 'ytKey' ? '⚠️ cần YouTube API key để đọc chat' : need === 'fbToken' ? '⚠️ cần Page token của Trang' : on ? pfMsg(o, P.live(o)) : (acc ? 'đang tắt' : 'chưa thêm – dán link kênh vào ô phía trên');
+    const act = need ? `<button data-need="${need}">${need === 'ytKey' ? '🔑 Dán API key' : '🔑 Dán Page token'}</button>` : '';
+    return `<div class="pf ${cls}"><div class="hd"><span class="ic">${P.ic}</span>${P.name}<label class="sw"><input type="checkbox" data-pf="${k}" ${on ? 'checked' : ''}><span></span></label></div><div class="acc">${esc(acc) || '<span class="mut">—</span>'}</div><div class="msg">${esc(msg)}</div><div class="act">${act}</div></div>`;
+  });
+  const ob = s.obs || {}, rl = ob.relay || {}, oc = ob.cfg || {};
+  const obsUsed = ob.connected || oc.hasPassword || ob.lastSync;
+  const tgt = (rl.targets || []).map(t => (t.ok ? '✅' : '❌') + ' ' + t.name).join(' ');
+  const ocls = !obsUsed ? '' : ob.streaming ? (rl.state === 'streaming' ? 'ok' : 'warn') : ob.connected ? 'warn' : 'bad';
+  const omsg = !obsUsed ? 'chưa dùng – cài trong thẻ 🎬 OBS (để phát YouTube/Facebook)' : ob.streaming ? `🔴 đang phát ${ob.timecode ? ob.timecode.slice(0, 8) : ''} ${tgt}` : ob.connected ? 'đã kết nối · chưa phát' : '⚠️ ' + (ob.error || 'chưa kết nối OBS');
+  tiles.push(`<div class="pf ${ocls}"><div class="hd"><span class="ic">🎬</span>OBS phát hình</div><div class="acc">${esc(tgt.replace(/[✅❌] /g, '')) || '<span class="mut">—</span>'}</div><div class="msg">${esc(omsg)}</div><div class="act"><button data-obs="sync">🔗 Khớp lại</button></div></div>`);
+  if (box.dataset.h !== tiles.join('')) { box.innerHTML = tiles.join(''); box.dataset.h = tiles.join(''); }
+}
+$('#pfs').addEventListener('change', async e => {
+  const k = e.target.dataset.pf; if (!k || !lastS) return;
+  const P = PF[k];
+  try {
+    if (e.target.checked) {
+      if (!P.acc(lastS) || (k === 'tiktok' && !lastS.tiktok.saved)) { e.target.checked = false; $('#qInput').focus(); return toast(`Dán link hoặc @tên ${P.name} vào ô phía trên trước`); }
+      await P.connect(lastS); toast(`${P.ic} Đang kết nối ${P.name}…`);
+    } else { await P.off(); toast(`Đã tắt ${P.name}`); }
+  } catch (err) { toast('❌ ' + err.message, 5000); }
+  $('#pfs').dataset.h = ''; refresh();
+});
+$('#pfs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.need) showNeed(b.dataset.need);
+  if (b.dataset.obs) $('#bObsSync').click();
+});
+function showNeed(kind) {
+  const q = $('#qNeed'); q.classList.remove('hidden');
+  q.innerHTML = kind === 'ytKey'
+    ? `<b>🔑 YouTube Data API key</b><div class="mut">console.cloud.google.com → tạo project → bật <b>YouTube Data API v3</b> → Credentials → Create API key (xem docs/huong-dan-live-3-nen-tang.md mục A4).</div><div class="row"><input type="password" id="needVal" placeholder="AIza…" autocomplete="off" style="flex:1"><button class="pri" id="needOk">Lưu &amp; kết nối</button><button id="needX">Đóng</button></div>`
+    : `<b>🔑 Page access token (Facebook)</b><div class="mut">developers.facebook.com → Graph API Explorer → quyền pages_show_list, pages_read_engagement, pages_read_user_content → chọn Trang (xem hướng dẫn mục A5). Token được cất trong Keychain.</div><div class="row"><input type="password" id="needVal" placeholder="EAA…" autocomplete="off" style="flex:1"><button class="pri" id="needOk">Lưu &amp; kết nối</button><button id="needX">Đóng</button></div>`;
+  $('#needVal').focus();
+  $('#needX').onclick = () => q.classList.add('hidden');
+  $('#needOk').onclick = async () => {
+    const v = $('#needVal').value.trim(); if (!v) return;
+    try {
+      if (kind === 'ytKey') await post('/api/youtube/connect', { input: (lastS && lastS.youtube.saved) || '', key: v });
+      else await post('/api/facebook/connect', { page: (lastS && lastS.facebook.saved) || '', token: v });
+      q.classList.add('hidden'); toast('✅ Đã lưu, đang kết nối…'); $('#pfs').dataset.h = ''; refresh();
+    } catch (e) { toast('❌ ' + e.message, 6000); }
+  };
+}
+async function quickAdd(as) {
+  const text = $('#qInput').value.trim(); if (!text) { $('#qInput').focus(); return; }
+  $('#qAsk').classList.add('hidden');
+  try {
+    const r = await post('/api/connect/smart', { text, as });
+    if (r.ask) {
+      $('#qAsk').innerHTML = `<span class="mut" style="align-self:center">“${esc(r.value)}” là kênh của:</span>` + r.ask.map(k => `<button data-as="${k}">${PF[k].ic} ${PF[k].name}</button>`).join('');
+      $('#qAsk').classList.remove('hidden'); return;
+    }
+    if (!r.ok) return toast('❌ ' + r.error, 5000);
+    $('#qInput').value = ''; toast(`${PF[r.platform].ic} Đã thêm ${PF[r.platform].name} – app tự nối khi bạn bắt đầu live`, 5000);
+    if (r.need) showNeed(r.need);
+    $('#pfs').dataset.h = ''; refresh();
+  } catch (e) { toast('❌ ' + e.message, 5000); }
+}
+$('#bQAdd').onclick = () => quickAdd(); $('#qInput').onkeydown = e => e.key === 'Enter' && quickAdd();
+$('#qAsk').onclick = e => { const b = e.target.closest('button'); if (b) quickAdd(b.dataset.as); };
+const stepsHtml = items => items.map(x => `<li>${x.ok === true ? '✅' : x.ok === false ? '⚠️' : '⚪'} <b>${esc(x.name)}</b>: ${esc(x.msg || '')}${x.fix && x.ok === false ? `<span class="fix">→ ${esc(x.fix)}</span>` : ''}</li>`).join('');
+$('#bSessStart').onclick = async () => {
+  const b = $('#bSessStart'); b.disabled = true; b.textContent = '⏳ Đang chuẩn bị…';
+  try { const r = await post('/api/session/start'); $('#qSteps').innerHTML = stepsHtml(r.steps); toast(r.ok ? '▶️ Sẵn sàng! Nhớ bấm phát trực tiếp trên YouTube Studio / Live Producer / LIVE Studio nếu cần' : '⚠️ Còn vài việc cần xử lý – xem danh sách', 7000); }
+  catch (e) { toast('❌ ' + e.message, 5000); }
+  b.disabled = false; b.textContent = '▶️ Bắt đầu buổi live'; refresh();
+};
+$('#bSessStop').onclick = async () => { if (!confirm('Dừng phát hình qua OBS? (comment vẫn nhận nếu bạn còn live bằng LIVE Studio)')) return; try { const r = await post('/api/session/stop'); $('#qSteps').innerHTML = stepsHtml(r.steps.length ? r.steps : [{ name: 'OBS', ok: null, msg: 'không có gì để dừng' }]); } catch (e) { toast('❌ ' + e.message); } refresh(); };
+$('#bCheck').onclick = async () => { $('#qSteps').innerHTML = '<li>⏳ Đang kiểm tra…</li>'; try { const r = await post('/api/check'); $('#qSteps').innerHTML = stepsHtml(r.items); } catch (e) { toast('❌ ' + e.message); } };
+
+// ===== 🎙️ Giọng MC =====
+const VF = { g: '', r: '', e: '' }; let VL = null, vRateT = 0;
+const vOn = (id, v) => $('#' + id).querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+[['vfG', 'g'], ['vfR', 'r'], ['vfE', 'e']].forEach(([id, k]) => { vOn(id, ''); $('#' + id).onclick = e => { const b = e.target.closest('button'); if (!b) return; VF[k] = b.dataset.v; vOn(id, VF[k]); renderVoices(); }; });
+async function loadVoices() { try { VL = await post('/api/voices'); renderVoices(); } catch { } }
+function renderVoices() {
+  if (!VL) return;
+  const cur = VL.current || {}, vn = VL.vieneu || {};
+  $('#vCur').innerHTML = `Đang dùng: <b>${esc(cur.id || '—')}</b> <span class="mut">(${cur.engine === 'mac' ? 'giọng Mac' : 'VieNeu'}${cur.ready ? '' : ' · chưa sẵn sàng'})</span>`;
+  if (document.activeElement !== $('#vRate')) { $('#vRate').value = VL.rate || 1; $('#vRateV').textContent = Number(VL.rate || 1).toFixed(2) + '×'; }
+  $('#vnHint').textContent = !vn.installed ? '⚠️ Chưa cài VieNeu (giọng tự nhiên): nhấp đúp file cai-giong-vieneu.command trong thư mục quan-nhau-cau-ca một lần, rồi mở lại app. Trong lúc chờ, dùng giọng Mac.' : vn.state === 'ready' ? `VieNeu đang chạy · ${vn.voices.length} giọng · bấm ▶ để nghe thử, “Dùng” để đổi ngay` : vn.state === 'starting' ? '⏳ VieNeu đang khởi động – nghe thử được sau ít phút' : vn.err ? '⚠️ ' + vn.err : '';
+  const all = [...(vn.voices || []), ...((VL.mac || {}).voices || [])].filter(v => (!VF.g || v.gender === VF.g) && (!VF.r || v.region === VF.r) && (!VF.e || v.engine === VF.e));
+  all.sort((a, b) => (a.engine === b.engine ? 0 : a.engine === 'vieneu' ? -1 : 1) || ((a.featured || 99) - (b.featured || 99)));
+  $('#vList').innerHTML = all.map(v => {
+    const isCur = v.engine === cur.engine && v.id === cur.id;
+    const tags = [v.gender === 'nữ' ? '👩 Nữ' : v.gender === 'nam' ? '👨 Nam' : '', v.region ? 'giọng ' + v.region : '', v.style, v.engine === 'mac' ? 'Mac' : 'VieNeu', v.featured && v.featured <= 10 ? '⭐ nên dùng' : ''].filter(Boolean).join(' · ');
+    return `<div class="vc ${isCur ? 'cur' : ''}"><b>${esc(v.id)}</b>${isCur ? ' <span class="mut">✓ đang dùng</span>' : ''}<div class="tg">${esc(tags)}</div><div class="act"><button data-pv="${esc(v.engine)}|${esc(v.id)}">▶ Nghe</button>${isCur ? '' : `<button class="pri" data-use="${esc(v.engine)}|${esc(v.id)}">Dùng</button>`}</div></div>`;
+  }).join('') || '<p class="mut">Không có giọng nào khớp bộ lọc.</p>';
+}
+$('#vList').onclick = async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const [engine, id] = (b.dataset.pv || b.dataset.use).split('|');
+  try {
+    if (b.dataset.pv) { const r = await post('/api/voice/preview', { engine, id, text: $('#vText').value.trim() }); toast(r.ok ? '🔊 Đang đọc thử: ' + id : '⚠️ ' + r.error, 5000); }
+    else { await post('/api/voice/set', { engine, id }); toast('🎙️ Đã đổi giọng MC: ' + id); await post('/api/voice/preview', { engine, id, text: 'Cậu Cả đổi giọng rồi nè! Cả nhà nghe có hay không?' }); loadVoices(); }
+  } catch (err) { toast('❌ ' + err.message, 5000); }
+};
+$('#vRate').oninput = () => { $('#vRateV').textContent = Number($('#vRate').value).toFixed(2) + '×'; clearTimeout(vRateT); vRateT = setTimeout(async () => { try { await post('/api/voice/set', { rate: Number($('#vRate').value) }); toast('Tốc độ đọc: ' + Number($('#vRate').value).toFixed(2) + '×'); } catch (e) { toast('❌ ' + e.message); } }, 600); };
+loadVoices(); setInterval(loadVoices, 8000);
 </script>
 </body>
 </html>
