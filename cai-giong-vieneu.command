@@ -31,13 +31,9 @@ echo "📦 Cài thư viện VieNeu (vài phút)…"
 "$DIR/venv/bin/python" -m pip install "vieneu==3.8.3" || { echo "❌ Cài VieNeu thất bại."; pause_exit 1; }
 
 echo "⬇️  Tải mô hình giọng (lần đầu, có thể mất vài phút)…"
-HF_HOME="$DIR/hf" "$DIR/venv/bin/python" - <<'PY' || { echo "❌ Tải mô hình thất bại – kiểm tra mạng rồi chạy lại."; pause_exit 1; }
-from vieneu import Vieneu
-tts = Vieneu(mode="v3turbo", backend="onnx")
-for _ in tts.infer_stream("Xin chào cả nhà, Cậu Cả đây!", apply_watermark=False):
-    pass
-print("OK")
-PY
+# bộ nhớ đệm cũ (dạng symlink) làm ONNX Runtime báo "External data path escapes model directory" → xoá, tải lại vào thư mục thường
+rm -rf "$DIR/hf/hub"
+HF_HOME="$DIR/hf" CAUCA_VIENEU_MODELS="$DIR/models" "$DIR/venv/bin/python" app/vieneu_run.py --warmup || { echo "❌ Tải hoặc chạy thử mô hình thất bại – xem lỗi phía trên (mất mạng thì chạy lại)."; pause_exit 1; }
 
 echo
 echo "✅ Xong! Tắt app (Ctrl+C) rồi mở lại Cau Ca Live.app – Cậu Cả sẽ nói bằng giọng VieNeu."
