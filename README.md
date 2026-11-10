@@ -308,4 +308,11 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
   - **OBS + bộ chuyển tiếp**: luồng hình chỉ đi từ OBS về app trên máy, rồi từ app lên YouTube/Facebook/TikTok bằng khóa luồng của bạn.
   - **Kết nối thẳng TikTok**: app dùng thư viện mã nguồn mở `tiktok-live-connector` để đọc phiên live công khai, không đăng nhập TikTok. Thư viện gửi **tên tài khoản** của bạn tới dịch vụ Euler Stream để ký kết nối. Đây là cách đọc không chính thức, TikTok có thể thay đổi bất cứ lúc nào; khi đó hãy dùng TikFinity.
 - Khách quen 🏠 là nhân vật máy, được đánh dấu rõ, và không tạo tim, quà hay thứ hạng giả.
+- **Lọc từ tục tĩu, xúc phạm** (`app/locfilter.cjs`). Bộ lọc nhận cả chữ có dấu, không dấu, viết tắt, chèn dấu chấm (`đm`, `d.m`, `vcl`…) và một số từ tiếng Anh, nhưng không bắt nhầm "lon bia", "đeo kính".
+  - Comment có từ xấu: chữ trên màn hình bị che thành `***`, app không đọc thành tiếng và không gửi Claude.
+  - Tên người xem có từ xấu được đổi thành "Khách 123".
+  - Câu Claude trả lời mà có từ xấu thì bị bỏ.
+  - App kiểm tra lại một lần nữa ngay trước khi đọc thành tiếng.
+  - Muốn thêm từ thì sửa `app/locfilter.cjs`, chép phần đó sang `index.html`, rồi chạy `npm run check:filter` để kiểm tra hai bản đã khớp.
+- **Không xin quà lặp lại.** Lời dẫn soạn sẵn chỉ nhắc chuyện quà nhiều nhất một lần mỗi 20 phút, giọng nhẹ nhàng, nói rõ không bắt buộc. Lời mời xem xiếc và karaoke chỉ kêu gọi thả tim. Khách quen 🏠 không xin quà. Claude được dặn không xin, không giục và không ép tặng quà. Lý do: TikTok không cho kiếm tiền với nội dung xin quà lặp đi lặp lại.
 - Đồ ăn, bia trong quán là **ảo**. Cậu Cả do AI dẫn được dặn không cổ vũ uống rượu bia thật và luôn nói thật mình là MC ảo khi được hỏi.

@@ -17,6 +17,8 @@ import { YouTubeSource, parseYouTubeInput } from './youtube.mjs';
 import { FacebookSource, parsePage } from './facebook.mjs';
 import { ObsClient } from './obs.mjs';
 import { Relay } from './relay.mjs';
+import { createRequire } from 'node:module';
+const { badFilter } = createRequire(import.meta.url)('./locfilter.cjs');   // lọc từ tục (dùng chung với game)
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG_PATH = path.join(ROOT, 'config.json');
@@ -200,6 +202,7 @@ function speak(text, opt = {}) {
   if (!useVn && !viVoice) return { ok: false, error: vn.state === 'starting' ? 'Giọng VieNeu đang khởi động' : voiceChecked ? 'Chưa có giọng: chạy cai-giong-vieneu.command (khuyên dùng) hoặc cài giọng Linh của Mac' : 'Đang kiểm tra giọng đọc' };
   const t = String(text || '').replace(/\[(cười|thở dài|hắng giọng)\]/g, '\u0001$1\u0002').replace(/[@#*_`<>\[\]{}|\\]/g, ' ').replace(/\u0001/g, '[').replace(/\u0002/g, ']').replace(/\s+/g, ' ').trim().slice(0, 220);
   if (!t) return { ok: false, error: 'Không có nội dung' };
+  if (badFilter(t).bad) { console.log('🚫 Bỏ câu có từ không phù hợp, không đọc: ' + badFilter(t).text); return { ok: false, error: 'Câu có từ không phù hợp – không đọc' }; }
   if (opt.preview) sayQ.length = 0;   // nghe thử: bỏ các câu đang chờ để nghe ngay
   if (sayQ.length >= 4) sayQ.shift();   // đừng dồn quá: bỏ câu cũ nhất (đủ chỗ cho một câu chuyện nhiều câu)
   sayQ.push({ t, engine: opt.engine || '', voice: opt.voice || '' }); sayNext();
