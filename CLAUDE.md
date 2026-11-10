@@ -49,6 +49,6 @@ Game 3D tương tác cho live **TikTok**, đọc thêm comment **YouTube Live** 
 Đã gộp vào `main`: nhân vật chibi + mặt biểu cảm + toon shading, YouTube/Facebook Live, kết nối thông minh, danh sách giọng MC, bộ lọc từ tục, nhạc nền từ link YouTube hoặc thư mục trên máy, máy quay xoay 360° định kỳ, hiệu ứng sân khấu karaoke, OBS + bộ chuyển tiếp 3 nền tảng, `cai-obs.command`.
 
 Việc còn mở (xem `docs/nghien-cuu-nang-cap-chibi.md` mục D):
-- Thu gọn bảng quà thành nút.
+- Hạng mục 5 còn phần thống nhất giao diện (bo góc, viền dày, chữ tròn). Bảng quà đã thu thành nút (`peekMenu`).
 - Chạy A/B 2 tuần.
 - Chạy thử `cai-obs.command` trên Mac thật. Chưa chạy lần nào vì môi trường cloud không phải macOS.

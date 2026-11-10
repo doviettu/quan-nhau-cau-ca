@@ -101,7 +101,10 @@ body.mgOn #bgmBox{display:none}
 .menuHead small{font-weight:700;font-size:10px;color:var(--yel2);display:block}
 .menuHead .chev{transition:transform .2s}
 #menuPanel.collapsed .chev{transform:rotate(-90deg)}
-#menuPanel.collapsed #menuList,#menuPanel.collapsed .hint{display:none}
+#menuPanel.collapsed #menuList,#menuPanel.collapsed .hint,#menuPanel.collapsed .menuHead small{display:none}
+/* thu gọn = một nút nhỏ, không che Cậu Cả và sân khấu */
+#menuPanel.collapsed{width:auto;border-radius:999px}
+#menuPanel.collapsed .menuHead{padding:7px 12px}
 #menuList{padding:3px 4px}
 .mrow{display:flex;align-items:center;justify-content:space-between;gap:4px;font-size:11.5px;padding:3px 6px;border-radius:8px;line-height:1.25}
 .mrow:nth-child(odd){background:rgba(255,255,255,.05)}
@@ -254,7 +257,7 @@ kbd{background:rgba(255,255,255,.15);border-radius:5px;padding:0 5px;font-size:1
     <div id="kqPanel" class="hidden"><div class="kqHead">🎤 KARAOKE</div><div id="kqList"></div></div>
   </div>
 
-  <div id="menuPanel" class="pe">
+  <div id="menuPanel" class="pe collapsed">
     <div class="menuHead" id="menuHead"><div>🎁 QUÀ → GỌI MÓN<small>Tặng x2 = món lớn</small></div><span class="chev">▾</span></div>
     <div id="menuList"></div>
     <div class="hint">💬 Comment là <b>vào quán</b> · <b>"bàn 7"</b> chọn bàn · <b>"bàn riêng"</b> · <b>"ghép Tên"</b> ngồi với bạn · <b>"dzô"</b> · <b>"hát + tên bài"</b> + 🎁 karaoke · <b>"xin lên mic"</b> · 🎯 <b>"đố vui"</b> · ❤ đẩy không khí<span id="platNote"></span></div>
@@ -2853,10 +2856,17 @@ const menuRows = {};
   });
   const sel = $('#simGift');
   SAMPLE_GIFTS.forEach(s => { const o = document.createElement('option'); o.value = s.name + '|' + s.d; o.textContent = `${giftVi(s.name)} (${s.d} xu) → ${mapGift(s.name, s.d).dish}`; sel.appendChild(o); });
-  $('#menuHead').addEventListener('click', () => $('#menuPanel').classList.toggle('collapsed'));
-  if (innerHeight < 520) $('#menuPanel').classList.add('collapsed');
+  // bấm mở tay thì giữ mở; bấm lại thì thu về nút
+  $('#menuHead').addEventListener('click', () => { menuPinned = !$('#menuPanel').classList.toggle('collapsed'); clearTimeout(menuT); });
 })();
-function flashMenu(id) { const r = menuRows[id]; if (!r) return; r.classList.remove('hit'); void r.offsetWidth; r.classList.add('hit'); }
+// bảng quà mặc định thu thành nút; có quà/gọi món thì mở ra vài giây cho người xem thấy món của mình
+let menuPinned = false, menuT = 0;
+function peekMenu(ms = 8000) {
+  if (menuPinned) return;
+  $('#menuPanel').classList.remove('collapsed'); clearTimeout(menuT);
+  menuT = setTimeout(() => { if (!menuPinned) $('#menuPanel').classList.add('collapsed'); }, ms);
+}
+function flashMenu(id) { const r = menuRows[id]; if (!r) return; peekMenu(); r.classList.remove('hit'); void r.offsetWidth; r.classList.add('hit'); }
 function feed(html, cls = '') {
   const f = $('#feed'); const d = document.createElement('div'); d.className = 'fi ' + cls; d.innerHTML = html; f.appendChild(d);
   const max = innerWidth < 600 ? 5 : innerHeight < 700 ? 5 : 7;
