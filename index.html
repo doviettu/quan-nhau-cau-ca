@@ -109,6 +109,7 @@ body.mgOn #bgmBox{display:none}
 .mrow .d{font-weight:800;white-space:nowrap;text-align:right}
 .mrow.hit{animation:hit 1.3s ease}
 @keyframes hit{0%,60%{background:rgba(255,201,60,.55);transform:scale(1.04)}100%{background:transparent}}
+.pf{display:inline-block;font-size:9px;font-weight:900;line-height:1;padding:2px 4px 1px;border-radius:4px;margin-right:4px;vertical-align:1px;color:#fff}.pf.yt{background:#ff0033}.pf.fb{background:#1877f2}
 .hint{font-size:10.5px;padding:5px 9px 7px;color:var(--yel2);border-top:1px dashed var(--line);line-height:1.35}
 .hint b{color:#fff}
 
@@ -256,7 +257,7 @@ kbd{background:rgba(255,255,255,.15);border-radius:5px;padding:0 5px;font-size:1
   <div id="menuPanel" class="pe">
     <div class="menuHead" id="menuHead"><div>🎁 QUÀ → GỌI MÓN<small>Tặng x2 = món lớn</small></div><span class="chev">▾</span></div>
     <div id="menuList"></div>
-    <div class="hint">💬 Comment là <b>vào quán</b> · <b>"bàn 7"</b> chọn bàn · <b>"bàn riêng"</b> · <b>"ghép Tên"</b> ngồi với bạn · <b>"dzô"</b> · <b>"hát + tên bài"</b> + 🎁 karaoke · <b>"xin lên mic"</b> · 🎯 <b>"đố vui"</b> · ❤ đẩy không khí</div>
+    <div class="hint">💬 Comment là <b>vào quán</b> · <b>"bàn 7"</b> chọn bàn · <b>"bàn riêng"</b> · <b>"ghép Tên"</b> ngồi với bạn · <b>"dzô"</b> · <b>"hát + tên bài"</b> + 🎁 karaoke · <b>"xin lên mic"</b> · 🎯 <b>"đố vui"</b> · ❤ đẩy không khí<span id="platNote"></span></div>
   </div>
 
   <div id="banner"></div>
@@ -2393,7 +2394,7 @@ function onChat(uid, name, text) {
   const tb = g.seat && g.seat.table;
   if (tb) { tb.chat.push({ name: g.name, text: msg }); if (tb.chat.length > 14) tb.chat.shift(); refreshCard(tb); }
   if (selActor === g) showActorCard(g);
-  feed(`${tb ? `<span class="tb">B${tb.n}</span>` : ''}<b>${esc(name)}</b>: ${esc(msg)}`);
+  feed(`${tb ? `<span class="tb">B${tb.n}</span>` : ''}${pfTag(uid)}<b>${esc(name)}</b>: ${esc(msg)}`);
   if (isNew) Snd.ding(); else Snd.pop();
   g.say(trunc(text, 80), 7, true); g.chatHold = now() + 1800;   // hiện lời chat trước, phản hồi lệnh sau
   speak(`${name} nói: ${text}`);
@@ -2438,11 +2439,13 @@ function onLike(uid, name, n) {
   }, i * 90);
   const t = now(); if (t - g.lastLikeFeed > 6000) { g.lastLikeFeed = t; feed(`❤️ <b>${esc(name)}</b> thả ${n} tim`); }
   if (!g.npc && !isBotUid(uid)) scriptLike(name, n);
-  if (G.totalLikes >= G.nextLikeMs) {
-    G.nextLikeMs = (Math.floor(G.totalLikes / G.likeStep) + 1) * G.likeStep;
-    const k = Math.floor(G.totalLikes / G.likeStep) * G.likeStep;
-    massToast(`❤️ Đủ ${k} tim! Cả quán dzô!`); setTimeout(() => ownerSay(pickLine('likeMilestone', { k }), true), 3500);
-  }
+  likeMilestone();
+}
+function likeMilestone() {
+  if (G.totalLikes < G.nextLikeMs) return;
+  G.nextLikeMs = (Math.floor(G.totalLikes / G.likeStep) + 1) * G.likeStep;
+  const k = Math.floor(G.totalLikes / G.likeStep) * G.likeStep;
+  massToast(`❤️ Đủ ${k} tim! Cả quán dzô!`); setTimeout(() => ownerSay(pickLine('likeMilestone', { k }), true), 3500);
 }
 function onGift(uid, name, giftName, count, diamonds) {
   count = clamp(Number(count) || 1, 1, 999); diamonds = Math.max(1, Number(diamonds) || 1);
@@ -2452,7 +2455,7 @@ function onGift(uid, name, giftName, count, diamonds) {
   g.points += total * 10; g.giftsN += count; addVibe(6 + total * 1.5);
   songGift(g, total); MG.score(g, total * 2); Circus.tip(g, total);
   G.revenue += item.price * (big ? 2 : 1) * (count > 2 ? Math.ceil(count / 2) : 1);
-  feed(`🎁 <b>${esc(name)}</b> tặng ${esc(giftVi(giftName))} x${count} → <b>${item.dish}${big ? ' (món lớn)' : ''}</b>`, 'gift');
+  feed(`🎁 ${pfTag(uid)}<b>${esc(name)}</b> tặng ${esc(giftVi(giftName))} x${count} → <b>${item.dish}${big ? ' (món lớn)' : ''}</b>`, 'gift');
   flashMenu(item.id);
   Snd.sparkle(); Snd.coin();
   g.say(pick([`Cho bàn em ${item.dish} nha!`, `${item.dish} đâu ra đây!`, `Gọi ${item.dish}! Dzô!`]), 3.5);
@@ -2474,7 +2477,7 @@ function onFollow(uid, name) {
   const g = ensureGuest(uid, name); if (!g) return;
   if (!g.fan) { g.fan = true; g.refreshLabel(); }
   g.points += 20; addVibe(8);
-  feed(`⭐ <b>${esc(name)}</b> đã theo dõi quán`, 'sys'); Snd.sparkle();
+  feed(`⭐ ${pfTag(uid)}<b>${esc(name)}</b> ${PLATFORM.get(String(uid)) === 'youtube' ? 'vừa thành hội viên kênh' : 'đã theo dõi quán'}`, 'sys'); Snd.sparkle();
   ownerSay(pickLine('follow', { n: trunc(name, 14) }), true);
 }
 function onShare(uid, name) {
@@ -2484,6 +2487,19 @@ function onShare(uid, name) {
   ownerSay(pickLine('share', { n: trunc(name, 14) }), true);
 }
 const isBotUid = uid => /^(npc|demo|sim):/.test(String(uid || ''));
+// người xem đến từ YouTube / Facebook: gắn nhãn nhỏ trước tên trong khung tin
+const PLATFORM = new Map();
+const pfTag = uid => { const p = PLATFORM.get(String(uid)); return p === 'youtube' ? '<span class="pf yt">YT</span>' : p === 'facebook' ? '<span class="pf fb">FB</span>' : ''; };
+function onLikeAnon(n, plat) {
+  n = clamp(Number(n) || 1, 1, 500);
+  G.totalLikes += n; addVibe(Math.min(10, n * 0.6));
+  if (karaoke.cur && karaoke.cur.singing) karaoke.cur.hearts += n;
+  const seatedReal = realGuests().filter(g => g.seat && PLATFORM.get(String(g.uid)) === plat);
+  const src = seatedReal.length ? pick(seatedReal).pos : { x: rand(-9, -3), y: 0, z: rand(-5, 5) };
+  for (let i = 0; i < Math.min(6, Math.ceil(n / 3)); i++) setTimeout(() => { hearts.spawn(src.x + rand(-0.3, 0.3), 1.4, src.z + rand(-0.3, 0.3), { size: rand(0.22, 0.34), life: rand(1.3, 1.9), vy: rand(0.9, 1.5), vx: rand(-0.35, 0.35), vz: rand(-0.2, 0.2), color: plat === 'facebook' ? pick(['#1877f2', '#ff3b6b', '#ffd54f']) : pick(['#ff3b6b', '#ff0033', '#ff6fa1']) }); Snd.heart(); }, i * 90);
+  const t = now(); if (t - (G.lastAnonFeed || 0) > 8000) { G.lastAnonFeed = t; feed(`${plat === 'facebook' ? '<span class="pf fb">FB</span>' : '<span class="pf yt">YT</span>'}❤️ Khán giả ${plat === 'facebook' ? 'Facebook' : 'YouTube'} thả ${n} tim`); }
+  likeMilestone();
+}
 function handle(type, d) {
   if (d && !isBotUid(d.uid)) G.lastRealAt = Date.now();
   try {
@@ -2494,6 +2510,7 @@ function handle(type, d) {
       case 'gift': return onGift(d.uid, d.name, d.gift, d.count, d.diamonds);
       case 'follow': return onFollow(d.uid, d.name);
       case 'share': return onShare(d.uid, d.name);
+      case 'likeAnon': return onLikeAnon(d.count, d.plat);
     }
   } catch (e) { console.warn('event error', e); }
   finally { try { aiNote(type, d); } catch { } }
@@ -2508,7 +2525,7 @@ function connectWS(url) {
   setWsStatus('Đang kết nối…', 'wait');
   try { ws = new WebSocket(url); } catch (e) { wsWant = false; setWsStatus('Địa chỉ không hợp lệ', 'err'); return; }
   const me = ws;
-  ws.onopen = () => { if (me !== ws) return; wsConnected = true; setWsStatus('Đã kết nối Live ✓', 'ok'); feed('📡 Đã kết nối TikTok Live – mời khách vào quán!', 'sys'); if (demoOn) setDemo(false); };
+  ws.onopen = () => { if (me !== ws) return; wsConnected = true; setWsStatus('Đã kết nối Live ✓', 'ok'); feed('📡 Đã kết nối Live – mời khách vào quán!', 'sys'); if (demoOn) setDemo(false); };
   ws.onmessage = onWsMessage;
   ws.onclose = () => {
     if (me !== ws) return; wsConnected = false;
@@ -2521,10 +2538,12 @@ function disconnectWS() { wsWant = false; wsConnected = false; clearTimeout(wsTi
 function onWsMessage(ev) {
   let j; try { j = JSON.parse(ev.data); } catch { return; }
   const type = j.event || j.type || j.eventName; const d = j.data || j;
+  if (type === 'likeAnon') { handle('likeAnon', { count: d.count, plat: d.platform }); return; }   // tim/cảm xúc chung từ YouTube, Facebook (không kèm tên)
   const u = d.user || {};
   const uid = d.uniqueId || u.uniqueId || d.userId || u.userId || d.nickname || u.nickname;
   const name = d.nickname || u.nickname || d.uniqueId || u.uniqueId || 'Khách';
   if (!uid) return;
+  if (d.platform) PLATFORM.set(String(uid), d.platform);
   switch (type) {
     case 'chat': case 'comment': handle('chat', { uid, name, text: d.comment ?? d.text ?? '' }); break;
     case 'gift': {
@@ -3844,6 +3863,7 @@ function syncSettingsUI() {
 }
 function applyAppConfig(c) {
   if (!c) return;
+  if (c.platforms) { const pf = c.platforms, n = []; if (pf.youtube) n.push('<span class="pf yt">YT</span>Super Chat = gọi món theo số tiền'); if (pf.facebook) n.push('<span class="pf fb">FB</span>comment, thả cảm xúc'); $('#platNote').innerHTML = n.length ? ' · ' + n.join(' · ') : ''; }
   const g = c.game || {};
   for (const k of ['aiModel', 'aiEvery', 'aiMax', 'kMin', 'kPrio', 'kMax', 'botsOn', 'botMin', 'mgAuto', 'mgEvery', 'autoOn', 'autoLuckyMin', 'bgmYt', 'bgmQuery', 'bgmVol', 'circusAuto', 'circusEvery', 'mcVoice', 'mcGap', 'jokeOn', 'jokeEvery']) if (g[k] !== undefined) opts[k] = g[k];
   BGM.setVolume(Number(opts.bgmVol ?? 35)); setTimeout(() => BGM.tick(), 50);

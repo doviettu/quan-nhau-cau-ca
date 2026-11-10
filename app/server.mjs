@@ -6,13 +6,15 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { exec, execFile, spawn } from 'node:child_process';
+import { exec, execFile, execFileSync, spawn } from 'node:child_process';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import WebSocket, { WebSocketServer } from 'ws';
 import { createClaudeHandler, claudeReady } from '../bridge/claude-bridge.mjs';
 import { TikTokSource, normalizeUser, validUser } from './tiktok.mjs';
+import { YouTubeSource, parseYouTubeInput } from './youtube.mjs';
+import { FacebookSource, parsePage } from './facebook.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG_PATH = path.join(ROOT, 'config.json');
@@ -20,6 +22,8 @@ const DEFAULTS = {
   port: 8686,
   tikfinityUrl: 'ws://localhost:21213/',
   tiktok: { username: '', on: false },   // kết nối thẳng TikTok LIVE bằng @tên (không cần TikFinity)
+  youtube: { on: false, input: '', key: '', minPoll: 8 },   // chat YouTube Live qua YouTube Data API (key riêng hoặc dùng chung key karaoke)
+  facebook: { on: false, page: '' },   // comment Facebook Live qua Graph API; Page token lưu trong Keychain
   notify: { on: true, topic: '', server: 'https://ntfy.sh', idleMin: 10 },   // báo về điện thoại qua app ntfy
   game: { aiOn: true, aiModel: 'claude-haiku-5-5', aiEvery: 20, aiMax: 180, ytKey: '', kMin: 50, kPrio: 180, kMax: 5, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, autoOn: true, autoLuckyMin: 8, bgmYt: false, bgmQuery: '', bgmVol: 35, circusAuto: true, circusEvery: 6, mcVoice: true, mcGap: 40, jokeOn: true, jokeEvery: 4, voiceEngine: 'auto', vieneuVoice: 'Trúc Ly' },
 };
@@ -39,8 +43,9 @@ if (!fs.existsSync(CONFIG_PATH)) saveConfig();
 const PORT = Number(process.env.PORT || config.port || 8686);
 const BASE = `http://127.0.0.1:${PORT}`;
 const LIVE_WS = `ws://127.0.0.1:${PORT}/live-events`;
-// nguồn sự kiện game dùng: kết nối thẳng TikTok (qua app) hoặc TikFinity
-const eventsUrl = () => config.tiktok.on ? LIVE_WS : config.tikfinityUrl;
+// nguồn sự kiện game dùng: qua app (TikTok trực tiếp, YouTube, Facebook; TikFinity được app chuyển tiếp) hoặc thẳng TikFinity
+const appSources = () => config.tiktok.on || config.youtube.on || config.facebook.on;
+const eventsUrl = () => appSources() ? LIVE_WS : config.tikfinityUrl;
 const gameUrl = () => `${BASE}/?obs=1&auto=1&clean=1&preset=live&ws=${encodeURIComponent(eventsUrl())}`;
 const claude = createClaudeHandler({ maxPerHour: Math.max(60, Number(config.game.aiMax) || 180) + 60 });
 
@@ -173,7 +178,29 @@ async function body(req) { let raw = ''; for await (const c of req) { raw += c; 
 function sendFile(res, file, type) {
   fs.readFile(file, (err, data) => { if (err) return json(res, 404, { error: 'Không thấy ' + path.basename(file) }); res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' }); res.end(data); });
 }
-const publicConfig = () => ({ game: config.game, claudeReady: claudeReady(), tikfinityUrl: eventsUrl(), live: { ok: live.ok, reason: live.reason } });
+const publicConfig = () => ({ game: config.game, claudeReady: claudeReady(), tikfinityUrl: eventsUrl(), live: { ok: live.ok, reason: live.reason },
+  platforms: { tiktok: config.tiktok.on || !appSources(), youtube: !!config.youtube.on, facebook: !!config.facebook.on } });
+
+// ---- khóa bí mật (Page token Facebook): Keychain trên Mac, tệp riêng quyền 600 ở máy khác ----
+const SECRET_FILE = path.join(ROOT, '.secrets.json');
+const secretCache = new Map();
+function secretGet(name) {
+  if (secretCache.has(name)) return secretCache.get(name);
+  let v = '';
+  if (process.platform === 'darwin') { try { v = String(execFileSync('security', ['find-generic-password', '-s', 'CauCaLive-' + name, '-w'], { stdio: ['ignore', 'pipe', 'ignore'] })).trim(); } catch { } }
+  else { try { v = JSON.parse(fs.readFileSync(SECRET_FILE, 'utf8'))[name] || ''; } catch { } }
+  secretCache.set(name, v); return v;
+}
+function secretSet(name, v) {
+  v = String(v || '').trim(); secretCache.set(name, v);
+  if (process.platform === 'darwin') {
+    try { if (v) execFileSync('security', ['add-generic-password', '-U', '-a', os.userInfo().username, '-s', 'CauCaLive-' + name, '-w', v], { stdio: 'ignore' }); else execFileSync('security', ['delete-generic-password', '-s', 'CauCaLive-' + name], { stdio: 'ignore' }); } catch { }
+    return;
+  }
+  let o = {}; try { o = JSON.parse(fs.readFileSync(SECRET_FILE, 'utf8')); } catch { }
+  if (v) o[name] = v; else delete o[name];
+  fs.writeFileSync(SECRET_FILE, JSON.stringify(o), { mode: 0o600 });
+}
 
 // ---- báo về điện thoại (ntfy) + thông báo trên Mac ----
 async function notify(title, message, priority = 4) {
@@ -193,7 +220,14 @@ async function notify(title, message, priority = 4) {
 const live = { ok: false, reason: 'chưa kết nối phiên live', since: Date.now(), badSince: 0, everOk: false, alerted: false, lastReal: 0 };
 function liveCheck() {
   const t = Date.now(); let ok, reason;
-  if (config.tiktok.on) { ok = tiktok.state === 'live'; reason = ok ? '' : (tiktok.error || (tiktok.state === 'connecting' ? 'đang kết nối lại TikTok' : 'mất kết nối TikTok')); }
+  if (appSources()) {
+    // nhiều nền tảng: chỉ cần một nơi còn đang live là quán còn khách
+    const bad = [];
+    const chk = (on, src, label, relay) => { if (!on) return false; if (src.state === 'live') return true; bad.push(`${label}: ${src.error || (src.state === 'connecting' ? 'đang kết nối' : 'chưa live')}`); return false; };
+    const tt = config.tiktok.on ? chk(true, tiktok, 'TikTok') : (tfRelay.ok || (bad.push('TikTok: TikFinity không chạy'), false));
+    ok = tt | chk(config.youtube.on, youtube, 'YouTube') | chk(config.facebook.on, facebook, 'Facebook');
+    ok = !!ok; reason = ok ? '' : bad.join(' · ');
+  }
   else {
     probeTikfinity();
     const fresh = gameState && t - gameStateAt < 10000;
@@ -225,9 +259,37 @@ setInterval(liveCheck, 5000);
 // ---- TikTok LIVE trực tiếp: phát sự kiện tới game qua ws://127.0.0.1:PORT/live-events ----
 const tiktok = new TikTokSource();
 const liveWss = new WebSocketServer({ noServer: true });
-tiktok.on('event', ev => { live.lastReal = Date.now(); const m = JSON.stringify(ev); for (const c of liveWss.clients) if (c.readyState === 1) c.send(m); });
+const relayEvent = ev => { live.lastReal = Date.now(); const m = JSON.stringify(ev); for (const c of liveWss.clients) if (c.readyState === 1) c.send(m); };
+tiktok.on('event', ev => relayEvent(ev));
 tiktok.on('connected', () => console.log(`📡 Đã kết nối TikTok LIVE @${tiktok.username}`));
-function tiktokApply() { if (config.tiktok.on && config.tiktok.username) tiktok.start(config.tiktok.username); else tiktok.stop(); }
+function tiktokApply() { if (config.tiktok.on && config.tiktok.username) tiktok.start(config.tiktok.username); else tiktok.stop(); tfRelayApply(); }
+// YouTube Live
+const youtube = new YouTubeSource();
+youtube.on('event', ev => relayEvent(ev));
+youtube.on('connected', () => console.log(`📡 Đã kết nối chat YouTube Live: ${youtube.title || youtube.videoId}`));
+const ytKey = () => String(config.youtube.key || config.game.ytKey || '').trim();
+function youtubeApply() { if (config.youtube.on && config.youtube.input) youtube.start(config.youtube.input, { getKey: ytKey, referer: BASE + '/', minPoll: config.youtube.minPoll }); else youtube.stop(); tfRelayApply(); }
+// Facebook Live
+const facebook = new FacebookSource();
+facebook.on('event', ev => relayEvent(ev));
+facebook.on('connected', () => console.log(`📡 Đã kết nối Facebook Live: ${facebook.pageName} – ${facebook.title || facebook.liveId}`));
+function facebookApply() { if (config.facebook.on && secretGet('facebook')) facebook.start(config.facebook.page, { getToken: () => secretGet('facebook') }); else facebook.stop(); tfRelayApply(); }
+// Dùng TikFinity cho TikTok nhưng có thêm YouTube/Facebook: app nhận sự kiện TikFinity rồi chuyển tiếp cho game
+const tfRelay = { ws: null, ok: false, timer: null, want: false };
+function tfRelayApply() {
+  const want = !config.tiktok.on && (config.youtube.on || config.facebook.on);
+  if (want === tfRelay.want) return; tfRelay.want = want;
+  if (want) tfRelayConnect(); else { clearTimeout(tfRelay.timer); try { tfRelay.ws && tfRelay.ws.terminate(); } catch { } tfRelay.ws = null; tfRelay.ok = false; }
+}
+function tfRelayConnect() {
+  if (!tfRelay.want) return;
+  let ws; try { ws = new WebSocket(config.tikfinityUrl); } catch { tfRelay.timer = setTimeout(tfRelayConnect, 5000); return; }
+  tfRelay.ws = ws;
+  ws.on('open', () => { tfRelay.ok = true; });
+  ws.on('message', d => { live.lastReal = Date.now(); const m = String(d); for (const c of liveWss.clients) if (c.readyState === 1) c.send(m); });
+  ws.on('close', () => { tfRelay.ok = false; if (tfRelay.ws === ws && tfRelay.want) tfRelay.timer = setTimeout(tfRelayConnect, 5000); });
+  ws.on('error', () => { });
+}
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, BASE); const p = url.pathname;
@@ -247,7 +309,9 @@ const server = http.createServer(async (req, res) => {
       probeTikfinity();
       return json(res, 200, {
         claudeReady: claudeReady(), claudeCalls: claude.callsLastHour(), tikfinity: tikProbe.ok, tikfinityUrl: config.tikfinityUrl,
-        tiktok: { ...tiktok.status(), on: config.tiktok.on, saved: config.tiktok.username, gameClients: liveWss.clients.size },
+        tiktok: { ...tiktok.status(), on: config.tiktok.on, saved: config.tiktok.username, gameClients: liveWss.clients.size, relay: tfRelay.want ? tfRelay.ok : null },
+        youtube: { ...youtube.status(), on: config.youtube.on, saved: config.youtube.input, minPoll: config.youtube.minPoll, ownKey: !!config.youtube.key, hasKey: !!ytKey() },
+        facebook: { ...facebook.status(), on: config.facebook.on, saved: config.facebook.page, hasToken: !!secretGet('facebook') },
         live: { ok: live.ok, reason: live.reason, since: live.since, lastReal: Math.max(live.lastReal, (gameState && gameState.lastReal) || 0) },
         notify: { on: config.notify.on, topic: config.notify.topic, idleMin: config.notify.idleMin },
         voice: { mac: process.platform === 'darwin', name: viVoice, checked: voiceChecked, on: config.game.mcVoice !== false, engine: config.game.voiceEngine || 'auto',
@@ -302,6 +366,28 @@ const server = http.createServer(async (req, res) => {
       broadcast({ type: 'config', config: publicConfig() });
       return json(res, 200, { ok: true });
     }
+    if (p === '/api/youtube/connect') {
+      const input = String(b.input || '').trim();
+      if (!parseYouTubeInput(input)) throw new Error('Nhập link buổi live, link kênh hoặc @tên kênh YouTube');
+      const yt = { ...config.youtube, input, on: true };
+      if (typeof b.key === 'string' && b.key.trim()) yt.key = b.key.trim();
+      if (Number(b.minPoll) >= 5) yt.minPoll = Math.min(60, Number(b.minPoll));
+      config.youtube = yt; saveConfig(); youtubeApply();
+      broadcast({ type: 'config', config: publicConfig() });
+      return json(res, 200, { ok: true, ws: LIVE_WS });
+    }
+    if (p === '/api/youtube/disconnect') { config.youtube.on = false; saveConfig(); youtubeApply(); broadcast({ type: 'config', config: publicConfig() }); return json(res, 200, { ok: true }); }
+    if (p === '/api/facebook/connect') {
+      const page = String(b.page || '').trim();
+      if (parsePage(page) === null) throw new Error('Tên hoặc ID Trang Facebook không hợp lệ');
+      if (typeof b.token === 'string' && b.token.trim()) { if (!/^[\w-]{30,600}$/.test(b.token.trim())) throw new Error('Page access token không đúng dạng'); secretSet('facebook', b.token); }
+      if (!secretGet('facebook')) throw new Error('Dán Page access token trước khi kết nối');
+      config.facebook = { ...config.facebook, page, on: true }; saveConfig(); facebookApply();
+      broadcast({ type: 'config', config: publicConfig() });
+      return json(res, 200, { ok: true, ws: LIVE_WS });
+    }
+    if (p === '/api/facebook/disconnect') { config.facebook.on = false; saveConfig(); facebookApply(); broadcast({ type: 'config', config: publicConfig() }); return json(res, 200, { ok: true }); }
+    if (p === '/api/facebook/forget') { secretSet('facebook', ''); config.facebook.on = false; saveConfig(); facebookApply(); broadcast({ type: 'config', config: publicConfig() }); return json(res, 200, { ok: true }); }
     if (p === '/api/notify/test') return json(res, 200, await notify('🍻 Cậu Cả Live', 'Thử thông báo: điện thoại đã nhận được báo từ app.', 3));
     if (p === '/api/speak') return json(res, 200, speak(b.text));
     if (p === '/api/window/open') return json(res, 200, openGameWindow());
@@ -325,10 +411,12 @@ server.listen(PORT, '127.0.0.1', () => {
    Địa chỉ game    : ${gameUrl()}
    Claude MC       : ${claudeReady() ? 'sẵn sàng (key trên máy)' : 'chưa có key – Cậu Cả chạy theo kịch bản có sẵn'}
    TikTok LIVE     : ${config.tiktok.on ? '@' + config.tiktok.username + ' (kết nối thẳng)' : 'qua TikFinity – hoặc nhập @tên trong bảng điều khiển'}
+   YouTube Live    : ${config.youtube.on ? config.youtube.input : 'chưa bật'}
+   Facebook Live   : ${config.facebook.on ? (config.facebook.page || 'Trang của token') : 'chưa bật'}
    Dừng app        : nhấn Ctrl+C trong cửa sổ này
 `);
   if (process.platform === 'darwin' && !process.argv.includes('--no-open')) exec(`open "${BASE}/panel"`);
-  tiktokApply();
+  tiktokApply(); youtubeApply(); facebookApply();
 });
-const stop = () => { console.log('\n👋 Đóng quán. Hẹn gặp lại!'); tiktok.stop(); vnStop(); server.close(); process.exit(0); };
+const stop = () => { console.log('\n👋 Đóng quán. Hẹn gặp lại!'); tiktok.stop(); youtube.stop(); facebook.stop(); vnStop(); server.close(); process.exit(0); };
 process.on('SIGINT', stop); process.on('SIGTERM', stop);
