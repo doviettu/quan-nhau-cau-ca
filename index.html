@@ -622,6 +622,7 @@ const SAMPLE_GIFTS = [
 const canvas = $('#c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 let dpr = Math.min(devicePixelRatio || 1, isTouch ? 1.75 : 2);
+const dprMax = dpr;
 renderer.setPixelRatio(dpr);
 renderer.setSize(innerWidth, innerHeight);
 const scene = new THREE.Scene();
@@ -3953,7 +3954,7 @@ $('#presetLive').onclick = () => { Snd.resume(); applyLivePreset(); };
 /* =====================================================================
    VÒNG LẶP
    ===================================================================== */
-const clock = new THREE.Clock(); let T = 0, hudAcc = 0, ledAcc = 0, slowAcc = 0, perfAcc = 0, perfN = 0, perfT = 0, tipAcc = 0, idleAcc = 0;
+const clock = new THREE.Clock(); let T = 0, hudAcc = 0, ledAcc = 0, slowAcc = 0, perfN = 0, perfT0 = performance.now(), perfLow = 0, perfHigh = 0, tipAcc = 0, idleAcc = 0;
 const TIPS = ['💡 Comment <b>"bàn 7"</b> để chọn bàn', '💡 Comment <b>"bàn riêng"</b> để giữ một bàn cho hội bạn', '💡 Comment <b>"ghép Tên"</b> để ngồi chung bàn với bạn', '💡 Comment <b>"mời Tên"</b> để rủ bạn qua bàn mình', '💡 Comment <b>"tên bàn Hội Bia"</b> để đặt tên bàn', '💡 Comment <b>"hát + tên bài"</b> rồi tặng quà từ 50 xu để đăng ký hát 🎤', '💡 Comment <b>"xin lên mic"</b> để hát cho cả phòng nghe 🎙️', '💡 Comment <b>"oẳn tù tì búa"</b> để thách Cậu Cả', '💡 Comment <b>"xí ngầu"</b> – ra 6 cả bàn uống!', '💡 Comment <b>"cụng ly với Tên"</b> để mời bạn 1 ly', '💡 Say quá? Comment <b>"trà đá"</b> cho tỉnh 😅', '💡 Thả ❤️ để đẩy thanh <b>Không khí</b> lên 100%', '💡 Tặng quà để nhân viên <b>bưng món</b> ra bàn bạn', '💡 Comment <b>"xiếc"</b> để mời đoàn xiếc đường phố (múa lân, phun lửa, tung hứng…)', '💡 Đang có xiếc? Thả tim <b>cổ vũ nghệ sĩ</b> nha!'];
 const OWNER_IDLE = ['Anh em cứ tự nhiên nha!', 'Bia lạnh đây, dzô!', 'Comment "bàn riêng" để giữ bàn nè!', 'Muốn ngồi với bạn thì comment "ghép" tên bạn!', 'Comment "hát" lên hát karaoke đi!', 'Oẳn tù tì với Cậu Cả không?', 'Thả tim cho quán đông vui nào!', 'Không say không về!'];
 function drawLED(t) {
@@ -4198,9 +4199,16 @@ function loop() {
   StageFX.update(dt, T); stageFog.update(dt); stageJet.update(dt);
   if (StageFX.camOn()) StageFX.cam(dt); else if (CamTour.on) CamTour.update(dt); else { CamTour.tick(); controls.update(); }
   renderer.render(scene, camera);
-  // tự giảm độ phân giải nếu máy yếu
-  perfT += dt; perfAcc += dt; perfN++;
-  if (perfT > 3) { const fps = perfN / perfAcc; perfT = perfAcc = perfN = 0; if (fps < 38 && dpr > 1) { dpr = Math.max(1, dpr - 0.25); renderer.setPixelRatio(dpr); } }
+  // tự giảm độ phân giải nếu máy yếu; chậm 2 nhịp liền mới giảm, mượt ~30 giây thì tăng lại
+  // (một lần khựng lúc khách vào dồn dập không được làm mờ hình cả buổi live).
+  // Đo bằng giờ thật vì dt bị kẹp 0,05; dưới 10 FPS là cửa sổ bị che/bóp, không phải máy yếu.
+  perfN++; const pNow = performance.now();
+  if (pNow - perfT0 > 3000) {
+    const fps = perfN * 1000 / (pNow - perfT0); perfT0 = pNow; perfN = 0;
+    if (document.hidden || fps < 10) perfLow = perfHigh = 0;
+    else if (fps < 38) { perfHigh = 0; if (++perfLow >= 2 && dpr > 1) { perfLow = 0; dpr = Math.max(1, dpr - 0.25); renderer.setPixelRatio(dpr); } }
+    else { perfLow = 0; if (fps > 55 && dpr < dprMax) { if (++perfHigh >= 10) { perfHigh = 0; dpr = Math.min(dprMax, dpr + 0.25); renderer.setPixelRatio(dpr); } } else perfHigh = 0; }
+  }
 }
 
 /* =====================================================================
