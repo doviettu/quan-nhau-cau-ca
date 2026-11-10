@@ -91,7 +91,7 @@ Nút **"Áp dụng cấu hình Live"** trong ⚙️ của game, hoặc tham số
 - **Claude MC**: Haiku 5.5, nhịp 20 giây, chi phí khoảng $0,02–0,06 mỗi giờ.
 - **Tự động dẫn live**: bốc thăm, dzô, pháo hoa, dọn bàn.
 - **Khách quen 🏠**: giữ quán luôn có ít nhất 20 người. Đây là nhân vật máy của quán, được đánh dấu rõ; họ không thả tim, không tặng quà, không lên bảng xếp hạng và không thắng trò chơi.
-- **Trò chơi nhỏ**: tự mở mỗi 3 phút. Đố vui có hơn 130 câu: địa lý, lịch sử, ẩm thực, câu đố mẹo, thành ngữ, khoa học, tính nhanh. Karaoke chốt bài từ 1 xu.
+- **Trò chơi nhỏ**: tự mở mỗi 3 phút. Đố vui có hơn 130 câu: địa lý, lịch sử, ẩm thực, câu đố mẹo, thành ngữ, khoa học, tính nhanh. Karaoke: tặng quà từ 50 xu để đăng ký hát, từ 180 xu để chen hàng.
 - **Xiếc đường phố**: khoảng 6 phút một lần có một tiết mục (đổi được trong bảng điều khiển).
 
 ## 4. Cậu Cả dẫn live bằng giọng nói
@@ -159,7 +159,7 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 
 ## 5. Karaoke YouTube
 
-- Người xem comment `hát <tên bài>` rồi tặng quà để chốt bài. Quà từ 30 xu được chen hàng.
+- Người xem comment `hát <tên bài>` rồi tặng quà **từ 50 xu** để chốt bài. Quà **từ 180 xu** được chen hàng. Đổi hai mức này trên bảng điều khiển → ⚙️ Cấu hình.
 - **Tự tìm bài**: nhập YouTube Data API key trong bảng điều khiển (hoặc ⚙️ của game – key được lưu lên app). Bấm **🔎 Kiểm tra key** để thử tìm một bài: nếu lỗi, bảng điều khiển nói rõ cách sửa (key sai, chưa bật YouTube Data API v3, key giới hạn trang web, hết hạn mức). Bấm **🎤 Phát thử** để thêm bài vào hàng chờ và nghe thử trong game. Hạn mức miễn phí khoảng 100 lượt tìm mỗi ngày.
 - **Không có key**: dùng 🔎 Tìm và 🔗 Dán link trong ⚙️ của game, hoặc ô **Thêm bài** trên bảng điều khiển.
 - **Lên mic**: người xem comment `xin lên mic`, bạn mời họ làm **Khách mời** trên TikTok. Giọng hát đi thẳng vào phòng live.

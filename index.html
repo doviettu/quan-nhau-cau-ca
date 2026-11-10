@@ -369,7 +369,7 @@ kbd{background:rgba(255,255,255,.15);border-radius:5px;padding:0 5px;font-size:1
   <div class="row"><label class="lbl">Âm lượng mic</label><input type="range" id="micVol" min="0" max="200"></div>
 
   <h4>⚡ Cấu hình nhanh cho Live</h4>
-  <p>Một chạm cho phòng live mới: Claude Haiku 5.5 (rẻ, nhanh), tự động dẫn live, khách quen giữ quán tối thiểu 20 người, trò chơi nhỏ mỗi 3 phút, karaoke chốt bài từ 1 xu.</p>
+  <p>Một chạm cho phòng live mới: Claude Haiku 5.5 (rẻ, nhanh), tự động dẫn live, khách quen giữ quán tối thiểu 20 người, trò chơi nhỏ mỗi 3 phút, karaoke chốt bài từ 50 xu, chen hàng từ 180 xu.</p>
   <div class="btns"><button class="btn pri" id="presetLive">⚡ Áp dụng cấu hình Live (Haiku 5.5)</button></div>
 
   <h4>🏠 Khách quen (người máy) & trò chơi nhỏ</h4>
@@ -1810,7 +1810,12 @@ function songGift(g, total) {
   if (cur && cur.singing && cur.g !== g) cur.giftXu += total;
   const prio = total >= kPrio();
   const p = karaoke.pending.get(g);
-  if (p) { p.paid += total; if (p.paid >= Math.max(1, kMin())) confirmSong(p, p.paid >= kPrio()); return; }
+  if (p) {
+    p.paid += total; p.at = now();   // còn tặng thì còn giữ lượt chờ
+    if (p.paid >= Math.max(1, kMin())) confirmSong(p, p.paid >= kPrio());
+    else { g.say(`Đã góp ${p.paid}/${kMin()} xu cho bài "${trunc(p.title, 18)}" 🎤`, 3.5); refreshKQ(); }
+    return;
+  }
   const q = karaoke.queue.find(it => it.g === g);
   if (q) {
     if (prio && !q.prio) { karaoke.queue.splice(karaoke.queue.indexOf(q), 1); q.prio = true; let i = 0; while (i < karaoke.queue.length && karaoke.queue[i].prio) i++; karaoke.queue.splice(i, 0, q); feed(`⏫ <b>${esc(g.name)}</b> chen hàng karaoke – lên thứ ${i + 1}`, 'gift'); refreshKQ(); }
@@ -2742,7 +2747,7 @@ updateSoundBtn();
 $('#bDzo').onclick = () => { Snd.resume(); runEvent('dzo'); };
 $('#bKara').onclick = () => { Snd.resume(); openSettings(); setTimeout(() => $('#karaSec').scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); };
 // karaoke & mic
-Object.assign(opts, Object.assign({ kMin: 1, kPrio: 30, kMax: 5, kSuffix: true, ytKey: '', ytVol: 100, micMon: false, micVol: 100 }, opts));
+Object.assign(opts, Object.assign({ kMin: 50, kPrio: 180, kMax: 5, kSuffix: true, ytKey: '', ytVol: 100, micMon: false, micVol: 100 }, opts));
 for (const [id, key] of [['ytKey', 'ytKey'], ['kMin', 'kMin'], ['kPrio', 'kPrio'], ['kMax', 'kMax'], ['ytVol', 'ytVol'], ['micVol', 'micVol']]) {
   const el = $('#' + id); el.value = opts[key];
   el.addEventListener('change', () => { opts[key] = el.type === 'text' ? el.value.trim() : Number(el.value); saveOpts(); if (key === 'ytVol') YTK.setVolume(opts.ytVol); if (key === 'micVol') Mic.apply(); if (key === 'ytKey') { appSaveYtKey(); } if (key === 'ytKey') karaoke.queue.forEach(it => { if (it.kind === 'song' && !it.link && it.vstatus !== 'ok') resolveVideo(it); }); refreshKQ(); });
@@ -3549,7 +3554,7 @@ bindToggle('optBots', 'botsOn', on => { if (!on) botList().forEach((b, i) => set
 bindToggle('optMgAuto', 'mgAuto', () => { MG.autoAcc = 0; });
 settings.addEventListener('click', e => { const b = e.target.closest('button[data-mg]'); if (!b) return; if (b.dataset.mg === 'stop') MG.stop('⏹ Chủ quán dừng trò chơi'); else if (!MG.start(b.dataset.mg, 'host')) feed('Đang có trò chơi chạy', 'sys'); closeSettings(); });
 function applyLivePreset() {
-  Object.assign(opts, { aiModel: 'claude-haiku-5-5', aiEvery: 30, aiMax: 90, aiTts: false, mcVoice: true, mcGap: 40, autoOn: true, autoLuckyMin: 8, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, kMin: 1, kPrio: 30, kMax: 5, music: true, sfx: true, nums: true });
+  Object.assign(opts, { aiModel: 'claude-haiku-5-5', aiEvery: 30, aiMax: 90, aiTts: false, mcVoice: true, mcGap: 40, autoOn: true, autoLuckyMin: 8, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, kMin: 50, kPrio: 180, kMax: 5, music: true, sfx: true, nums: true });
   saveOpts();
   for (const id of ['aiModel', 'aiEvery', 'aiMax', 'autoLuckyMin', 'botMin', 'mgEvery', 'kMin', 'kPrio', 'kMax']) { const el = $('#' + id); if (el) el.value = opts[id]; }
   for (const [id, k] of [['optAiTts', 'aiTts'], ['optAuto', 'autoOn'], ['optBots', 'botsOn'], ['optMgAuto', 'mgAuto'], ['optMusic', 'music'], ['optSfx', 'sfx'], ['optNums', 'nums']]) $('#' + id).checked = !!opts[k];
@@ -3563,7 +3568,7 @@ $('#presetLive').onclick = () => { Snd.resume(); applyLivePreset(); };
    VÒNG LẶP
    ===================================================================== */
 const clock = new THREE.Clock(); let T = 0, hudAcc = 0, ledAcc = 0, slowAcc = 0, perfAcc = 0, perfN = 0, perfT = 0, tipAcc = 0, idleAcc = 0;
-const TIPS = ['💡 Comment <b>"bàn 7"</b> để chọn bàn', '💡 Comment <b>"bàn riêng"</b> để giữ một bàn cho hội bạn', '💡 Comment <b>"ghép Tên"</b> để ngồi chung bàn với bạn', '💡 Comment <b>"mời Tên"</b> để rủ bạn qua bàn mình', '💡 Comment <b>"tên bàn Hội Bia"</b> để đặt tên bàn', '💡 Comment <b>"hát + tên bài"</b> rồi tặng quà để đăng ký karaoke 🎤', '💡 Tặng quà từ 30 xu để <b>chen hàng</b> karaoke ⏫', '💡 Comment <b>"xin lên mic"</b> để hát cho cả phòng nghe 🎙️', '💡 Comment <b>"oẳn tù tì búa"</b> để thách Cậu Cả', '💡 Comment <b>"xí ngầu"</b> – ra 6 cả bàn uống!', '💡 Comment <b>"cụng ly với Tên"</b> để mời bạn 1 ly', '💡 Say quá? Comment <b>"trà đá"</b> cho tỉnh 😅', '💡 Thả ❤️ để đẩy thanh <b>Không khí</b> lên 100%', '💡 Tặng quà để nhân viên <b>bưng món</b> ra bàn bạn', '💡 Comment <b>"xiếc"</b> để mời đoàn xiếc đường phố (múa lân, phun lửa, tung hứng…)', '💡 Đang có xiếc? Thả tim, tặng quà để <b>thưởng nghệ sĩ</b> diễn thêm!'];
+const TIPS = ['💡 Comment <b>"bàn 7"</b> để chọn bàn', '💡 Comment <b>"bàn riêng"</b> để giữ một bàn cho hội bạn', '💡 Comment <b>"ghép Tên"</b> để ngồi chung bàn với bạn', '💡 Comment <b>"mời Tên"</b> để rủ bạn qua bàn mình', '💡 Comment <b>"tên bàn Hội Bia"</b> để đặt tên bàn', '💡 Comment <b>"hát + tên bài"</b> rồi tặng quà để đăng ký karaoke 🎤', '💡 Tặng quà từ 180 xu để <b>chen hàng</b> karaoke ⏫', '💡 Comment <b>"hát + tên bài"</b> rồi tặng quà từ 50 xu để đăng ký hát 🎤', '💡 Comment <b>"xin lên mic"</b> để hát cho cả phòng nghe 🎙️', '💡 Comment <b>"oẳn tù tì búa"</b> để thách Cậu Cả', '💡 Comment <b>"xí ngầu"</b> – ra 6 cả bàn uống!', '💡 Comment <b>"cụng ly với Tên"</b> để mời bạn 1 ly', '💡 Say quá? Comment <b>"trà đá"</b> cho tỉnh 😅', '💡 Thả ❤️ để đẩy thanh <b>Không khí</b> lên 100%', '💡 Tặng quà để nhân viên <b>bưng món</b> ra bàn bạn', '💡 Comment <b>"xiếc"</b> để mời đoàn xiếc đường phố (múa lân, phun lửa, tung hứng…)', '💡 Đang có xiếc? Thả tim, tặng quà để <b>thưởng nghệ sĩ</b> diễn thêm!'];
 const OWNER_IDLE = ['Anh em cứ tự nhiên nha!', 'Bia lạnh đây, dzô!', 'Comment "bàn riêng" để giữ bàn nè!', 'Muốn ngồi với bạn thì comment "ghép" tên bạn!', 'Comment "hát" lên hát karaoke đi!', 'Oẳn tù tì với Cậu Cả không?', 'Thả tim cho quán đông vui nào!', 'Không say không về!', 'Tặng quà là có món ngay!'];
 function drawLED(t) {
   const g = ledCtx, W = 320, H = 160;
