@@ -56,13 +56,15 @@ Làm theo README mục 1: cài Node.js, tải repo, mở `Cau Ca Live.app`. Mu�
 
 ### A6. OBS Studio + nút "Khớp lại OBS"
 App tự cài đặt OBS qua WebSocket nên bạn không phải chỉnh tay từng mục, và không cần plugin.
-1. **Cài OBS Studio** bản 30 trở lên (obsproject.com; Mac chip M chọn bản **Apple Silicon**).
-2. **Cài ffmpeg** cho bộ chuyển tiếp của app: mở Terminal, chạy `brew install ffmpeg`.
-3. **Bật WebSocket trong OBS:**
-   - Vào **Tools → WebSocket Server Settings**, tích **Enable WebSocket server** (cổng 4455).
-   - Bấm **Show Connect Info** để xem mật khẩu.
-4. **Nhập vào app:** bảng điều khiển → thẻ **🎬 OBS – phát YouTube, Facebook, TikTok** → mở **Cài đặt OBS và khóa luồng**.
-   - Dán **mật khẩu WebSocket**.
+1. **Nhấp đúp `cai-obs.command`** trong thư mục `quan-nhau-cau-ca`. File này tự làm mọi việc sau:
+   - cài **OBS Studio** và **ffmpeg** bằng Homebrew, nếu máy chưa có;
+   - tắt OBS nếu đang mở, rồi **bật sẵn WebSocket** của OBS (cổng 4455, mật khẩu tự tạo);
+   - mở lại OBS.
+
+   App tự đọc mật khẩu WebSocket trong file cấu hình của OBS trên máy, nên bạn không cần chép hay dán mật khẩu.
+
+   *Muốn làm tay:* cài OBS bản 30 trở lên và `brew install ffmpeg`. Trong OBS vào **Tools → WebSocket Server Settings**, tích **Enable WebSocket server**, bấm **Show Connect Info** để xem mật khẩu, rồi dán mật khẩu đó vào thẻ 🎬 OBS ở bước 2.
+2. **Nhập khóa luồng vào app:** bảng điều khiển → thẻ **🎬 OBS – phát YouTube, Facebook, TikTok** → mở **Cài đặt OBS và khóa luồng**.
    - Tích **YouTube** và dán khóa luồng YouTube (A4).
    - Tích **Facebook** và dán khóa luồng Facebook (A5).
    - Nếu TikTok có khóa luồng (A3, cách 1): tích **TikTok**, dán **Server URL** và **khóa luồng**.

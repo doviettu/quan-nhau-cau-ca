@@ -156,7 +156,7 @@ Quán nhận comment, quà và lượt thích từ **TikTok, YouTube và Faceboo
 - **OBS Studio + nút 🔗 Khớp lại OBS** trong thẻ **🎬 OBS** của bảng điều khiển.
   - App điều khiển OBS qua WebSocket: tạo cảnh dọc, chụp đúng cửa sổ game (cắt thanh tiêu đề), thu toàn bộ âm thanh máy, đặt bitrate và bộ mã hoá Apple VT.
   - OBS phát **một** luồng về bộ chuyển tiếp của app. Bộ chuyển tiếp dùng ffmpeg chép nguyên luồng lên **YouTube, Facebook và TikTok** (TikTok chỉ khi tài khoản có khóa luồng). Một nơi lỗi thì các nơi khác vẫn phát, và app báo về điện thoại.
-  - Cần `brew install ffmpeg` và bật **Tools → WebSocket Server Settings** trong OBS.
+  - Cài một lần: nhấp đúp **`cai-obs.command`**. File này tự cài OBS và ffmpeg, bật WebSocket của OBS và mở OBS. App tự đọc mật khẩu WebSocket từ cấu hình OBS trên máy. Bạn chỉ còn phải cấp quyền **Ghi màn hình** cho OBS (macOS hỏi lần đầu) và dán khóa luồng.
   - Mật khẩu OBS và khóa luồng được cất trong Keychain.
   - Bấm **▶️ Bắt đầu phát** / **⏹ Dừng phát** ngay trên bảng điều khiển.
 - Phát nhiều luồng cùng lúc làm Mac nóng và tốn mạng hơn. Hãy thử trước khi live thật.

@@ -17,6 +17,7 @@ import { YouTubeSource, parseYouTubeInput } from './youtube.mjs';
 import { FacebookSource, parsePage } from './facebook.mjs';
 import { ObsClient } from './obs.mjs';
 import { Relay } from './relay.mjs';
+import { readObsPassword } from './obs-setup.mjs';
 import { createRequire } from 'node:module';
 const { badFilter } = createRequire(import.meta.url)('./locfilter.cjs');   // lọc từ tục (dùng chung với game)
 
@@ -372,7 +373,9 @@ function relayTargets() {
 function relayApply() { relay.start(relayTargets(), { port: config.obsLive.relayPort, key: config.obsLive.relayKey }); }
 relay.on('streaming', () => console.log('🎬 OBS đang phát qua bộ chuyển tiếp → ' + relay.targets.map(t => t.name).join(', ')));
 relay.on('targetFailed', (name, line) => { console.log(`⚠️ Không phát được lên ${name}: ${line}`); notify(`⚠️ Mất luồng ${name}`, `Bộ chuyển tiếp không phát được lên ${name}. Kiểm tra khóa luồng và bấm Phát trực tiếp trên ${name}, rồi dừng/phát lại OBS.`, 4); });
-async function obsConnect() { await obs.connect(config.obsLive.url, secretGet('obs')); }
+// mật khẩu OBS: lấy trong Keychain (nếu bạn tự dán), không có thì đọc thẳng từ file cấu hình WebSocket của OBS trên máy
+const obsPassword = () => secretGet('obs') || readObsPassword();
+async function obsConnect() { await obs.connect(config.obsLive.url, obsPassword()); }
 async function obsSync() {
   await obsConnect();
   const [w, h] = String(config.obsLive.res || '720x1280').split('x').map(Number);
@@ -448,7 +451,7 @@ async function sessionStart() {
     steps.push({ name: name + ' (comment)', ok: src.state !== 'error', msg: src.state === 'live' ? 'đang nhận' : 'đang chờ buổi live – app tự nối khi bạn bắt đầu live' });
   }
   if (!pf.some(x => x[1])) steps.push({ name: 'Comment', ok: false, msg: 'chưa thêm nền tảng nào – dán link kênh vào ô Kết nối nhanh' });
-  if (config.obsLive.auto || secretGet('obs')) {
+  if (config.obsLive.auto || obsPassword()) {
     try {
       const r = await obsSync();
       if (!relay.targets.length) steps.push({ name: 'OBS', ok: false, msg: 'chưa có khóa luồng nào – nhập trong thẻ OBS' });
@@ -479,7 +482,7 @@ async function healthCheck() {
     else if (!ok) { try { const r = await fetch(`${process.env.FB_GRAPH_BASE || 'https://graph.facebook.com'}/me?fields=name&access_token=${encodeURIComponent(secretGet('facebook'))}`, { signal: AbortSignal.timeout(8000) }); const j = await r.json(); if (j.error) { msg = 'token lỗi: ' + j.error.message; } else msg = `token hợp lệ (${j.name}) · ${msg}`; } catch { } }
     add('Facebook', ok, msg, 'Dán Page token mới (Nâng cao → Facebook) hoặc bắt đầu live trên Trang');
   }
-  if (config.obsLive.auto || secretGet('obs')) {
+  if (config.obsLive.auto || obsPassword()) {
     try { await obsConnect(); add('OBS', true, obsState.streaming ? 'đang phát' : 'đã kết nối', ''); } catch (e) { add('OBS', false, e.message, 'Mở OBS → Tools → WebSocket Server Settings → Enable, nhập đúng mật khẩu'); }
     const ff = await new Promise(r => execFile(process.env.FFMPEG || 'ffmpeg', ['-version'], { timeout: 5000 }, e => r(!e)));
     add('ffmpeg (bộ chuyển tiếp)', ff, ff ? 'có sẵn' : 'chưa cài', 'Mở Terminal chạy: brew install ffmpeg');
@@ -513,7 +516,7 @@ const server = http.createServer(async (req, res) => {
         youtube: { ...youtube.status(), on: config.youtube.on, saved: config.youtube.input, minPoll: config.youtube.minPoll, ownKey: !!config.youtube.key, hasKey: !!ytKey() },
         facebook: { ...facebook.status(), on: config.facebook.on, saved: config.facebook.page, hasToken: !!secretGet('facebook') },
         obs: { connected: obs.connected, error: obs.err, streaming: obsState.streaming, timecode: obsState.timecode, lastSync: obsState.lastSync, relay: relay.status(),
-          cfg: { url: config.obsLive.url, res: config.obsLive.res, bitrate: config.obsLive.bitrate, hasPassword: !!secretGet('obs'),
+          cfg: { url: config.obsLive.url, res: config.obsLive.res, bitrate: config.obsLive.bitrate, hasPassword: !!obsPassword(), autoPassword: !secretGet('obs') && !!readObsPassword(),
             ...Object.fromEntries(['yt', 'fb', 'tt'].map(k => [k, { on: !!config.obsLive[k].on, server: config.obsLive[k].server, hasKey: !!secretGet('stream-' + k) }])) } },
         live: { ok: live.ok, reason: live.reason, since: live.since, lastReal: Math.max(live.lastReal, (gameState && gameState.lastReal) || 0) },
         notify: { on: config.notify.on, topic: config.notify.topic, idleMin: config.notify.idleMin },

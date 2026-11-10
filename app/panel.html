@@ -155,6 +155,7 @@ button.big{font-size:16px;padding:12px 18px}
   <section class="card obs">
     <h2>🎬 OBS – phát YouTube, Facebook, TikTok</h2>
     <p class="mut" style="margin-top:0">OBS chụp cửa sổ game và phát <b>một</b> luồng về app; app chép nguyên luồng lên các nơi đã bật (cần <code>brew install ffmpeg</code>). TikTok chỉ phát qua OBS được khi tài khoản có <b>khóa luồng</b>; nếu không, giữ TikTok trên LIVE Studio như cũ.</p>
+    <p class="mut" style="margin-top:0">⚡ Lần đầu: nhấp đúp file <code>cai-obs.command</code> trong thư mục quan-nhau-cau-ca – tự cài OBS, ffmpeg và bật WebSocket (app tự đọc mật khẩu). Sau đó chỉ cần dán khóa luồng bên dưới.</p>
     <div class="btns"><button class="pri" id="bObsSync">🔗 Khớp lại OBS</button><button id="bObsStart">▶️ Bắt đầu phát</button><button id="bObsStop">⏹ Dừng phát</button></div>
     <div class="mut" id="obsStatus">Chưa kết nối OBS</div>
     <ul class="mut" id="obsSyncList" style="margin:6px 0 4px;padding-left:18px"></ul>
@@ -303,7 +304,7 @@ async function refresh() {
     if (fb.saved) $('#fbPage').value = fb.saved; $('#fbToken').placeholder = fb.hasToken ? 'đã lưu trong Keychain – dán token mới để thay' : 'Page access token';
     ytQuota();
     $('#obsUrl').value = oc.url || 'ws://127.0.0.1:4455'; $('#obsRes').value = oc.res || '720x1280'; $('#obsBitrate').value = oc.bitrate || 3500;
-    $('#obsPass').placeholder = oc.hasPassword ? 'đã lưu – dán mật khẩu mới để thay' : 'mật khẩu WebSocket';
+    $('#obsPass').placeholder = oc.autoPassword ? 'tự đọc từ OBS – không cần dán' : oc.hasPassword ? 'đã lưu – dán mật khẩu mới để thay' : 'mật khẩu WebSocket (hoặc chạy cai-obs.command)';
     for (const [k, id] of [['yt', 'Yt'], ['fb', 'Fb'], ['tt', 'Tt']]) { const t = oc[k] || {}; $('#obs' + id + 'On').checked = !!t.on; $('#obs' + id + 'Key').placeholder = t.hasKey ? 'đã lưu khóa – dán khóa mới để thay' : 'khóa luồng'; }
     if (oc.tt && oc.tt.server) $('#obsTtServer').value = oc.tt.server;
     for (const k of ['aiModel', 'aiEvery', 'aiMax', 'ytKey', 'kMin', 'kPrio', 'botMin', 'mgEvery', 'autoLuckyMin', 'bgmQuery', 'bgmVol', 'circusEvery']) $('#' + k).value = c[k] ?? '';
