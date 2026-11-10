@@ -532,7 +532,7 @@ controls.enablePan = false; controls.enableDamping = true; controls.dampingFacto
 controls.minPolarAngle = 0.5; controls.maxPolarAngle = 1.5;
 controls.minAzimuthAngle = 0.25; controls.maxAzimuthAngle = 1.95;
 controls.rotateSpeed = 0.6; controls.zoomSpeed = 0.8;
-const CAM_DIR = new THREE.Vector3(0.86, 0.45, 0.44).normalize();   // đứng bên này đường, máy nghiêng 25° so với mặt ngang, nhìn chéo sang quán
+const CAM_DIR = new THREE.Vector3(0.86, 0.3516, 0.44).normalize();   // đứng bên này đường, máy nghiêng 20° so với mặt ngang (0.3516 = 0.966·tan20°), nhìn chéo sang quán
 function fitCamera() {
   const w = innerWidth, h = innerHeight, a = w / h;
   renderer.setSize(w, h);
@@ -540,15 +540,15 @@ function fitCamera() {
   camera.fov = a < 0.8 ? 60 : a < 1.2 ? 54 : 45;
   camera.updateProjectionMatrix();
   const tu = window.__camTune || {};
-  controls.target.set(a < 0.8 ? (tu.tx ?? -8.2) : (tu.lx ?? -7.2), a < 0.8 ? (tu.ty ?? 2.0) : (tu.ly ?? 2.2), a < 0.8 ? (tu.tz ?? 0.6) : -0.4);
+  controls.target.set(a < 0.8 ? (tu.tx ?? -9.0) : (tu.lx ?? -7.2), a < 0.8 ? (tu.ty ?? 3.0) : (tu.ly ?? 2.2), a < 0.8 ? (tu.tz ?? 0.6) : -0.4);
   const tv = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   const halfW = a < 0.8 ? (tu.halfW ?? 6.2) : (tu.lhalfW ?? 9.5);
   const halfV = a < 0.8 ? 5.5 : 6.2;
   const dist = clamp(Math.max(halfW / (tv * a), halfV / tv), 14, 42);
   // điện thoại dọc: nhìn chúc xuống hơn và đẩy khung hình xuống dưới để bảng điều khiển phía trên không che quán
-  const dir = a < 0.8 ? new THREE.Vector3(0.9, tu.elev ?? 0.4425, tu.dz ?? 0.3).normalize() : CAM_DIR;   // máy nghiêng 25° so với mặt ngang (0.4425 = 0.949·tan25°)
+  const dir = a < 0.8 ? new THREE.Vector3(0.9, tu.elev ?? 0.3454, tu.dz ?? 0.3).normalize() : CAM_DIR;   // máy nghiêng 20° so với mặt ngang (0.3454 = 0.949·tan20°)
   camera.position.copy(controls.target).addScaledVector(dir, dist);
-  if (a < 0.8) camera.setViewOffset(w, h, 0, -Math.round(h * (tu.off ?? -0.05)), w, h);   // biển hiệu sát mép trên, đường sát mép dưới else camera.clearViewOffset();
+  if (a < 0.8) camera.setViewOffset(w, h, 0, -Math.round(h * (tu.off ?? -0.12)), w, h);   // biển hiệu sát mép trên, đường sát mép dưới else camera.clearViewOffset();
   controls.minDistance = dist * 0.35; controls.maxDistance = dist * 1.3;
   controls.update();
   scene.fog.near = dist * 1.0; scene.fog.far = dist * 2.8;
@@ -3003,7 +3003,7 @@ const CIRCUS_ACTS = {
 };
 const CIRCUS_KEYS = { tung_hung: /tung hung/, phun_lua: /phun lua|lua/, ca_kheo: /ca kheo/, xoay_dia: /xoay dia|dia/, mua_lan: /mua lan|lan/ };
 const RE_CIRCUS = /(^|\s)(xiec|xem xiec|goi xiec|moi xiec|xiec duong pho|mua lan|phun lua|tung hung|ca kheo|xoay dia)(\s|$|!|\?)/;
-const STAGE = { x: -0.5, z: 0.6 };   // giữa đường, phía phải màn hình – không bị khung tin che
+const STAGE = { x: -0.5, z: 1.2 };   // giữa đường, phía phải màn hình – không bị khung tin che
 const CAM_FACE = Math.atan2(0.86, 0.44);   // quay mặt về phía máy quay (bên kia đường)
 const Circus = {
   cur: null, last: -1e9, cd: 150, tips: 0,
