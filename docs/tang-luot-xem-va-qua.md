@@ -32,7 +32,7 @@ Tài liệu dành cho kênh mới chạy game "Quán nhậu vỉa hè Cậu Cả
 | 11 | Khi đủ điều kiện thì bật **LIVE Goals, Gift Gallery, Fan Club** [CXM: tuỳ khu vực]. | TikTok | Kiểm tra trong LIVE Center |
 | 12 | **Multi-guest / LIVE Match (PK)** với kênh game cùng cỡ để trao đổi khán giả. Cần có người thật. | TikTok | Nên thử |
 | 13 | Nhân vật 🏠 chỉ là NPC trong game. **Không** dùng tài khoản phụ để thả tim hay comment, vì đó là tương tác giả. | Game | Đã đúng (🏠 không thả tim, không tặng quà) |
-| 14 | Lọc bình luận tục tĩu, độc hại trước khi MC đọc lên. | Game | Nên bổ sung |
+| 14 | Lọc bình luận tục tĩu, độc hại trước khi MC đọc lên. | Game | Đã có (`app/locfilter.cjs`: che chữ trên màn hình, không đọc, không gửi Claude; lọc cả câu Claude trả lời) |
 | 15 | Khung 1080×1920. Chữ đặt trong vùng an toàn, tránh góc dưới (ô bình luận) và cột nút bên phải. | Game | Đã có (lề chừa cho giao diện TikTok) |
 
 ## C. Rủi ro vi phạm cần tránh với game này

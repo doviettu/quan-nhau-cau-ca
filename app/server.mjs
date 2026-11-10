@@ -15,6 +15,10 @@ import { createClaudeHandler, claudeReady } from '../bridge/claude-bridge.mjs';
 import { TikTokSource, normalizeUser, validUser } from './tiktok.mjs';
 import { YouTubeSource, parseYouTubeInput } from './youtube.mjs';
 import { FacebookSource, parsePage } from './facebook.mjs';
+import { ObsClient } from './obs.mjs';
+import { Relay } from './relay.mjs';
+import { createRequire } from 'node:module';
+const { badFilter } = createRequire(import.meta.url)('./locfilter.cjs');   // lọc từ tục (dùng chung với game)
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG_PATH = path.join(ROOT, 'config.json');
@@ -24,8 +28,11 @@ const DEFAULTS = {
   tiktok: { username: '', on: false },   // kết nối thẳng TikTok LIVE bằng @tên (không cần TikFinity)
   youtube: { on: false, input: '', key: '', minPoll: 8 },   // chat YouTube Live qua YouTube Data API (key riêng hoặc dùng chung key karaoke)
   facebook: { on: false, page: '' },   // comment Facebook Live qua Graph API; Page token lưu trong Keychain
+  // OBS phát một luồng về bộ chuyển tiếp trên máy → YouTube, Facebook, TikTok (khóa luồng + mật khẩu OBS nằm trong Keychain)
+  obsLive: { url: 'ws://127.0.0.1:4455', res: '720x1280', bitrate: 3500, relayPort: 19350, relayKey: '', auto: false,
+    yt: { on: false, server: 'rtmps://a.rtmps.youtube.com/live2' }, fb: { on: false, server: 'rtmps://live-api-s.facebook.com:443/rtmp/' }, tt: { on: false, server: '' } },
   notify: { on: true, topic: '', server: 'https://ntfy.sh', idleMin: 10 },   // báo về điện thoại qua app ntfy
-  game: { aiOn: true, aiModel: 'claude-haiku-5-5', aiEvery: 20, aiMax: 180, ytKey: '', kMin: 50, kPrio: 180, kMax: 5, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, autoOn: true, autoLuckyMin: 8, bgmYt: false, bgmQuery: '', bgmVol: 35, circusAuto: true, circusEvery: 6, mcVoice: true, mcGap: 40, jokeOn: true, jokeEvery: 4, voiceEngine: 'auto', vieneuVoice: 'Trúc Ly' },
+  game: { aiOn: true, aiModel: 'claude-haiku-5-5', aiEvery: 20, aiMax: 180, ytKey: '', kMin: 50, kPrio: 180, kMax: 5, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, autoOn: true, autoLuckyMin: 8, bgmYt: false, bgmQuery: '', bgmVol: 35, circusAuto: true, circusEvery: 6, mcVoice: true, mcGap: 40, jokeOn: true, jokeEvery: 4, voiceEngine: 'auto', vieneuVoice: 'Trúc Ly', macVoice: '', voiceRate: 1 },
 };
 const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
 const merge = (a, b) => { const o = { ...a }; for (const k of Object.keys(b || {})) o[k] = isObj(a[k]) && isObj(b[k]) ? merge(a[k], b[k]) : b[k]; return o; };
@@ -37,6 +44,7 @@ let config = loadConfig();
 if (config.game.vieneuVoice === 'Hải Đăng' && !config.game.voiceV2) { config.game.vieneuVoice = 'Trúc Ly'; config.game.voiceV2 = true; saveConfig(); }
 if (config.game.kMin === 1 && config.game.kPrio === 30 && !config.game.kPriceV2) { config.game.kMin = 50; config.game.kPrio = 180; config.game.kPriceV2 = true; saveConfig(); }
 if (config.obs) { delete config.obs; saveConfig(); }
+if (!config.obsLive.relayKey) { config.obsLive.relayKey = 'cauca-' + crypto.randomBytes(4).toString('hex'); saveConfig(); }
 if (!config.notify.topic) { config.notify.topic = 'caucalive-' + crypto.randomBytes(5).toString('hex'); saveConfig(); }
 if (!fs.existsSync(CONFIG_PATH)) saveConfig();
 
@@ -81,14 +89,38 @@ function openGameWindow() {
 }
 
 // ---- giọng Cậu Cả: đọc bằng giọng tiếng Việt của macOS (lệnh `say`), tiếng ra loa máy → LIVE Studio thu âm thanh máy tính ----
-let viVoice = null, voiceChecked = false, saying = false; const sayQ = [];
+let viVoice = null, voiceChecked = false, saying = false, macVoices = []; const sayQ = [];
 function checkVoice() {
   if (process.platform !== 'darwin') { voiceChecked = true; return; }
   execFile('say', ['-v', '?'], (e, out) => {
     voiceChecked = true; if (e) return;
-    const line = String(out).split('\n').find(l => /\bvi[_-]VN\b/.test(l));
-    viVoice = line ? line.split(/\s{2,}/)[0].trim() : null;
+    // mọi giọng tiếng Việt của macOS (Linh, bản nâng cao nếu đã tải…)
+    macVoices = String(out).split('\n').filter(l => /\bvi[_-]VN\b/.test(l)).map(l => l.split(/\s{2,}/)[0].trim()).filter(Boolean);
+    viVoice = macVoices[0] || null;
   });
+}
+const macVoiceName = () => (macVoices.includes(config.game.macVoice) ? config.game.macVoice : viVoice);
+const voiceRate = () => Math.min(1.5, Math.max(0.7, Number(config.game.voiceRate) || 1));
+// 25 giọng có sẵn của VieNeu v3 Turbo (tên · giới tính · miền · phong cách) – hiện cả khi VieNeu chưa chạy
+const VN_PRESETS = [['Trúc Ly', 'nữ', 'Bắc', 'tự nhiên', 2], ['Mai Anh', 'nữ', 'Bắc', 'tin tức', 4], ['Ngọc Huyền', 'nữ', 'Bắc', 'tự nhiên', 8], ['Đoan Trang', 'nữ', 'Bắc', 'tự nhiên'], ['Ngọc Linh', 'nữ', 'Bắc', 'kể chuyện'], ['Quỳnh Anh', 'nữ', 'Bắc', 'đọc truyện'],
+  ['Ngọc Trân', 'nữ', 'Trung', 'tự nhiên', 10], ['Thùy Dung', 'nữ', 'Nam', 'tin tức', 6], ['Thục Đoan', 'nữ', 'Nam', 'kể chuyện'], ['Mỹ Duyên', 'nữ', 'Nam', 'đọc truyện'], ['Kim Thanh', 'nữ', 'Nam', 'đọc truyện'],
+  ['Adam bựa', 'nam', 'Bắc', 'tự nhiên', 1], ['Hải Đăng', 'nam', 'Bắc', 'tự nhiên', 5], ['Thiện Minh', 'nam', 'Bắc', 'kể chuyện', 3], ['Thiền Tâm Đức', 'nam', 'Bắc', 'kể chuyện', 7], ['Minh Đức', 'nam', 'Bắc', 'tin tức'], ['Phạm Tuyên', 'nam', 'Bắc', 'tự nhiên'],
+  ['Xuân Vĩnh', 'nam', 'Bắc', 'tự nhiên'], ['Thanh Bình', 'nam', 'Bắc', 'kể chuyện'], ['Quốc Tuấn', 'nam', 'Bắc', 'tự nhiên'], ['Quang Sơn', 'nam', 'Trung', 'tự nhiên', 9], ['Thái Sơn', 'nam', 'Nam', 'kể chuyện'], ['Minh Triết', 'nam', 'Nam', 'tin tức'],
+  ['Đức Trí', 'nam', 'Nam', 'đọc truyện'], ['Adam', 'nam', 'Nam', 'tự nhiên']];
+function voiceList() {
+  const parse = d => { const p = String(d || '').split('·').map(x => x.trim()); return { gender: /nữ/i.test(p[0]) ? 'nữ' : /nam/i.test(p[0]) ? 'nam' : '', region: p[1] || '', style: String(p[2] || '').replace(/^(Phong cách|Giọng đọc)\s*/i, '') }; };
+  const live = vn.state === 'ready' && vn.voices.length;
+  const vnl = live ? vn.voices.map(v => ({ id: v.id, ...parse(v.desc), ...(v.gender ? { gender: v.gender === 'female' ? 'nữ' : 'nam' } : {}), featured: v.featured || null }))
+    : VN_PRESETS.map(([id, gender, region, style, featured]) => ({ id, gender, region, style, featured: featured || null }));
+  return {
+    vieneu: { installed: vnInstalled(), state: vn.state, err: vn.err, voices: vnl.map(v => ({ engine: 'vieneu', ...v })) },
+    mac: { available: process.platform === 'darwin' && macVoices.length > 0, voices: macVoices.map(id => ({ engine: 'mac', id, gender: /^linh/i.test(id) ? 'nữ' : '', region: '', style: 'giọng máy macOS' })) },
+    current: currentVoice(), rate: voiceRate(), engineSetting: config.game.voiceEngine || 'auto',
+  };
+}
+function currentVoice() {
+  const eng = config.game.voiceEngine === 'mac' ? 'mac' : vn.state === 'ready' ? 'vieneu' : config.game.voiceEngine === 'vieneu' ? 'vieneu' : macVoiceName() ? 'mac' : 'vieneu';
+  return { engine: eng, id: eng === 'mac' ? macVoiceName() : config.game.vieneuVoice, ready: eng === 'mac' ? !!macVoiceName() : vn.state === 'ready' };
 }
 // ---- VieNeu-TTS: giọng tiếng Việt tự nhiên chạy trên máy (cài bằng cai-giong-vieneu.command) ----
 const VIENEU_HOME = path.join(process.env.HOME || os.homedir(), 'Library', 'Application Support', 'CauCaLive', 'vieneu');
@@ -99,7 +131,7 @@ const vnInstalled = () => fs.existsSync(VIENEU_PY);
 const vnWanted = () => config.game.voiceEngine !== 'mac' && vnInstalled();
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function vnHealth() { try { const r = await fetch(vn.url + '/health', { signal: AbortSignal.timeout(1500) }); return r.ok; } catch { return false; } }
-async function vnLoadVoices() { try { const j = await (await fetch(vn.url + '/v1/voices', { signal: AbortSignal.timeout(5000) })).json(); vn.voices = (j.data || []).map(v => ({ id: v.id, desc: v.description || '' })); } catch { } }
+async function vnLoadVoices() { try { const j = await (await fetch(vn.url + '/v1/voices', { signal: AbortSignal.timeout(5000) })).json(); vn.voices = (j.data || []).map(v => ({ id: v.id, desc: v.description || '', gender: v.gender || '', featured: v.featured || null })); } catch { } }
 async function vnStart() {
   if (vn.proc || vn.state === 'starting' || !vnWanted()) return;
   if (await vnHealth()) { vn.state = 'ready'; vnLoadVoices(); return; }   // đã chạy sẵn
@@ -127,46 +159,54 @@ function wavFromPcm(pcm, rate) {
   h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22); h.writeUInt32LE(rate, 24); h.writeUInt32LE(rate * 2, 28); h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34);
   h.write('data', 36); h.writeUInt32LE(pcm.length, 40); return Buffer.concat([h, pcm]);
 }
-async function vnSynth(text) {
-  const voice = vn.voices.some(v => v.id === config.game.vieneuVoice) ? config.game.vieneuVoice : undefined;
+async function vnSynth(text, want) {
+  want = want || config.game.vieneuVoice;
+  const voice = vn.voices.some(v => v.id === want) ? want : undefined;
   const r = await fetch(vn.url + '/v1/audio/speech', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(30000),
     body: JSON.stringify({ model: 'vieneu-v3-turbo', input: text, voice, response_format: 'pcm', sample_rate: 24000 }) });
   if (!r.ok) throw new Error('VieNeu HTTP ' + r.status);
   return wavFromPcm(Buffer.from(await r.arrayBuffer()), 24000);
 }
 let wavN = 0;
-function playWav(buf) {
+function playWav(buf, rate = 1) {
   return new Promise(res => {
     const f = path.join(os.tmpdir(), `caucalive-${process.pid}-${wavN++ % 4}.wav`); fs.writeFileSync(f, buf);
     const player = process.platform === 'darwin' ? 'afplay' : process.env.CAUCA_PLAYER;
     if (!player) return setTimeout(res, Math.round((buf.length - 44) / 48));   // không có trình phát (máy thử): giả thời lượng
-    execFile(player, [f], { timeout: 60000 }, () => res());
+    const args = process.platform === 'darwin' && Math.abs(rate - 1) > 0.02 ? ['-r', rate.toFixed(2), '-q', '1', f] : [f];   // tốc độ đọc: afplay phát nhanh/chậm hơn
+    execFile(player, args, { timeout: 60000 }, () => res());
   });
 }
 const EMO = /\[(cười|thở dài|hắng giọng)\]/g;   // ký hiệu cảm xúc của VieNeu – giọng Mac thì bỏ đi
-function sayMac(t) { const s = t.replace(EMO, ' ').trim(); return s ? new Promise(res => execFile('say', ['-v', viVoice, '-r', '200', s], { timeout: 30000 }, () => res())) : Promise.resolve(); }
+function sayMac(t, voice) { const s = t.replace(EMO, ' ').trim(), v = voice || macVoiceName(); return s && v ? new Promise(res => execFile('say', ['-v', v, '-r', String(Math.round(190 * voiceRate())), s], { timeout: 30000 }, () => res())) : Promise.resolve(); }
 let nextWav = null;   // tạo sẵn câu kế tiếp trong lúc đang phát câu trước
+// mỗi câu trong hàng đợi: { t: chữ, engine, voice } – engine/voice rỗng = giọng đang chọn
 async function sayNext() {
   if (saying || !sayQ.length) return;
-  saying = true; const t = sayQ.shift();
+  saying = true; const it = sayQ.shift();
+  const eng = it.engine || currentVoice().engine, macV = it.engine === 'mac' ? it.voice : undefined;
   try {
-    if (vn.state === 'ready') {
-      const buf = nextWav && nextWav.t === t ? await nextWav.p : await vnSynth(t); nextWav = null;
-      if (sayQ.length) { const n = sayQ[0]; nextWav = { t: n, p: vnSynth(n).catch(() => null) }; }
-      if (buf) await playWav(buf); else if (viVoice) await sayMac(t);
-    } else if (viVoice) await sayMac(t);
-  } catch (e) { vn.err = String(e.message || e); if (viVoice) await sayMac(t); }
+    if (eng === 'vieneu' && vn.state === 'ready') {
+      const buf = nextWav && nextWav.it === it ? await nextWav.p : await vnSynth(it.t, it.voice); nextWav = null;
+      const n = sayQ[0]; if (n && (n.engine || currentVoice().engine) === 'vieneu') nextWav = { it: n, p: vnSynth(n.t, n.voice).catch(() => null) };
+      if (buf) await playWav(buf, voiceRate()); else await sayMac(it.t);
+    } else await sayMac(it.t, macV);
+  } catch (e) { vn.err = String(e.message || e); await sayMac(it.t); }
   saying = false; sayNext();
 }
-function speak(text) {
-  const useVn = vn.state === 'ready';
+function speak(text, opt = {}) {
+  const useVn = opt.engine ? opt.engine === 'vieneu' && vn.state === 'ready' : vn.state === 'ready' && config.game.voiceEngine !== 'mac';
+  if (opt.engine === 'vieneu' && vn.state !== 'ready') return { ok: false, error: !vnInstalled() ? 'Chưa cài VieNeu – nhấp đúp cai-giong-vieneu.command (một lần) rồi mở lại app' : vn.state === 'starting' ? 'VieNeu đang khởi động, thử lại sau ít phút' : 'VieNeu chưa chạy' + (vn.err ? ': ' + vn.err : '') };
+  if (opt.engine === 'mac' && !macVoices.includes(opt.voice)) return { ok: false, error: 'Mac không có giọng này' };
   if (!useVn && process.platform !== 'darwin') return { ok: false, error: vn.state === 'starting' ? 'Giọng VieNeu đang khởi động' : 'Chỉ đọc bằng giọng máy trên Mac' };
   if (!useVn && !viVoice) return { ok: false, error: vn.state === 'starting' ? 'Giọng VieNeu đang khởi động' : voiceChecked ? 'Chưa có giọng: chạy cai-giong-vieneu.command (khuyên dùng) hoặc cài giọng Linh của Mac' : 'Đang kiểm tra giọng đọc' };
   const t = String(text || '').replace(/\[(cười|thở dài|hắng giọng)\]/g, '\u0001$1\u0002').replace(/[@#*_`<>\[\]{}|\\]/g, ' ').replace(/\u0001/g, '[').replace(/\u0002/g, ']').replace(/\s+/g, ' ').trim().slice(0, 220);
   if (!t) return { ok: false, error: 'Không có nội dung' };
+  if (badFilter(t).bad) { console.log('🚫 Bỏ câu có từ không phù hợp, không đọc: ' + badFilter(t).text); return { ok: false, error: 'Câu có từ không phù hợp – không đọc' }; }
+  if (opt.preview) sayQ.length = 0;   // nghe thử: bỏ các câu đang chờ để nghe ngay
   if (sayQ.length >= 4) sayQ.shift();   // đừng dồn quá: bỏ câu cũ nhất (đủ chỗ cho một câu chuyện nhiều câu)
-  sayQ.push(t); sayNext();
-  return { ok: true, voice: useVn ? 'VieNeu · ' + (config.game.vieneuVoice || 'mặc định') : viVoice };
+  sayQ.push({ t, engine: opt.engine || '', voice: opt.voice || '' }); sayNext();
+  return { ok: true, voice: useVn ? 'VieNeu · ' + (opt.voice || config.game.vieneuVoice || 'mặc định') : (opt.voice || macVoiceName()) };
 }
 checkVoice();
 vnStart();
@@ -274,6 +314,38 @@ const facebook = new FacebookSource();
 facebook.on('event', ev => relayEvent(ev));
 facebook.on('connected', () => console.log(`📡 Đã kết nối Facebook Live: ${facebook.pageName} – ${facebook.title || facebook.liveId}`));
 function facebookApply() { if (config.facebook.on && secretGet('facebook')) facebook.start(config.facebook.page, { getToken: () => secretGet('facebook') }); else facebook.stop(); tfRelayApply(); }
+// ---- OBS + bộ chuyển tiếp: một luồng từ OBS → YouTube, Facebook, TikTok ----
+const obs = new ObsClient();
+const relay = new Relay();
+const obsState = { lastSync: null, streaming: false, timecode: '', at: 0 };
+const PF_NAMES = { yt: 'YouTube', fb: 'Facebook', tt: 'TikTok' };
+function relayTargets() {
+  const o = config.obsLive, out = [];
+  for (const k of ['yt', 'fb', 'tt']) {
+    const t = o[k], key = secretGet('stream-' + k);
+    if (t && t.on && key && /^rtmps?:\/\//.test(t.server || '')) out.push({ name: PF_NAMES[k], url: String(t.server).replace(/\/+$/, '') + '/' + key });
+  }
+  return out;
+}
+function relayApply() { relay.start(relayTargets(), { port: config.obsLive.relayPort, key: config.obsLive.relayKey }); }
+relay.on('streaming', () => console.log('🎬 OBS đang phát qua bộ chuyển tiếp → ' + relay.targets.map(t => t.name).join(', ')));
+relay.on('targetFailed', (name, line) => { console.log(`⚠️ Không phát được lên ${name}: ${line}`); notify(`⚠️ Mất luồng ${name}`, `Bộ chuyển tiếp không phát được lên ${name}. Kiểm tra khóa luồng và bấm Phát trực tiếp trên ${name}, rồi dừng/phát lại OBS.`, 4); });
+async function obsConnect() { await obs.connect(config.obsLive.url, secretGet('obs')); }
+async function obsSync() {
+  await obsConnect();
+  const [w, h] = String(config.obsLive.res || '720x1280').split('x').map(Number);
+  relayApply();
+  const r = await obs.sync({ width: w || 720, height: h || 1280, bitrate: Number(config.obsLive.bitrate) || 3500, server: relay.ingest, key: config.obsLive.relayKey });
+  if (!relay.targets.length) r.warnings.push(relay.error);
+  obsState.lastSync = { ...r, at: Date.now() };
+  if (!config.obsLive.auto) { config.obsLive.auto = true; saveConfig(); }
+  return r;
+}
+setInterval(async () => {
+  if (!obs.connected) return;
+  try { const s = await obs.streamStatus(); obsState.streaming = s.active; obsState.timecode = s.timecode; obsState.at = Date.now(); } catch { }
+}, 4000);
+
 // Dùng TikFinity cho TikTok nhưng có thêm YouTube/Facebook: app nhận sự kiện TikFinity rồi chuyển tiếp cho game
 const tfRelay = { ws: null, ok: false, timer: null, want: false };
 function tfRelayApply() {
@@ -289,6 +361,90 @@ function tfRelayConnect() {
   ws.on('message', d => { live.lastReal = Date.now(); const m = String(d); for (const c of liveWss.clients) if (c.readyState === 1) c.send(m); });
   ws.on('close', () => { tfRelay.ok = false; if (tfRelay.ws === ws && tfRelay.want) tfRelay.timer = setTimeout(tfRelayConnect, 5000); });
   ws.on('error', () => { });
+}
+
+// ---- kết nối thông minh: dán link/@tên bất kỳ → tự nhận ra nền tảng ----
+function detectPlatform(text) {
+  const t = String(text || '').trim(); if (!t) return null;
+  if (/tiktok\.com/i.test(t)) return { platform: 'tiktok', value: normalizeUser(t) };
+  if (/youtu\.?be|youtube\.com/i.test(t) || /^UC[\w-]{22}$/.test(t)) return { platform: 'youtube', value: t };
+  if (/facebook\.com|fb\.com|fb\.watch/i.test(t)) return { platform: 'facebook', value: t };
+  if (/^@?[\w.\-]{2,30}$/.test(t)) return { platform: null, value: t.replace(/^@/, ''), ambiguous: ['tiktok', 'youtube', 'facebook'] };
+  return null;
+}
+async function smartConnect(text, as) {
+  let d = detectPlatform(text);
+  if (!d) return { ok: false, error: 'Không nhận ra – dán link kênh TikTok, YouTube, Trang Facebook hoặc @tên' };
+  if (as && ['tiktok', 'youtube', 'facebook'].includes(as)) d = { ...d, platform: as };
+  if (!d.platform) return { ok: false, ask: d.ambiguous, value: d.value };
+  if (d.platform === 'tiktok') {
+    const u = normalizeUser(d.value); if (!validUser(u)) return { ok: false, error: 'Tên TikTok không hợp lệ' };
+    config.tiktok = { username: u, on: true }; saveConfig(); tiktokApply();
+  } else if (d.platform === 'youtube') {
+    const v = /^[\w.\-]{3,30}$/.test(d.value) && !/youtu/i.test(d.value) && !/^UC/.test(d.value) ? '@' + d.value : d.value;
+    if (!parseYouTubeInput(v)) return { ok: false, error: 'Link YouTube không hợp lệ' };
+    config.youtube = { ...config.youtube, input: v, on: true }; saveConfig(); youtubeApply();
+    if (!ytKey()) { broadcast({ type: 'config', config: publicConfig() }); return { ok: true, platform: 'youtube', need: 'ytKey' }; }
+  } else {
+    const page = parsePage(d.value); if (page === null) return { ok: false, error: 'Tên Trang Facebook không hợp lệ' };
+    config.facebook = { ...config.facebook, page: page === 'me' ? '' : page, on: true }; saveConfig();
+    if (!secretGet('facebook')) { broadcast({ type: 'config', config: publicConfig() }); return { ok: true, platform: 'facebook', need: 'fbToken' }; }
+    facebookApply();
+  }
+  broadcast({ type: 'config', config: publicConfig() });
+  return { ok: true, platform: d.platform };
+}
+// ---- một nút "Bắt đầu buổi live": cửa sổ game, các nguồn comment, OBS ----
+async function sessionStart() {
+  const steps = [];
+  if (!controlClients.size) { const r = openGameWindow(); steps.push({ name: 'Cửa sổ game', ok: r.ok, msg: r.ok ? 'đang mở…' : r.error }); await sleep(r.ok ? 4000 : 0); }
+  else steps.push({ name: 'Cửa sổ game', ok: true, msg: 'đang chạy' });
+  const pf = [['TikTok', config.tiktok.on, () => tiktokApply(), tiktok], ['YouTube', config.youtube.on, () => youtubeApply(), youtube], ['Facebook', config.facebook.on, () => facebookApply(), facebook]];
+  for (const [name, on, apply, src] of pf) {
+    if (!on) continue;
+    if (src.state !== 'live' && src.state !== 'connecting') apply();
+    steps.push({ name: name + ' (comment)', ok: src.state !== 'error', msg: src.state === 'live' ? 'đang nhận' : 'đang chờ buổi live – app tự nối khi bạn bắt đầu live' });
+  }
+  if (!pf.some(x => x[1])) steps.push({ name: 'Comment', ok: false, msg: 'chưa thêm nền tảng nào – dán link kênh vào ô Kết nối nhanh' });
+  if (config.obsLive.auto || secretGet('obs')) {
+    try {
+      const r = await obsSync();
+      if (!relay.targets.length) steps.push({ name: 'OBS', ok: false, msg: 'chưa có khóa luồng nào – nhập trong thẻ OBS' });
+      else if (obsState.streaming) steps.push({ name: 'OBS', ok: true, msg: 'đang phát rồi' });
+      else { await obs.startStream(); steps.push({ name: 'OBS', ok: true, msg: 'bắt đầu phát → ' + relay.targets.map(t => t.name).join(', ') }); }
+      for (const w of r.warnings.filter(Boolean)) steps.push({ name: 'OBS', ok: false, msg: w });
+    } catch (e) { steps.push({ name: 'OBS', ok: false, msg: String(e.message || e) }); }
+  } else steps.push({ name: 'OBS', ok: null, msg: 'không dùng (TikTok phát bằng LIVE Studio)' });
+  return { ok: steps.every(s => s.ok !== false), steps };
+}
+// ---- 🩺 kiểm tra nhanh mọi thứ, kèm cách sửa ----
+async function healthCheck() {
+  const out = [], add = (name, ok, msg, fix = '') => out.push({ name, ok, msg, fix });
+  const lb = o => o.error || ({ connecting: 'đang kết nối', offline: 'chưa live', off: 'đang tắt', live: 'đang live' }[o.state] || o.state);
+  add('Cửa sổ game', controlClients.size > 0, controlClients.size ? 'đang chạy' : 'chưa mở', 'Bấm 🪟 Mở cửa sổ game');
+  add('Claude MC', claudeReady(), claudeReady() ? 'có key' : 'chưa có key – Cậu Cả nói theo kịch bản', 'Chạy ./start.command --reset-key để nhập key');
+  const cv = currentVoice();
+  add('Giọng MC', cv.ready, cv.ready ? `${cv.engine === 'mac' ? 'giọng Mac' : 'VieNeu'} · ${cv.id}` : (vn.state === 'starting' ? 'VieNeu đang khởi động' : 'chưa có giọng'), vnInstalled() ? '' : 'Nhấp đúp cai-giong-vieneu.command để có giọng tự nhiên');
+  if (config.tiktok.on) add('TikTok', tiktok.state === 'live', tiktok.state === 'live' ? '@' + tiktok.username + ' đang live' : lb(tiktok), 'Bắt đầu live trên TikTok – app tự nối');
+  if (config.youtube.on) {
+    let msg = youtube.state === 'live' ? 'đang nhận chat' : lb(youtube), ok = youtube.state === 'live';
+    if (!ytKey()) { ok = false; msg = 'chưa có YouTube API key'; }
+    add('YouTube', ok, msg, ytKey() ? 'Bắt đầu live trên YouTube; nếu app không tự thấy, dán link buổi live' : 'Dán YouTube Data API key (Nâng cao → YouTube)');
+  }
+  if (config.facebook.on) {
+    let ok = facebook.state === 'live', msg = ok ? 'đang nhận comment' : lb(facebook);
+    if (!secretGet('facebook')) { ok = false; msg = 'chưa có Page token'; }
+    else if (!ok) { try { const r = await fetch(`${process.env.FB_GRAPH_BASE || 'https://graph.facebook.com'}/me?fields=name&access_token=${encodeURIComponent(secretGet('facebook'))}`, { signal: AbortSignal.timeout(8000) }); const j = await r.json(); if (j.error) { msg = 'token lỗi: ' + j.error.message; } else msg = `token hợp lệ (${j.name}) · ${msg}`; } catch { } }
+    add('Facebook', ok, msg, 'Dán Page token mới (Nâng cao → Facebook) hoặc bắt đầu live trên Trang');
+  }
+  if (config.obsLive.auto || secretGet('obs')) {
+    try { await obsConnect(); add('OBS', true, obsState.streaming ? 'đang phát' : 'đã kết nối', ''); } catch (e) { add('OBS', false, e.message, 'Mở OBS → Tools → WebSocket Server Settings → Enable, nhập đúng mật khẩu'); }
+    const ff = await new Promise(r => execFile(process.env.FFMPEG || 'ffmpeg', ['-version'], { timeout: 5000 }, e => r(!e)));
+    add('ffmpeg (bộ chuyển tiếp)', ff, ff ? 'có sẵn' : 'chưa cài', 'Mở Terminal chạy: brew install ffmpeg');
+    add('Khóa luồng', relayTargets().length > 0, relayTargets().map(t => t.name).join(', ') || 'chưa có', 'Nhập khóa luồng trong thẻ OBS');
+  }
+  add('Báo về điện thoại', !!config.notify.on, config.notify.on ? 'bật' : 'tắt', 'Bật trong thẻ 🔔');
+  return { ok: out.every(x => x.ok), items: out };
 }
 
 const server = http.createServer(async (req, res) => {
@@ -312,6 +468,9 @@ const server = http.createServer(async (req, res) => {
         tiktok: { ...tiktok.status(), on: config.tiktok.on, saved: config.tiktok.username, gameClients: liveWss.clients.size, relay: tfRelay.want ? tfRelay.ok : null },
         youtube: { ...youtube.status(), on: config.youtube.on, saved: config.youtube.input, minPoll: config.youtube.minPoll, ownKey: !!config.youtube.key, hasKey: !!ytKey() },
         facebook: { ...facebook.status(), on: config.facebook.on, saved: config.facebook.page, hasToken: !!secretGet('facebook') },
+        obs: { connected: obs.connected, error: obs.err, streaming: obsState.streaming, timecode: obsState.timecode, lastSync: obsState.lastSync, relay: relay.status(),
+          cfg: { url: config.obsLive.url, res: config.obsLive.res, bitrate: config.obsLive.bitrate, hasPassword: !!secretGet('obs'),
+            ...Object.fromEntries(['yt', 'fb', 'tt'].map(k => [k, { on: !!config.obsLive[k].on, server: config.obsLive[k].server, hasKey: !!secretGet('stream-' + k) }])) } },
         live: { ok: live.ok, reason: live.reason, since: live.since, lastReal: Math.max(live.lastReal, (gameState && gameState.lastReal) || 0) },
         notify: { on: config.notify.on, topic: config.notify.topic, idleMin: config.notify.idleMin },
         voice: { mac: process.platform === 'darwin', name: viVoice, checked: voiceChecked, on: config.game.mcVoice !== false, engine: config.game.voiceEngine || 'auto',
@@ -388,8 +547,55 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/facebook/disconnect') { config.facebook.on = false; saveConfig(); facebookApply(); broadcast({ type: 'config', config: publicConfig() }); return json(res, 200, { ok: true }); }
     if (p === '/api/facebook/forget') { secretSet('facebook', ''); config.facebook.on = false; saveConfig(); facebookApply(); broadcast({ type: 'config', config: publicConfig() }); return json(res, 200, { ok: true }); }
+    if (p === '/api/obs/save') {
+      const o = config.obsLive;
+      if (typeof b.url === 'string' && /^wss?:\/\/[\w.\-]+(:\d+)?\/?$/.test(b.url.trim())) o.url = b.url.trim();
+      if (typeof b.password === 'string' && b.password) secretSet('obs', b.password);
+      if (['720x1280', '1080x1920'].includes(b.res)) o.res = b.res;
+      if (Number(b.bitrate) >= 1000) o.bitrate = Math.min(9000, Math.round(Number(b.bitrate)));
+      for (const k of ['yt', 'fb', 'tt']) {
+        const t = isObj(b.targets) && b.targets[k]; if (!isObj(t)) continue;
+        if (typeof t.on === 'boolean') o[k].on = t.on;
+        if (typeof t.server === 'string' && t.server.trim()) { if (!/^rtmps?:\/\/\S+$/.test(t.server.trim())) throw new Error(`Địa chỉ máy chủ ${PF_NAMES[k]} phải bắt đầu bằng rtmp:// hoặc rtmps://`); o[k].server = t.server.trim(); }
+        if (typeof t.key === 'string' && t.key.trim()) { if (/[\s|\[\]]/.test(t.key.trim())) throw new Error(`Khóa luồng ${PF_NAMES[k]} không đúng dạng`); secretSet('stream-' + k, t.key.trim()); }
+        if (t.forget) secretSet('stream-' + k, '');
+      }
+      saveConfig();
+      if (relay.want && relay.state !== 'streaming') relayApply();
+      return json(res, 200, { ok: true, targets: relayTargets().map(t => t.name) });
+    }
+    if (p === '/api/obs/sync') { try { return json(res, 200, await obsSync()); } catch (e) { return json(res, 200, { ok: false, error: String(e.message || e) }); } }
+    if (p === '/api/obs/start') {
+      try {
+        await obsConnect();
+        if (!relay.want || relay.state === 'off' || relay.state === 'error') { const r = await obsSync(); if (!relay.targets.length) return json(res, 200, { ok: false, error: relay.error, sync: r }); }
+        if (relay.state === 'streaming') return json(res, 200, { ok: true, already: true });
+        await obs.startStream(); return json(res, 200, { ok: true, targets: relay.targets.map(t => t.name) });
+      } catch (e) { return json(res, 200, { ok: false, error: String(e.message || e) }); }
+    }
+    if (p === '/api/obs/stop') { try { await obsConnect(); await obs.stopStream(); return json(res, 200, { ok: true }); } catch (e) { return json(res, 200, { ok: false, error: String(e.message || e) }); } }
     if (p === '/api/notify/test') return json(res, 200, await notify('🍻 Cậu Cả Live', 'Thử thông báo: điện thoại đã nhận được báo từ app.', 3));
     if (p === '/api/speak') return json(res, 200, speak(b.text));
+    if (p === '/api/voices') return json(res, 200, voiceList());
+    if (p === '/api/voice/preview') {
+      const engine = b.engine === 'mac' ? 'mac' : 'vieneu', voice = String(b.id || '').slice(0, 64);
+      const text = String(b.text || '').trim().slice(0, 160) || 'Chào cả nhà! Mời cả nhà vào quán vỉa hè Cậu Cả, comment một câu là có ghế ngồi liền nha!';
+      return json(res, 200, speak(text, { engine, voice, preview: true }));
+    }
+    if (p === '/api/voice/set') {
+      const g = config.game, prevEng = g.voiceEngine;
+      if (b.engine === 'mac') { if (!macVoices.includes(b.id)) throw new Error('Mac không có giọng này'); g.voiceEngine = 'mac'; g.macVoice = b.id; }
+      else if (b.engine === 'vieneu') { if (!VN_PRESETS.some(v => v[0] === b.id) && !vn.voices.some(v => v.id === b.id)) throw new Error('Không có giọng VieNeu này'); g.voiceEngine = 'vieneu'; g.vieneuVoice = b.id; }
+      if (Number(b.rate) >= 0.7 && Number(b.rate) <= 1.5) g.voiceRate = Math.round(Number(b.rate) * 100) / 100;
+      saveConfig();
+      if (g.voiceEngine !== prevEng) { if (g.voiceEngine === 'mac') vnStop(); else vnStart(); }
+      broadcast({ type: 'config', config: publicConfig() });
+      return json(res, 200, { ok: true, current: currentVoice(), rate: voiceRate() });
+    }
+    if (p === '/api/connect/smart') return json(res, 200, await smartConnect(String(b.text || '').trim(), b.as));
+    if (p === '/api/session/start') return json(res, 200, await sessionStart());
+    if (p === '/api/session/stop') { const steps = []; if (obs.connected) { try { await obs.stopStream(); steps.push({ name: 'OBS', ok: true, msg: 'đã dừng phát' }); } catch (e) { steps.push({ name: 'OBS', ok: false, msg: e.message }); } } return json(res, 200, { ok: true, steps }); }
+    if (p === '/api/check') return json(res, 200, await healthCheck());
     if (p === '/api/window/open') return json(res, 200, openGameWindow());
     json(res, 404, { error: 'Không có' });
   } catch (e) { json(res, 500, { error: String(e.message || e) }); }
@@ -417,6 +623,7 @@ server.listen(PORT, '127.0.0.1', () => {
 `);
   if (process.platform === 'darwin' && !process.argv.includes('--no-open')) exec(`open "${BASE}/panel"`);
   tiktokApply(); youtubeApply(); facebookApply();
+  if (config.obsLive.auto) { relayApply(); obsConnect().then(() => console.log('🎬 Đã kết nối OBS')).catch(() => { }); }
 });
-const stop = () => { console.log('\n👋 Đóng quán. Hẹn gặp lại!'); tiktok.stop(); youtube.stop(); facebook.stop(); vnStop(); server.close(); process.exit(0); };
+const stop = () => { console.log('\n👋 Đóng quán. Hẹn gặp lại!'); tiktok.stop(); youtube.stop(); facebook.stop(); relay.stop(); obs.close(); vnStop(); server.close(); process.exit(0); };
 process.on('SIGINT', stop); process.on('SIGTERM', stop);
