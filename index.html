@@ -971,8 +971,9 @@ class Actor {
     if (this.drunk && !walking) { wig += Math.sin(t * 1.8 + this.phase) * 0.25; g.rotation.z = Math.sin(t * 1.3 + this.phase) * 0.1; } else g.rotation.z = 0;
     let dr = this.rot + wig - g.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr));
     g.rotation.y += dr * Math.min(1, dt * 10);
-    if (this.bubble) { this.bubbleT -= dt; if (this.bubbleT <= 0) { disposeSprite(this.bubble); this.bubble = null; } }
-    if (this.label) { const v = this.tagShown(); if (this.label.visible !== v) { this.label.visible = v; this.placeLabel(); } }
+    const near = nearStageCam(this);   // máy quay sân khấu đang cận: ẩn tên, bong bóng để khỏi che mặt người hát
+    if (this.bubble) { this.bubbleT -= dt; if (this.bubbleT <= 0) { disposeSprite(this.bubble); this.bubble = null; } else this.bubble.visible = !near; }
+    if (this.label) { const v = this.tagShown() && !near; if (this.label.visible !== v) { this.label.visible = v; this.placeLabel(); } }
   }
   dispose() {
     scene.remove(this.g); this.av.body.geometry.dispose();
@@ -2035,10 +2036,12 @@ function startSing(it) {
   else path = [];
   path.push({ x: KARAOKE.x, z: KARAOKE.z, stage: true });
   a.walkTo(path, () => { if (k.cur !== it) return; a.rot = Math.PI / 2 - 0.25; a.singing = true; it.singing = true; beginPerformance(it); });
+  StageFX.walkIn(a);   // máy quay đi theo người hát lên sân khấu
   a.say(it.title ? `Lên hát "${trunc(it.title, 18)}" đây! 🎤` : 'Lên hát đây! 🎤', 2.5);
   refreshKQ();
 }
 function beginPerformance(it) {
+  StageFX.start(it.actor);   // đèn sân khấu, khói, máy quay biểu diễn
   const name = singerName(it);
   banner(`🎤 ${esc(name)} lên hát${it.title ? '<br>“' + esc(trunc(it.title, 34)) + '”' : ''}`, 'purple', 3000);
   feed(`🎤 <b>${esc(name)}</b> đang hát${it.title ? ' <b>“' + esc(it.title) + '”</b>' : ''} – thả tim cổ vũ nha!`, 'sys');
@@ -2060,6 +2063,7 @@ function endSing(abort) {
   const k = karaoke, it = k.cur; if (!it) return;
   k.cur = null; k.line = ''; Snd.karaoke = false; Snd.duck(false); YTK.stop();
   const a = it.actor; if (a) a.singing = false;
+  StageFX.end(!!it.singing, abort || !a || (it.g && it.g.leaving));
   refreshKQ();
   if (abort || !a || (it.g && it.g.leaving)) return;
   if (it.singing) {
@@ -3019,7 +3023,7 @@ for (const [id, key] of [['ytKey', 'ytKey'], ['kMin', 'kMin'], ['kPrio', 'kPrio'
   if (el.type === 'range') el.addEventListener('input', () => { opts[key] = Number(el.value); if (key === 'ytVol') YTK.setVolume(opts.ytVol); else Mic.apply(); });
 }
 bindToggle('optKSuffix', 'kSuffix');
-Object.assign(opts, Object.assign({ bgmYt: false, bgmSource: 'youtube', bgmFolder: '', bgmScanVer: 0, bgmQuery: '', bgmLinks: '', bgmShuffle: true, bgmVol: 35, camTourEvery: 8, circusAuto: true, circusEvery: 6, mcVoice: false, mcGap: 40, jokeOn: true, jokeEvery: 4 }, opts));
+Object.assign(opts, Object.assign({ stageCam: true, stageFx: true, bgmYt: false, bgmSource: 'youtube', bgmFolder: '', bgmScanVer: 0, bgmQuery: '', bgmLinks: '', bgmShuffle: true, bgmVol: 35, camTourEvery: 8, circusAuto: true, circusEvery: 6, mcVoice: false, mcGap: 40, jokeOn: true, jokeEvery: 4 }, opts));
 bindToggle('optBgmYt', 'bgmYt', () => BGM.tick());
 $('#bgmQuery').value = opts.bgmQuery || ''; $('#bgmQuery').placeholder = 'Từ khoá nhạc nền (mặc định: ' + BGM_DEF_Q + ')';
 $('#bgmQuery').addEventListener('change', e => { opts.bgmQuery = e.target.value.trim(); saveOpts(); if (BGM.playing) BGM.play(); });
@@ -3981,6 +3985,125 @@ function drawLED(t) {
   }
   g.shadowBlur = 0; ledTex.needsUpdate = true;
 }
+function nearStageCam(a) { return StageFX.camOn() && a.g.position.distanceToSquared(camera.position) < 64; }
+/* ---------- 🎆 HIỆU ỨNG SÂN KHẤU: đèn quét, đèn rọi, khói, máy quay biểu diễn khi có người hát ---------- */
+const stageFog = new Pool(puffTex, 70), stageJet = new Pool(puffTex, 70);
+const StageFX = (() => {
+  const S = new THREE.Vector3(KARAOKE.x, 0, KARAOKE.z), TX = KARAOKE.x + 1.55, TY = 3.35, TZ = 2.25;
+  // giàn đèn (2 cột + xà ngang) trước sân khấu
+  scene.add(new THREE.Mesh(merge([CY(0.05, 0.05, TY, '#3a3a44', [TX, TY / 2, KARAOKE.z - TZ], null, 8), CY(0.05, 0.05, TY, '#3a3a44', [TX, TY / 2, KARAOKE.z + TZ], null, 8),
+    CY(0.045, 0.045, TZ * 2, '#3a3a44', [TX, TY, KARAOKE.z], [Math.PI / 2, 0, 0], 8)]), vcMat));
+  const beamTex = canvasTex(4, 64, c => { const gr = c.createLinearGradient(0, 0, 0, 64); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.fillRect(0, 0, 4, 64); });
+  const beamGeo = new THREE.ConeGeometry(0.6, 4.2, 22, 1, true).translate(0, -2.1, 0).rotateX(-Math.PI / 2);   // đỉnh ở gốc, loe về +z
+  const headGeo = merge([B(0.22, 0.18, 0.22, '#222', 0, 0, 0), CY(0.08, 0.08, 0.03, '#ddd', [0, -0.1, 0], null, 10)]);
+  const heads = [-1.6, -0.55, 0.55, 1.6].map((dz, i) => {
+    const pos = new THREE.Vector3(TX, TY - 0.14, KARAOKE.z + dz);
+    const h = new THREE.Mesh(headGeo, vcMat); h.position.copy(pos); scene.add(h);
+    const mat = new THREE.MeshBasicMaterial({ map: beamTex, color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const beam = new THREE.Mesh(beamGeo, mat); beam.position.copy(pos); beam.visible = false; beam.renderOrder = 6; scene.add(beam);
+    return { pos, beam, mat, i };
+  });
+  // 2 đèn rọi chiếu người hát (tạo sẵn lúc mở game để không phải dựng lại shader khi bật)
+  const spots = [heads[0].pos, heads[3].pos].map(p => { const l = new THREE.SpotLight(0xffffff, 0, 11, 0.42, 0.65, 1.2); l.position.copy(p); scene.add(l); scene.add(l.target); return l; });
+  const ringTex = canvasTex(128, 128, c => { const gr = c.createRadialGradient(64, 64, 6, 64, 64, 62); gr.addColorStop(0, 'rgba(255,255,255,.95)'); gr.addColorStop(0.55, 'rgba(255,240,200,.45)'); gr.addColorStop(1, 'rgba(255,240,200,0)'); c.fillStyle = gr; c.fillRect(0, 0, 128, 128); });
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(0.85, 36).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: ringTex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+  floor.position.set(S.x, 0.03, S.z); floor.renderOrder = 4; scene.add(floor);
+  const st = { on: false, actor: null, camOn: false, walk: false, t: 0, lvl: 0, endT: 0, jetT: 0, jetAcc: 0, fogAcc: 0, shot: -1, shotT: 0, from: null, fromLook: null, look: new THREE.Vector3(), demo: null };
+  const SEQ = [0, 1, 2, 3, 1, 4, 5], SHOT_LEN = 7;
+  const v = (x, y, z) => new THREE.Vector3(x, y, z);
+  const P = () => (st.actor ? st.actor.g.position : S);
+  function shot(i, k) {   // trả về [vị trí máy quay, điểm nhìn] ở tiến độ k (0..1) của cảnh – mỗi cảnh có dolly nhẹ
+    const p = P(), port = innerWidth / innerHeight < 0.8, far = port ? 1.35 : 1, up = port ? 0.75 : 0;
+    const L = (a, b) => a.clone().lerp(b, k);
+    const off = (o1, o2, base) => base.clone().add(L(o1, o2).multiplyScalar(far));
+    switch (i) {
+      case 0: return [off(v(8.5, 3.0, 3.0), v(7.0, 2.6, 2.0), S), S.clone().add(v(0, 1.1 + up, 0))];              // toàn cảnh sân khấu
+      case 1: return [off(v(2.7, 1.3, 1.0), v(2.1, 1.2, 0.5), p), p.clone().add(v(0, 0.95 + up * 0.6, 0))];     // cận mặt người hát
+      case 2: return [off(v(3.3, 0.45, -1.7), v(2.8, 0.5, -0.6), p), p.clone().add(v(0, 1.35 + up, 0))];       // góc thấp
+      case 3: return [off(v(5.0, 5.2, -4.2), v(4.2, 4.6, -2.6), S), S.clone().add(v(0, 0.6 + up, 0.3))];      // trên cao chéo
+      case 4: return [off(v(9.5, 1.7, -3.6), v(8.4, 1.7, -2.4), S), p.clone().add(v(0, 1.0 + up, 0))];        // qua vai khán giả
+      default: return [st.home.clone(), st.homeLook.clone()];                                                   // toàn cảnh quán
+    }
+  }
+  function camEnable() {
+    if (st.camOn) return; if (CamTour.on) CamTour.stop();
+    st.camOn = true; controls.enabled = false; st.home = camera.position.clone(); st.homeLook = controls.target.clone();
+    st.from = camera.position.clone(); st.fromLook = controls.target.clone(); st.look.copy(controls.target); st.blend = 0;
+  }
+  function camDisable() { if (!st.camOn) return; st.camOn = false; controls.enabled = true; fitCamera(); }
+  function jet(sec = 1.3) { st.jetT = Math.max(st.jetT, sec); Snd.whoosh ? Snd.whoosh() : null; }
+  return {
+    camOn: () => st.camOn,
+    get on() { return st.on; },
+    walkIn(a) { if (opts.stageCam === false || !a) return; st.actor = a; st.walk = true; camEnable(); st.blend = 0; st.from = camera.position.clone(); st.fromLook = st.look.clone(); },
+    start(a) {
+      st.actor = a || st.actor; st.on = opts.stageFx !== false; st.walk = false; st.t = 0; st.endT = 0; st.shot = -1; st.shotT = 0;
+      if (st.on) { jet(1.6); explode(new THREE.Vector3(S.x + 0.4, 2.4, S.z), 90, 0.22, 2.6, 1.6); }
+      if (opts.stageCam !== false) { camEnable(); st.from = camera.position.clone(); st.fromLook = st.look.clone(); st.blend = 0; }
+    },
+    end(finished, abort) {
+      if (!st.on && !st.camOn) return;
+      if (abort) return this.stop();
+      if (finished && st.on) { jet(1.8); explode(new THREE.Vector3(S.x + 0.6, 2.6, S.z), 160, 0.26, 3.6, 2.0); }
+      st.endT = 3.2;   // giữ cảnh chào khán giả rồi mới trả máy quay
+    },
+    stop() { st.on = false; st.walk = false; st.endT = 0; st.actor = null; camDisable(); },
+    demo() {
+      if (karaoke.cur || st.on || st.demo) return false;
+      st.demo = true; const o = owner;
+      this.walkIn(o);
+      o.walkTo([{ x: KARAOKE.x, z: KARAOKE.z, stage: true }], () => {
+        o.rot = Math.PI / 2 - 0.25; o.singing = true; this.start(o); ownerSay('Cậu Cả thử sân khấu nè! Đèn, khói, quẩy lên nào!', true);
+        setTimeout(() => { o.singing = false; this.end(true); setTimeout(() => { st.demo = false; if (!karaoke.cur) o.walkTo([{ x: -FACADE_X + 0.75, z: -3.9 }], () => { o.rot = Math.PI / 2 + 0.5; }); }, 3400); }, 24000);
+      });
+      return true;
+    },
+    update(dt, T) {
+      // đèn: bật/tắt mượt
+      const want = st.on ? 1 : 0; st.lvl += (want - st.lvl) * Math.min(1, dt * 2.5);
+      const lv = st.lvl, p = P();
+      for (const h of heads) {
+        h.beam.visible = lv > 0.02;
+        if (!h.beam.visible) continue;
+        const focus = (T % 9) < 2.2;   // định kỳ mọi đèn cùng rọi vào người hát
+        const tgt = focus ? p.clone().add(v(0, 0.9, 0)) : v(S.x + 1.2 + Math.sin(T * 0.9 + h.i * 1.7) * 2.2, 0, S.z + Math.cos(T * 0.7 + h.i * 1.3) * 2.6);
+        h.beam.lookAt(tgt); h.mat.opacity = 0.42 * lv;
+        h.mat.color.setHSL((T * 0.08 + h.i * 0.22) % 1, 1, 0.6);
+      }
+      spots.forEach((l, i) => { l.intensity = 70 * lv; l.target.position.set(p.x, 0.8, p.z); l.color.setHSL((T * 0.08 + 0.5 + i * 0.3) % 1, 0.7, 0.75); });
+      floor.position.set(p.x, 0.03, p.z); floor.material.opacity = lv * (0.55 + Math.sin(T * 6) * 0.15);
+      if (st.on) {
+        st.t += dt;
+        // khói mờ sát sàn, trôi ra phía khán giả
+        st.fogAcc += dt; while (st.fogAcc > 0.11) { st.fogAcc -= 0.11; const c = new THREE.Color().setHSL((T * 0.08) % 1, 0.6, 0.82);
+          stageFog.spawn(S.x + rand(-1.2, 1.0), 0.18, S.z + rand(-1.8, 1.8), { size: rand(1.1, 1.7), grow: 1.3, life: rand(4, 6), vx: rand(0.15, 0.4), vy: 0.03, vz: rand(-0.1, 0.1), color: '#' + c.getHexString(), base: 0.26 }); }
+        if (st.t > 6 && (st.t % 24) < dt) jet(1.2);   // phun khói giữa bài
+      }
+      if (st.jetT > 0) {   // cột khói CO2 phun lên ở 2 góc sân khấu
+        st.jetT -= dt; st.jetAcc += dt;
+        while (st.jetAcc > 0.025) { st.jetAcc -= 0.025; for (const dz of [-1.75, 1.75]) stageJet.spawn(S.x + 1.15 + rand(-0.05, 0.05), 0.15, S.z + dz + rand(-0.05, 0.05), { size: rand(0.3, 0.45), grow: 3.2, life: rand(0.9, 1.3), vy: rand(4.5, 6), vx: rand(-0.2, 0.3), vz: rand(-0.25, 0.25), color: '#ffffff', base: 0.55 }); }
+      }
+      if (st.endT > 0) { st.endT -= dt; if (st.endT <= 0) this.stop(); }
+    },
+    cam(dt) {
+      if (camera.view && camera.view.enabled) { camera.clearViewOffset(); camera.updateProjectionMatrix(); }
+      let pos, look;
+      if (st.walk && st.actor) {   // đi theo người hát lên sân khấu
+        const a = st.actor.g.position, port = innerWidth / innerHeight < 0.8, far = port ? 1.35 : 1;
+        pos = a.clone().add(v(3.8 * far, 2.4, 1.6 * far)); look = a.clone().add(v(0, 0.9 + (port ? 0.6 : 0), 0));
+      } else {
+        st.shotT -= dt;
+        if (st.shotT <= 0) { st.shot = (st.shot + 1) % SEQ.length; st.shotT = SEQ[st.shot] === 5 ? 6 : SHOT_LEN; st.from = camera.position.clone(); st.fromLook = st.look.clone(); st.blend = 0; }
+        const len = SEQ[st.shot] === 5 ? 6 : SHOT_LEN, k = 1 - Math.max(0, st.shotT) / len;
+        [pos, look] = shot(SEQ[st.shot], k);
+      }
+      st.blend = Math.min(1, (st.blend || 0) + dt / 0.7); const e = st.blend * st.blend * (3 - 2 * st.blend);
+      camera.position.copy(st.from).lerp(pos, e); st.look.copy(st.fromLook).lerp(look, e);
+      if (st.walk) { st.from.copy(camera.position); st.fromLook.copy(st.look); st.blend = Math.min(st.blend, 0.08); }   // bám theo mượt khi đang đi
+      camera.lookAt(st.look);
+    }
+  };
+})();
 /* ---------- 🎥 Máy quay xoay 360° định kỳ quanh quán cho đỡ nhàm ---------- */
 const CamTour = {
   on: false, t: 0, dur: 28, nextAt: 0, near: null,
@@ -4072,7 +4195,8 @@ function loop() {
     for (const g of guests.values()) if (!g.npc && !g.leaving && !g.singing && g.rank === 0 && tnow - g.lastActive > (full ? 240000 : 600000) && Math.random() < 0.35) g.leave();
     for (const g of guests.values()) if (g.drinks > 0) { g.drinks--; if (g.drunk && g.drinks < 4) { g.drunk = false; g.refreshLabel(); } }
   }
-  if (CamTour.on) CamTour.update(dt); else { CamTour.tick(); controls.update(); }
+  StageFX.update(dt, T); stageFog.update(dt); stageJet.update(dt);
+  if (StageFX.camOn()) StageFX.cam(dt); else if (CamTour.on) CamTour.update(dt); else { CamTour.tick(); controls.update(); }
   renderer.render(scene, camera);
   // tự giảm độ phân giải nếu máy yếu
   perfT += dt; perfAcc += dt; perfN++;
@@ -4082,11 +4206,11 @@ function loop() {
 /* =====================================================================
    KHỞI ĐỘNG
    ===================================================================== */
-addEventListener('resize', () => { if (CamTour.on) CamTour.stop(); fitCamera(); });
+addEventListener('resize', () => { if (CamTour.on) CamTour.stop(); fitCamera(); });   // máy quay sân khấu tự bỏ view offset ở khung kế
 fitCamera();
 drawLED(0);
 window.__gameReady = true;
-window.__cc = { CamTour, renderer, guests, handle, Actor, lookFor, controls, actors, runEvent, tables, camera, THREE, karaoke, traffic, Mic, YTK, MG, opts, Circus, BGM, TRIVIA, approach, KARAOKE, STAGE_BOX, routeAround, owner, LANES: { LANE_IN, LANE_MID, LANE_OUT, FACADE_X } };
+window.__cc = { StageFX, CamTour, renderer, guests, handle, Actor, lookFor, controls, actors, runEvent, tables, camera, THREE, karaoke, traffic, Mic, YTK, MG, opts, Circus, BGM, TRIVIA, approach, KARAOKE, STAGE_BOX, routeAround, owner, LANES: { LANE_IN, LANE_MID, LANE_OUT, FACADE_X } };
 document.getElementById('loadErr').style.display = 'none';
 loop();
 
@@ -4134,7 +4258,7 @@ function applyAppConfig(c) {
   if (!c) return;
   if (c.platforms) { const pf = c.platforms, n = []; if (pf.youtube) n.push('<span class="pf yt">YT</span>Super Chat = gọi món theo số tiền'); if (pf.facebook) n.push('<span class="pf fb">FB</span>comment, thả cảm xúc'); $('#platNote').innerHTML = n.length ? ' · ' + n.join(' · ') : ''; }
   const g = c.game || {};
-  for (const k of ['aiModel', 'aiEvery', 'aiMax', 'kMin', 'kPrio', 'kMax', 'botsOn', 'botMin', 'mgAuto', 'mgEvery', 'autoOn', 'autoLuckyMin', 'bgmYt', 'bgmSource', 'bgmFolder', 'bgmScanVer', 'bgmQuery', 'bgmLinks', 'bgmShuffle', 'bgmVol', 'camTourEvery', 'circusAuto', 'circusEvery', 'mcVoice', 'mcGap', 'jokeOn', 'jokeEvery']) if (g[k] !== undefined) opts[k] = g[k];
+  for (const k of ['aiModel', 'aiEvery', 'aiMax', 'kMin', 'kPrio', 'kMax', 'botsOn', 'botMin', 'mgAuto', 'mgEvery', 'autoOn', 'autoLuckyMin', 'bgmYt', 'bgmSource', 'bgmFolder', 'bgmScanVer', 'bgmQuery', 'bgmLinks', 'bgmShuffle', 'bgmVol', 'camTourEvery', 'stageCam', 'stageFx', 'circusAuto', 'circusEvery', 'mcVoice', 'mcGap', 'jokeOn', 'jokeEvery']) if (g[k] !== undefined) opts[k] = g[k];
   BGM.setVolume(Number(opts.bgmVol ?? 35)); setTimeout(() => BGM.tick(), 50);
   // key YouTube: app có key thì dùng key app; app chưa có mà game đã có (dán trong ⚙️ game) thì gửi lên app, không xoá
   if (g.ytKey) { if (g.ytKey !== opts.ytKey) { opts.ytKey = g.ytKey; karaoke.queue.forEach(it => { if (it.kind === 'song' && !it.link && it.vstatus !== 'ok') resolveVideo(it); }); } }
@@ -4152,6 +4276,7 @@ function appCmd(c) {
     case 'event': if (['dzo', 'lucky', 'fire', 'party', 'clearDish', 'reset', 'circus'].includes(c.name)) runEvent(c.name); break;
     case 'live': setAppLive(!!c.ok, c.reason); break;
     case 'camtour': CamTour.start(); break;
+    case 'stagefx': if (!StageFX.demo()) feed('🎤 Sân khấu đang bận – thử lại khi không có ai hát', 'sys'); break;
     case 'bgm': if (c.action === 'next') { if (BGM.playing) BGM.next(); else BGM.tick(); } else if (c.action === 'play') { opts.bgmYt = true; saveOpts(); BGM.retryAt = 0; BGM.warned = false; BGM.list = []; BGM.playing = false; BGM.tick(); } else if (c.action === 'stop') { opts.bgmYt = false; saveOpts(); BGM.pause(); } break;
     case 'circus': if (c.name === 'stop') Circus.stop(); else if (!Circus.cur) Circus.start(c.name, 'host'); break;
     case 'mg': if (c.name === 'stop') MG.stop('⏹ Chủ quán dừng trò chơi'); else if (MG_INFO[c.name] && !MG.start(c.name, 'host')) feed('Đang có trò chơi chạy', 'sys'); break;

@@ -229,6 +229,12 @@ Key được giữ trên máy theo hai cách, không có cách nào để key n�
 - Người xem comment `hát <tên bài>` rồi tặng quà **từ 50 xu** để chốt bài. Quà **từ 180 xu** được chen hàng. Đổi hai mức này trên bảng điều khiển → ⚙️ Cấu hình.
 - **Tự tìm bài**: nhập YouTube Data API key trong bảng điều khiển (hoặc ⚙️ của game – key được lưu lên app). Bấm **🔎 Kiểm tra key** để thử tìm một bài: nếu lỗi, bảng điều khiển nói rõ cách sửa (key sai, chưa bật YouTube Data API v3, key giới hạn trang web, hết hạn mức). Bấm **🎤 Phát thử** để thêm bài vào hàng chờ và nghe thử trong game. Hạn mức miễn phí khoảng 100 lượt tìm mỗi ngày.
 - **Không có key**: dùng 🔎 Tìm và 🔗 Dán link trong ⚙️ của game, hoặc ô **Thêm bài** trên bảng điều khiển.
+- **🎆 Hiệu ứng sân khấu** khi có người hát:
+  - Máy quay **đi theo người hát** lên sân khấu.
+  - Khi họ bắt đầu hát, máy quay đổi góc khoảng 7 giây một lần: toàn cảnh sân khấu, cận mặt, góc thấp, trên cao, qua vai khán giả, xen lẫn toàn cảnh quán.
+  - Giàn đèn trước sân khấu có **4 đèn quét** đổi màu, cứ khoảng 9 giây lại cùng rọi vào người hát. Thêm **2 đèn rọi**, vòng sáng dưới chân, **khói mờ** sát sàn và **cột khói phun** lúc bắt đầu, giữa bài và lúc kết. Hát xong có pháo giấy.
+  - Ở góc cận, tên và bong bóng chữ của nhân vật được ẩn để không che mặt người hát.
+  - Bật/tắt đèn khói và máy quay biểu diễn ở ⚙️ Cấu hình. Nút **🎤 Thử sân khấu** cho Cậu Cả lên diễn thử khoảng 25 giây.
 - **Sân khấu** nằm sát tường mặt tiền quán: TV treo tường, hai loa hai bên, micro đứng giữa. Người hát đi qua khe giữa bàn 1 và bàn 2 để lên sân khấu; nhân vật tự đi vòng phía trước sân khấu, không đi xuyên loa hay TV.
 - **Lên mic**: người xem comment `xin lên mic`, bạn mời họ làm **Khách mời** trên TikTok. Giọng hát đi thẳng vào phòng live.
 
