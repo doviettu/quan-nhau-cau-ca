@@ -68,8 +68,22 @@ body.party .vibeBar i{animation:hue 1s linear infinite}
 .kqi.mut{opacity:.7}
 #ktv{position:absolute;left:50%;top:calc(31% + var(--sat));transform:translateX(-50%);width:min(94vw,620px);background:#0d0812;border:2px solid #ff4fb8;border-radius:14px;overflow:hidden;box-shadow:0 10px 40px rgba(255,60,170,.35)}
 #ktv.mini{left:auto;right:calc(62px + var(--sar));top:auto;bottom:calc(12px + var(--sab));transform:none;width:min(52vw,300px)}
+/* đang hát: khung karaoke to hết cỡ để người xem đọc được lời (không cắt video – điều khoản YouTube không cho che/cắt trình phát) */
+@media (orientation:portrait){
+  #ktv:not(.mini){left:0;width:100vw;transform:none;border-left:0;border-right:0;border-radius:0;top:calc(var(--sat) + 112px)}
+}
+@media (orientation:landscape){
+  #ktv:not(.mini){width:min(72vw,calc((100vh - 150px) * 1.7778));top:calc(var(--sat) + 64px)}
+}
+body:has(#ktv:not(.hidden):not(.mini)) #menuList,body:has(#ktv:not(.hidden):not(.mini)) #menuPanel .hint{display:none}   /* thu gọn bảng quà khi đang hát */
 .ktvBar{display:flex;align-items:center;gap:6px;padding:4px 6px 4px 10px;background:linear-gradient(90deg,#7b1fa2,#e91e63);font-size:12.5px;font-weight:800}
 .ktvBar span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ktvTick{overflow:hidden;white-space:nowrap;background:linear-gradient(90deg,#2a0f3a,#4a1240,#2a0f3a);border-top:1px solid rgba(255,79,184,.5);font-size:14px;font-weight:800;line-height:30px;height:30px}
+.ktvTick span{display:inline-block;padding-left:100%;animation:ktvTick var(--tickDur,28s) linear infinite;color:#ffe9a6}
+.ktvTick b{color:#fff}
+@keyframes ktvTick{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+@media (orientation:landscape){.ktvTick{font-size:17px;line-height:36px;height:36px}}
+#ktv.mini .ktvTick{font-size:11px;line-height:22px;height:22px}
 .ktvBar button{flex:none;width:30px;height:26px;border-radius:8px;border:none;background:rgba(0,0,0,.3);font-size:14px}
 .ktvBox{position:relative;width:100%;aspect-ratio:16/9;background:#000}
 #ktvPlayer,#ktvPlayer iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
@@ -251,6 +265,7 @@ kbd{background:rgba(255,255,255,.15);border-radius:5px;padding:0 5px;font-size:1
   <div id="ktv" class="pe hidden">
     <div class="ktvBar"><span id="ktvTitle">🎤</span><button id="ktvSize" title="Thu nhỏ / phóng to">⤢</button><button id="ktvSkip" title="Qua bài">⏭</button></div>
     <div class="ktvBox"><div id="ktvPlayer"></div><div id="ktvMsg" class="hidden"></div></div>
+    <div class="ktvTick"><span id="ktvTick"></span></div>
   </div>
   <div id="feed"></div>
 
@@ -354,7 +369,7 @@ kbd{background:rgba(255,255,255,.15);border-radius:5px;padding:0 5px;font-size:1
   <div class="row"><label class="lbl">Âm lượng mic</label><input type="range" id="micVol" min="0" max="200"></div>
 
   <h4>⚡ Cấu hình nhanh cho Live</h4>
-  <p>Một chạm cho phòng live mới: Claude Haiku 5.5 (rẻ, nhanh), tự động dẫn live, khách quen giữ quán tối thiểu 20 người, trò chơi nhỏ mỗi 3 phút, karaoke chốt bài từ 1 xu.</p>
+  <p>Một chạm cho phòng live mới: Claude Haiku 5.5 (rẻ, nhanh), tự động dẫn live, khách quen giữ quán tối thiểu 20 người, trò chơi nhỏ mỗi 3 phút, karaoke chốt bài từ 50 xu, chen hàng từ 180 xu.</p>
   <div class="btns"><button class="btn pri" id="presetLive">⚡ Áp dụng cấu hình Live (Haiku 5.5)</button></div>
 
   <h4>🏠 Khách quen (người máy) & trò chơi nhỏ</h4>
@@ -472,13 +487,14 @@ function saveOpts() { store.set(opts); }
 /* =====================================================================
    BỐ CỤC QUÁN – hai dãy vỉa hè kê bàn, lòng đường ở giữa cho xe qua lại
    ===================================================================== */
-const FACADE_X = 9.6, CURB_X = 1.7, TABLE_X = 3.6, TABLE_X2 = 6.6;   // vỉa hè trước quán rộng, 2 dãy bàn
+const FACADE_X = 13, CURB_X = 1.7, TABLE_X = 4.3, TABLE_X2 = 8.7;   // vỉa hè trước quán rộng, 2 dãy bàn giãn xa nhau
 const ROWS = [6.6, 3.3, 0, -3.3, -6.6];   // vị trí bàn dọc theo phố (trục z = trái ↔ phải màn hình)
-const LANE_IN = 2.3, LANE_MID = 5.1, LANE_OUT = 8.1;   // lối đi: sát lòng đường / giữa 2 dãy bàn / sát mặt tiền quán
+const LANE_IN = 2.9, LANE_MID = 6.5, LANE_OUT = 11.1;   // lối đi: sát lòng đường / giữa 2 dãy bàn / sát mặt tiền quán
 const TOP_DZ = 0.42, SIDE_OFF = 0.62, END_OFF = 1.2, GAP_DZ = 1.65;
 const SEATS_PER = 6, STOOL_H = 0.3, HIP = 0.37;
 const FRONT_Z = 14, BACK_Z = -14, DOOR_Z = -1.65;   // khách đi vào từ hai đầu phố (trái/phải màn hình)
-const KARAOKE = { x: -3.45, z: 6.6 };   // góc karaoke thế chỗ bàn đầu dãy bên quán (đối diện)
+const KARAOKE = { x: -4.1, z: 3.6 };   // sân hát karaoke: thế chỗ 2 bàn đầu dãy sát đường, nằm trong khung hình dọc
+const KARA_ROWS = [6.6, 3.3];         // các chỗ bàn dãy ngoài nhường cho sân hát
 
 /* =====================================================================
    THỰC ĐƠN: QUÀ → MÓN
@@ -531,22 +547,23 @@ controls.enablePan = false; controls.enableDamping = true; controls.dampingFacto
 controls.minPolarAngle = 0.5; controls.maxPolarAngle = 1.5;
 controls.minAzimuthAngle = 0.25; controls.maxAzimuthAngle = 1.95;
 controls.rotateSpeed = 0.6; controls.zoomSpeed = 0.8;
-const CAM_DIR = new THREE.Vector3(0.86, 0.27, 0.44).normalize();   // đứng bên này đường, ngang tầm mắt, nhìn chéo sang quán
+const CAM_DIR = new THREE.Vector3(0.86, 0.2588, 0.44).normalize();   // đứng bên này đường, máy nghiêng 15° so với mặt ngang (0.2588 = 0.966·tan15°), nhìn chéo sang quán
 function fitCamera() {
   const w = innerWidth, h = innerHeight, a = w / h;
   renderer.setSize(w, h);
   camera.aspect = a;
   camera.fov = a < 0.8 ? 60 : a < 1.2 ? 54 : 45;
   camera.updateProjectionMatrix();
-  controls.target.set(a < 0.8 ? -5.6 : -5.2, a < 0.8 ? 2.4 : 2.2, a < 0.8 ? -0.2 : -0.4);
+  const tu = window.__camTune || {};
+  controls.target.set(a < 0.8 ? (tu.tx ?? -10.0) : (tu.lx ?? -7.2), a < 0.8 ? (tu.ty ?? 4.0) : (tu.ly ?? 2.2), a < 0.8 ? (tu.tz ?? 0.6) : -0.4);
   const tv = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-  const halfW = a < 0.8 ? 6.2 : 9.5;
+  const halfW = a < 0.8 ? (tu.halfW ?? 6.4) : (tu.lhalfW ?? 9.5);
   const halfV = a < 0.8 ? 5.5 : 6.2;
   const dist = clamp(Math.max(halfW / (tv * a), halfV / tv), 14, 42);
   // điện thoại dọc: nhìn chúc xuống hơn và đẩy khung hình xuống dưới để bảng điều khiển phía trên không che quán
-  const dir = a < 0.8 ? new THREE.Vector3(0.9, 0.36, 0.3).normalize() : CAM_DIR;
+  const dir = a < 0.8 ? new THREE.Vector3(0.9, tu.elev ?? 0.2543, tu.dz ?? 0.3).normalize() : CAM_DIR;   // máy nghiêng 15° so với mặt ngang (0.2543 = 0.949·tan15°)
   camera.position.copy(controls.target).addScaledVector(dir, dist);
-  if (a < 0.8) camera.setViewOffset(w, h, 0, -Math.round(h * 0.07), w, h); else camera.clearViewOffset();
+  if (a < 0.8) camera.setViewOffset(w, h, 0, -Math.round(h * (tu.off ?? -0.2)), w, h);   // biển hiệu sát mép trên, đường sát mép dưới else camera.clearViewOffset();
   controls.minDistance = dist * 0.35; controls.maxDistance = dist * 1.3;
   controls.update();
   scene.fog.near = dist * 1.0; scene.fog.far = dist * 2.8;
@@ -1002,8 +1019,8 @@ const beams = [];
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.29, 0.025, 6, 24), stageStrip); ring.position.set(0, 0.65, 0.3); loa.add(ring);
   const mic = new THREE.Mesh(merge([CY(0.15, 0.18, 0.03, '#222', [0, 0.015, 0], null, 10), CY(0.015, 0.015, 1.3, '#999', [0, 0.65, 0], null, 6), CY(0.03, 0.02, 0.12, '#111', [0, 1.33, 0.04], [0.5, 0, 0], 8), SP(0.04, '#aaa', [0, 1.4, 0.07])]), vcMat);
   mic.position.set(KARAOKE.x + 0.25, 0, KARAOKE.z - 0.8); scene.add(mic);
-  const rug = new THREE.Mesh(merge([B(1.5, 0.01, 1.3, '#8e1b3a', 0, 0.007, 0), B(1.3, 0.012, 1.1, '#b5294e', 0, 0.008, 0)]), vcMat);
-  rug.position.set(KARAOKE.x, 0, KARAOKE.z); scene.add(rug);
+  const rug = new THREE.Mesh(merge([B(2.3, 0.01, 3.4, '#8e1b3a', 0, 0.007, 0), B(2.1, 0.012, 3.2, '#b5294e', 0, 0.008, 0), B(1.9, 0.014, 0.06, '#ffd54f', 0, 0.009, 1.45), B(1.9, 0.014, 0.06, '#ffd54f', 0, 0.009, -1.45)]), vcMat);
+  rug.position.set(KARAOKE.x - 0.1, 0, KARAOKE.z + 0.3); scene.add(rug);
   ledCanvas = document.createElement('canvas'); ledCanvas.width = 320; ledCanvas.height = 160; ledCtx = ledCanvas.getContext('2d');
   ledTex = new THREE.CanvasTexture(ledCanvas); ledTex.colorSpace = THREE.SRGBColorSpace;
   const tv = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.95), new THREE.MeshBasicMaterial({ map: ledTex }));
@@ -1024,9 +1041,9 @@ const beams = [];
 /* ---------- Đèn ---------- */
 scene.add(new THREE.HemisphereLight(0xffd2a8, 0x2a1830, 1.9));
 const moon = new THREE.DirectionalLight(0xa8b4ff, 0.9); moon.position.set(6, 14, 8); scene.add(moon);
-const warm1 = new THREE.PointLight(0xffb066, 40, 16, 1.6); warm1.position.set(-4.5, 4.6, 4); scene.add(warm1);
-const warm2 = new THREE.PointLight(0xffb066, 40, 16, 1.6); warm2.position.set(-4.5, 4.6, -4); scene.add(warm2);
-const shopLight = new THREE.PointLight(0xff9a3c, 40, 14, 1.6); shopLight.position.set(-7.6, 2.8, 0); scene.add(shopLight);
+const warm1 = new THREE.PointLight(0xffb066, 40, 16, 1.6); warm1.position.set(-6.2, 4.6, 4); scene.add(warm1);
+const warm2 = new THREE.PointLight(0xffb066, 40, 16, 1.6); warm2.position.set(-6.2, 4.6, -4); scene.add(warm2);
+const shopLight = new THREE.PointLight(0xff9a3c, 40, 14, 1.6); shopLight.position.set(-10.4, 2.8, 0); scene.add(shopLight);
 const stageLight = new THREE.PointLight(0xff3d9a, 35, 13, 1.6); stageLight.position.set(KARAOKE.x + 1.6, 3.0, KARAOKE.z); scene.add(stageLight);
 // dây đèn bóng tròn giăng ngang phố
 {
@@ -1118,7 +1135,7 @@ const bikeGeoC = c => bikeGeoCache[c] || (bikeGeoCache[c] = bikeGeo(c));
    ===================================================================== */
 const tables = []; const seats = [];
 const plasticMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-const NT = ROWS.length * 2 - 1;   // 2 dãy × 5, trừ chỗ góc karaoke
+const NT = ROWS.length * 2 - KARA_ROWS.length;   // 2 dãy × 5, trừ chỗ sân hát karaoke
 const topGeo = new THREE.BoxGeometry(0.82, 0.05, 0.82).translate(0, 0.53, 0);
 const tableTops = new THREE.InstancedMesh(topGeo, plasticMat, NT * 2);
 const tableLegs = new THREE.InstancedMesh(new THREE.BoxGeometry(0.05, 0.52, 0.05).translate(0, 0.26, 0), plasticMat, NT * 8);
@@ -1132,7 +1149,7 @@ const blobs = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.0, 3.0).rotateX(
   const r = mulberry32(42);
   let ti = 0, li = 0, si = 0;
   [0, 1].forEach((col, k) => [...ROWS].sort((p, q) => q - p).forEach((z, ri) => {
-    if (col === 0 && z === KARAOKE.z) return;
+    if (col === 0 && KARA_ROWS.includes(z)) return;
     const sd = -1, x = -(col ? TABLE_X2 : TABLE_X), n = tables.length + 1;
     const base = (ri + k) % 2 ? BLUE : RED;
     for (const dz of [-TOP_DZ, TOP_DZ]) {
@@ -1793,7 +1810,12 @@ function songGift(g, total) {
   if (cur && cur.singing && cur.g !== g) cur.giftXu += total;
   const prio = total >= kPrio();
   const p = karaoke.pending.get(g);
-  if (p) { p.paid += total; if (p.paid >= Math.max(1, kMin())) confirmSong(p, p.paid >= kPrio()); return; }
+  if (p) {
+    p.paid += total; p.at = now();   // còn tặng thì còn giữ lượt chờ
+    if (p.paid >= Math.max(1, kMin())) confirmSong(p, p.paid >= kPrio());
+    else { g.say(`Đã góp ${p.paid}/${kMin()} xu cho bài "${trunc(p.title, 18)}" 🎤`, 3.5); refreshKQ(); }
+    return;
+  }
   const q = karaoke.queue.find(it => it.g === g);
   if (q) {
     if (prio && !q.prio) { karaoke.queue.splice(karaoke.queue.indexOf(q), 1); q.prio = true; let i = 0; while (i < karaoke.queue.length && karaoke.queue[i].prio) i++; karaoke.queue.splice(i, 0, q); feed(`⏫ <b>${esc(g.name)}</b> chen hàng karaoke – lên thứ ${i + 1}`, 'gift'); refreshKQ(); }
@@ -1925,7 +1947,21 @@ function updateKaraoke(dt) {
 /* ---------- trình phát YouTube (khung karaoke) ---------- */
 const ktv = $('#ktv');
 function ktvMsg(html) { const m = $('#ktvMsg'); m.innerHTML = html || ''; m.classList.toggle('hidden', !html); }
-function showKtv(it) { ktv.classList.remove('hidden'); $('#ktvTitle').textContent = `🎤 ${singerName(it)} – ${it.title || ''}`; }
+function ktvTicker() {
+  const k = karaoke, nx = k.queue[0];
+  const gift = kMin() > 0 ? `rồi tặng quà từ <b>${kMin()} xu</b> để chốt bài` : 'là được xếp hàng';
+  const parts = [
+    `🎤 Muốn hát: comment <b>"hát + tên bài"</b> ${gift}`,
+    `⏫ Tặng quà từ <b>${kPrio()} xu</b> để chen hàng`,
+    `🎙️ Muốn hát cho cả phòng nghe: comment <b>"xin lên mic"</b> – Cậu Cả mời bạn làm khách mời, bấm chấp nhận rồi bật mic hát theo lời trên màn hình`,
+    `❤️ Thả tim, tặng quà cổ vũ người đang hát`,
+    nx ? `⏭ Tiếp theo: <b>${esc(singerName(nx))}</b>${nx.title ? ' – ' + esc(trunc(nx.title, 30)) : ''}` : `📋 Hàng chờ đang trống – comment "hát" là tới lượt bạn!`,
+  ];
+  const html = parts.join('&nbsp;&nbsp;•&nbsp;&nbsp;');
+  const el = $('#ktvTick'); if (el.innerHTML === html) return;
+  el.innerHTML = html; el.parentElement.style.setProperty('--tickDur', Math.max(20, Math.round(el.textContent.length / 9)) + 's');
+}
+function showKtv(it) { ktvTicker(); ktv.classList.remove('hidden'); $('#ktvTitle').textContent = `🎤 ${singerName(it)} – ${it.title || ''}`; }
 function hideKtv() { ktv.classList.add('hidden'); ktvMsg(''); }
 const YTK = {
   api: null, player: null, ready: false, it: null,
@@ -2072,6 +2108,7 @@ const Mic = {
 /* ---------- bảng hàng chờ karaoke (HUD + bảng điều khiển) ---------- */
 const VST = { ok: '✓ có video', searching: '🔎 đang tìm…', nokey: '⚠ chưa có video', none: '⚠ không thấy video', err: '⚠ lỗi tìm' };
 function refreshKQ() {
+  if (!ktv.classList.contains('hidden')) ktvTicker();
   const k = karaoke, rows = [];
   if (k.cur) rows.push(`<div class="kqi now">▶ <b>${esc(trunc(singerName(k.cur), 14))}</b>${k.cur.title ? ' – ' + esc(trunc(k.cur.title, 24)) : ' (hát mộc)'}${k.cur.g && k.cur.g.onMic ? ' 🎙️' : ''}</div>`);
   k.queue.slice(0, 3).forEach((it, i) => rows.push(`<div class="kqi">${i + 1}. ${it.prio ? '⏫ ' : ''}<b>${esc(trunc(singerName(it), 12))}</b>${it.title ? ' – ' + esc(trunc(it.title, 20)) : ' (hát mộc)'}</div>`));
@@ -2710,7 +2747,7 @@ updateSoundBtn();
 $('#bDzo').onclick = () => { Snd.resume(); runEvent('dzo'); };
 $('#bKara').onclick = () => { Snd.resume(); openSettings(); setTimeout(() => $('#karaSec').scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); };
 // karaoke & mic
-Object.assign(opts, Object.assign({ kMin: 1, kPrio: 30, kMax: 5, kSuffix: true, ytKey: '', ytVol: 100, micMon: false, micVol: 100 }, opts));
+Object.assign(opts, Object.assign({ kMin: 50, kPrio: 180, kMax: 5, kSuffix: true, ytKey: '', ytVol: 100, micMon: false, micVol: 100 }, opts));
 for (const [id, key] of [['ytKey', 'ytKey'], ['kMin', 'kMin'], ['kPrio', 'kPrio'], ['kMax', 'kMax'], ['ytVol', 'ytVol'], ['micVol', 'micVol']]) {
   const el = $('#' + id); el.value = opts[key];
   el.addEventListener('change', () => { opts[key] = el.type === 'text' ? el.value.trim() : Number(el.value); saveOpts(); if (key === 'ytVol') YTK.setVolume(opts.ytVol); if (key === 'micVol') Mic.apply(); if (key === 'ytKey') { appSaveYtKey(); } if (key === 'ytKey') karaoke.queue.forEach(it => { if (it.kind === 'song' && !it.link && it.vstatus !== 'ok') resolveVideo(it); }); refreshKQ(); });
@@ -3001,7 +3038,7 @@ const CIRCUS_ACTS = {
 };
 const CIRCUS_KEYS = { tung_hung: /tung hung/, phun_lua: /phun lua|lua/, ca_kheo: /ca kheo/, xoay_dia: /xoay dia|dia/, mua_lan: /mua lan|lan/ };
 const RE_CIRCUS = /(^|\s)(xiec|xem xiec|goi xiec|moi xiec|xiec duong pho|mua lan|phun lua|tung hung|ca kheo|xoay dia)(\s|$|!|\?)/;
-const STAGE = { x: -0.5, z: -2 };   // giữa đường, lệch phải màn hình – không bị khung tin che
+const STAGE = { x: -0.5, z: 1.8 };   // giữa đường, phía phải màn hình – không bị khung tin che
 const CAM_FACE = Math.atan2(0.86, 0.44);   // quay mặt về phía máy quay (bên kia đường)
 const Circus = {
   cur: null, last: -1e9, cd: 150, tips: 0,
@@ -3517,7 +3554,7 @@ bindToggle('optBots', 'botsOn', on => { if (!on) botList().forEach((b, i) => set
 bindToggle('optMgAuto', 'mgAuto', () => { MG.autoAcc = 0; });
 settings.addEventListener('click', e => { const b = e.target.closest('button[data-mg]'); if (!b) return; if (b.dataset.mg === 'stop') MG.stop('⏹ Chủ quán dừng trò chơi'); else if (!MG.start(b.dataset.mg, 'host')) feed('Đang có trò chơi chạy', 'sys'); closeSettings(); });
 function applyLivePreset() {
-  Object.assign(opts, { aiModel: 'claude-haiku-5-5', aiEvery: 30, aiMax: 90, aiTts: false, mcVoice: true, mcGap: 40, autoOn: true, autoLuckyMin: 8, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, kMin: 1, kPrio: 30, kMax: 5, music: true, sfx: true, nums: true });
+  Object.assign(opts, { aiModel: 'claude-haiku-5-5', aiEvery: 30, aiMax: 90, aiTts: false, mcVoice: true, mcGap: 40, autoOn: true, autoLuckyMin: 8, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, kMin: 50, kPrio: 180, kMax: 5, music: true, sfx: true, nums: true });
   saveOpts();
   for (const id of ['aiModel', 'aiEvery', 'aiMax', 'autoLuckyMin', 'botMin', 'mgEvery', 'kMin', 'kPrio', 'kMax']) { const el = $('#' + id); if (el) el.value = opts[id]; }
   for (const [id, k] of [['optAiTts', 'aiTts'], ['optAuto', 'autoOn'], ['optBots', 'botsOn'], ['optMgAuto', 'mgAuto'], ['optMusic', 'music'], ['optSfx', 'sfx'], ['optNums', 'nums']]) $('#' + id).checked = !!opts[k];
@@ -3531,7 +3568,7 @@ $('#presetLive').onclick = () => { Snd.resume(); applyLivePreset(); };
    VÒNG LẶP
    ===================================================================== */
 const clock = new THREE.Clock(); let T = 0, hudAcc = 0, ledAcc = 0, slowAcc = 0, perfAcc = 0, perfN = 0, perfT = 0, tipAcc = 0, idleAcc = 0;
-const TIPS = ['💡 Comment <b>"bàn 7"</b> để chọn bàn', '💡 Comment <b>"bàn riêng"</b> để giữ một bàn cho hội bạn', '💡 Comment <b>"ghép Tên"</b> để ngồi chung bàn với bạn', '💡 Comment <b>"mời Tên"</b> để rủ bạn qua bàn mình', '💡 Comment <b>"tên bàn Hội Bia"</b> để đặt tên bàn', '💡 Comment <b>"hát + tên bài"</b> rồi tặng quà để đăng ký karaoke 🎤', '💡 Tặng quà từ 30 xu để <b>chen hàng</b> karaoke ⏫', '💡 Comment <b>"xin lên mic"</b> để hát cho cả phòng nghe 🎙️', '💡 Comment <b>"oẳn tù tì búa"</b> để thách Cậu Cả', '💡 Comment <b>"xí ngầu"</b> – ra 6 cả bàn uống!', '💡 Comment <b>"cụng ly với Tên"</b> để mời bạn 1 ly', '💡 Say quá? Comment <b>"trà đá"</b> cho tỉnh 😅', '💡 Thả ❤️ để đẩy thanh <b>Không khí</b> lên 100%', '💡 Tặng quà để nhân viên <b>bưng món</b> ra bàn bạn', '💡 Comment <b>"xiếc"</b> để mời đoàn xiếc đường phố (múa lân, phun lửa, tung hứng…)', '💡 Đang có xiếc? Thả tim, tặng quà để <b>thưởng nghệ sĩ</b> diễn thêm!'];
+const TIPS = ['💡 Comment <b>"bàn 7"</b> để chọn bàn', '💡 Comment <b>"bàn riêng"</b> để giữ một bàn cho hội bạn', '💡 Comment <b>"ghép Tên"</b> để ngồi chung bàn với bạn', '💡 Comment <b>"mời Tên"</b> để rủ bạn qua bàn mình', '💡 Comment <b>"tên bàn Hội Bia"</b> để đặt tên bàn', '💡 Comment <b>"hát + tên bài"</b> rồi tặng quà để đăng ký karaoke 🎤', '💡 Tặng quà từ 180 xu để <b>chen hàng</b> karaoke ⏫', '💡 Comment <b>"hát + tên bài"</b> rồi tặng quà từ 50 xu để đăng ký hát 🎤', '💡 Comment <b>"xin lên mic"</b> để hát cho cả phòng nghe 🎙️', '💡 Comment <b>"oẳn tù tì búa"</b> để thách Cậu Cả', '💡 Comment <b>"xí ngầu"</b> – ra 6 cả bàn uống!', '💡 Comment <b>"cụng ly với Tên"</b> để mời bạn 1 ly', '💡 Say quá? Comment <b>"trà đá"</b> cho tỉnh 😅', '💡 Thả ❤️ để đẩy thanh <b>Không khí</b> lên 100%', '💡 Tặng quà để nhân viên <b>bưng món</b> ra bàn bạn', '💡 Comment <b>"xiếc"</b> để mời đoàn xiếc đường phố (múa lân, phun lửa, tung hứng…)', '💡 Đang có xiếc? Thả tim, tặng quà để <b>thưởng nghệ sĩ</b> diễn thêm!'];
 const OWNER_IDLE = ['Anh em cứ tự nhiên nha!', 'Bia lạnh đây, dzô!', 'Comment "bàn riêng" để giữ bàn nè!', 'Muốn ngồi với bạn thì comment "ghép" tên bạn!', 'Comment "hát" lên hát karaoke đi!', 'Oẳn tù tì với Cậu Cả không?', 'Thả tim cho quán đông vui nào!', 'Không say không về!', 'Tặng quà là có món ngay!'];
 function drawLED(t) {
   const g = ledCtx, W = 320, H = 160;

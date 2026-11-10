@@ -6,7 +6,8 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { exec, execFile } from 'node:child_process';
+import { exec, execFile, spawn } from 'node:child_process';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import WebSocket, { WebSocketServer } from 'ws';
@@ -20,13 +21,15 @@ const DEFAULTS = {
   tikfinityUrl: 'ws://localhost:21213/',
   tiktok: { username: '', on: false },   // kết nối thẳng TikTok LIVE bằng @tên (không cần TikFinity)
   notify: { on: true, topic: '', server: 'https://ntfy.sh', idleMin: 10 },   // báo về điện thoại qua app ntfy
-  game: { aiOn: true, aiModel: 'claude-haiku-5-5', aiEvery: 20, aiMax: 180, ytKey: '', kMin: 1, kPrio: 30, kMax: 5, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, autoOn: true, autoLuckyMin: 8, bgmYt: false, bgmQuery: '', bgmVol: 35, circusAuto: true, circusEvery: 6, mcVoice: true, mcGap: 40 },
+  game: { aiOn: true, aiModel: 'claude-haiku-5-5', aiEvery: 20, aiMax: 180, ytKey: '', kMin: 50, kPrio: 180, kMax: 5, botsOn: true, botMin: 20, mgAuto: true, mgEvery: 3, autoOn: true, autoLuckyMin: 8, bgmYt: false, bgmQuery: '', bgmVol: 35, circusAuto: true, circusEvery: 6, mcVoice: true, mcGap: 40, voiceEngine: 'auto', vieneuVoice: 'Hải Đăng' },
 };
 const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
 const merge = (a, b) => { const o = { ...a }; for (const k of Object.keys(b || {})) o[k] = isObj(a[k]) && isObj(b[k]) ? merge(a[k], b[k]) : b[k]; return o; };
 function loadConfig() { try { return merge(DEFAULTS, JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'))); } catch { return merge(DEFAULTS, {}); } }
 function saveConfig() { fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), { mode: 0o600 }); }
 let config = loadConfig();
+// đổi mức quà karaoke mặc định cũ (1 xu chốt bài / 30 xu chen hàng) sang 50 / 180 xu
+if (config.game.kMin === 1 && config.game.kPrio === 30 && !config.game.kPriceV2) { config.game.kMin = 50; config.game.kPrio = 180; config.game.kPriceV2 = true; saveConfig(); }
 if (config.obs) { delete config.obs; saveConfig(); }
 if (!config.notify.topic) { config.notify.topic = 'caucalive-' + crypto.randomBytes(5).toString('hex'); saveConfig(); }
 if (!fs.existsSync(CONFIG_PATH)) saveConfig();
@@ -80,21 +83,84 @@ function checkVoice() {
     viVoice = line ? line.split(/\s{2,}/)[0].trim() : null;
   });
 }
-function sayNext() {
+// ---- VieNeu-TTS: giọng tiếng Việt tự nhiên chạy trên máy (cài bằng cai-giong-vieneu.command) ----
+const VIENEU_HOME = path.join(process.env.HOME || os.homedir(), 'Library', 'Application Support', 'CauCaLive', 'vieneu');
+const VIENEU_PY = process.env.VIENEU_PYTHON || path.join(VIENEU_HOME, 'venv', 'bin', 'python');
+const VIENEU_PORT = Number(process.env.VIENEU_PORT || 8011);
+const vn = { state: 'off', err: '', proc: null, voices: [], restarts: 0, url: `http://127.0.0.1:${VIENEU_PORT}` };
+const vnInstalled = () => fs.existsSync(VIENEU_PY);
+const vnWanted = () => config.game.voiceEngine !== 'mac' && vnInstalled();
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function vnHealth() { try { const r = await fetch(vn.url + '/health', { signal: AbortSignal.timeout(1500) }); return r.ok; } catch { return false; } }
+async function vnLoadVoices() { try { const j = await (await fetch(vn.url + '/v1/voices', { signal: AbortSignal.timeout(5000) })).json(); vn.voices = (j.data || []).map(v => ({ id: v.id, desc: v.description || '' })); } catch { } }
+async function vnStart() {
+  if (vn.proc || vn.state === 'starting' || !vnWanted()) return;
+  if (await vnHealth()) { vn.state = 'ready'; vnLoadVoices(); return; }   // đã chạy sẵn
+  vn.state = 'starting'; vn.err = '';
+  fs.mkdirSync(VIENEU_HOME, { recursive: true });
+  const logFile = path.join(VIENEU_HOME, 'server.log'), log = fs.openSync(logFile, 'a');
+  vn.proc = spawn(VIENEU_PY, ['-m', 'apps.openai_speech'], { stdio: ['ignore', log, log],
+    env: { ...process.env, HOST: '127.0.0.1', PORT: String(VIENEU_PORT), VIENEU_BACKEND: 'onnx', HF_HOME: path.join(VIENEU_HOME, 'hf') } });
+  vn.proc.on('exit', code => {
+    const wasReady = vn.state === 'ready'; vn.proc = null; if (vn.state === 'off') return;
+    vn.state = 'error'; vn.err = `VieNeu dừng (mã ${code}) – xem ${logFile}`; console.log('🗣️ ' + vn.err);
+    if (wasReady && vn.restarts < 3) { vn.restarts++; setTimeout(vnStart, 10000); }   // tự khởi động lại, tối đa 3 lần
+  });
+  console.log('🗣️ Đang khởi động giọng VieNeu (lần đầu có thể mất vài phút)…');
+  for (const t0 = Date.now(); Date.now() - t0 < 10 * 60000;) {
+    await sleep(2000); if (!vn.proc) return;
+    if (await vnHealth()) { vn.state = 'ready'; await vnLoadVoices(); console.log(`🗣️ Giọng VieNeu sẵn sàng (${vn.voices.length} giọng)`); return; }
+  }
+  vn.state = 'error'; vn.err = 'VieNeu khởi động quá lâu – xem ' + logFile;
+}
+function vnStop() { const p = vn.proc; vn.state = 'off'; vn.proc = null; try { p && p.kill(); } catch { } }
+function wavFromPcm(pcm, rate) {
+  const h = Buffer.alloc(44); h.write('RIFF', 0); h.writeUInt32LE(36 + pcm.length, 4); h.write('WAVE', 8); h.write('fmt ', 12);
+  h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22); h.writeUInt32LE(rate, 24); h.writeUInt32LE(rate * 2, 28); h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34);
+  h.write('data', 36); h.writeUInt32LE(pcm.length, 40); return Buffer.concat([h, pcm]);
+}
+async function vnSynth(text) {
+  const voice = vn.voices.some(v => v.id === config.game.vieneuVoice) ? config.game.vieneuVoice : undefined;
+  const r = await fetch(vn.url + '/v1/audio/speech', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(30000),
+    body: JSON.stringify({ model: 'vieneu-v3-turbo', input: text, voice, response_format: 'pcm', sample_rate: 24000 }) });
+  if (!r.ok) throw new Error('VieNeu HTTP ' + r.status);
+  return wavFromPcm(Buffer.from(await r.arrayBuffer()), 24000);
+}
+let wavN = 0;
+function playWav(buf) {
+  return new Promise(res => {
+    const f = path.join(os.tmpdir(), `caucalive-${process.pid}-${wavN++ % 4}.wav`); fs.writeFileSync(f, buf);
+    const player = process.platform === 'darwin' ? 'afplay' : process.env.CAUCA_PLAYER;
+    if (!player) return setTimeout(res, Math.round((buf.length - 44) / 48));   // không có trình phát (máy thử): giả thời lượng
+    execFile(player, [f], { timeout: 60000 }, () => res());
+  });
+}
+function sayMac(t) { return new Promise(res => execFile('say', ['-v', viVoice, '-r', '185', t], { timeout: 30000 }, () => res())); }
+let nextWav = null;   // tạo sẵn câu kế tiếp trong lúc đang phát câu trước
+async function sayNext() {
   if (saying || !sayQ.length) return;
   saying = true; const t = sayQ.shift();
-  execFile('say', ['-v', viVoice, '-r', '185', t], { timeout: 30000 }, () => { saying = false; sayNext(); });
+  try {
+    if (vn.state === 'ready') {
+      const buf = nextWav && nextWav.t === t ? await nextWav.p : await vnSynth(t); nextWav = null;
+      if (sayQ.length) { const n = sayQ[0]; nextWav = { t: n, p: vnSynth(n).catch(() => null) }; }
+      if (buf) await playWav(buf); else if (viVoice) await sayMac(t);
+    } else if (viVoice) await sayMac(t);
+  } catch (e) { vn.err = String(e.message || e); if (viVoice) await sayMac(t); }
+  saying = false; sayNext();
 }
 function speak(text) {
-  if (process.platform !== 'darwin') return { ok: false, error: 'Chỉ đọc bằng giọng máy trên Mac' };
-  if (!viVoice) return { ok: false, error: voiceChecked ? 'Máy chưa có giọng tiếng Việt – cài giọng Linh: Cài đặt hệ thống → Trợ năng → Nội dung được đọc → Giọng hệ thống → Quản lý giọng → Tiếng Việt' : 'Đang kiểm tra giọng đọc' };
+  const useVn = vn.state === 'ready';
+  if (!useVn && process.platform !== 'darwin') return { ok: false, error: vn.state === 'starting' ? 'Giọng VieNeu đang khởi động' : 'Chỉ đọc bằng giọng máy trên Mac' };
+  if (!useVn && !viVoice) return { ok: false, error: vn.state === 'starting' ? 'Giọng VieNeu đang khởi động' : voiceChecked ? 'Chưa có giọng: chạy cai-giong-vieneu.command (khuyên dùng) hoặc cài giọng Linh của Mac' : 'Đang kiểm tra giọng đọc' };
   const t = String(text || '').replace(/[@#*_`<>\[\]{}|\\]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
   if (!t) return { ok: false, error: 'Không có nội dung' };
   if (sayQ.length >= 2) sayQ.shift();   // đừng dồn: bỏ câu cũ nhất
   sayQ.push(t); sayNext();
-  return { ok: true, voice: viVoice };
+  return { ok: true, voice: useVn ? 'VieNeu · ' + (config.game.vieneuVoice || 'mặc định') : viVoice };
 }
 checkVoice();
+vnStart();
 
 // ---- tiện ích HTTP ----
 const sameOrigin = req => { const o = req.headers.origin; return !o || o === BASE || o === `http://localhost:${PORT}`; };
@@ -180,7 +246,8 @@ const server = http.createServer(async (req, res) => {
         tiktok: { ...tiktok.status(), on: config.tiktok.on, saved: config.tiktok.username, gameClients: liveWss.clients.size },
         live: { ok: live.ok, reason: live.reason, since: live.since, lastReal: Math.max(live.lastReal, (gameState && gameState.lastReal) || 0) },
         notify: { on: config.notify.on, topic: config.notify.topic, idleMin: config.notify.idleMin },
-        voice: { mac: process.platform === 'darwin', name: viVoice, checked: voiceChecked, on: config.game.mcVoice !== false },
+        voice: { mac: process.platform === 'darwin', name: viVoice, checked: voiceChecked, on: config.game.mcVoice !== false, engine: config.game.voiceEngine || 'auto',
+          vieneu: { installed: vnInstalled(), state: vn.state, err: vn.err, voice: config.game.vieneuVoice, voices: vn.voices } },
         game: gameState, gameAge: gameStateAt ? Date.now() - gameStateAt : null, gameClients: controlClients.size,
         gameUrl: gameUrl(), panelUrl: `${BASE}/panel`, config: { game: config.game, tikfinityUrl: config.tikfinityUrl },
       });
@@ -193,7 +260,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/config') {
       const { game, tikfinityUrl, notify: nf } = b;
       if (isObj(nf)) { const o = {}; if (typeof nf.on === 'boolean') o.on = nf.on; if (typeof nf.topic === 'string' && /^[\w-]{1,64}$/.test(nf.topic.trim())) o.topic = nf.topic.trim(); if (Number(nf.idleMin) >= 3) o.idleMin = Math.min(120, Number(nf.idleMin)); config.notify = merge(config.notify, o); }
-      if (isObj(game)) config.game = merge(config.game, game);
+      if (isObj(game)) { const prevEng = config.game.voiceEngine; config.game = merge(config.game, game); if (config.game.voiceEngine !== prevEng) { if (config.game.voiceEngine === 'mac') vnStop(); else vnStart(); } }
       if (typeof tikfinityUrl === 'string' && /^wss?:\/\//.test(tikfinityUrl)) config.tikfinityUrl = tikfinityUrl;
       saveConfig(); broadcast({ type: 'config', config: publicConfig() });
       return json(res, 200, { ok: true });
@@ -259,5 +326,5 @@ server.listen(PORT, '127.0.0.1', () => {
   if (process.platform === 'darwin' && !process.argv.includes('--no-open')) exec(`open "${BASE}/panel"`);
   tiktokApply();
 });
-const stop = () => { console.log('\n👋 Đóng quán. Hẹn gặp lại!'); tiktok.stop(); server.close(); process.exit(0); };
+const stop = () => { console.log('\n👋 Đóng quán. Hẹn gặp lại!'); tiktok.stop(); vnStop(); server.close(); process.exit(0); };
 process.on('SIGINT', stop); process.on('SIGTERM', stop);
