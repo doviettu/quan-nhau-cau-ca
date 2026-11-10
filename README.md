@@ -90,6 +90,7 @@ Nút **"Áp dụng cấu hình Live"** trong ⚙️ của game, hoặc tham số
 
 - **Claude MC**: Haiku 5.5, nhịp 20 giây, chi phí khoảng $0,02–0,06 mỗi giờ.
 - **Tự động dẫn live**: bốc thăm, dzô, pháo hoa, dọn bàn.
+- **Nhân vật chibi**: đầu tròn to, mắt to, đổ bóng kiểu hoạt hình. Nét mặt đổi theo tình huống: chớp mắt, cười khi cụng ly hoặc nghe chuyện cười, hát, mắt sao khi thắng trò chơi hay tặng quà lớn, mắt xoáy khi say. Người xem thật vừa comment vào quán thì nhân vật của họ nảy lên, có **vòng sáng vàng dưới chân** và hiện tên trong 8 giây, để họ nhận ra mình ngay.
 - **Khách quen 🏠**: giữ quán luôn có ít nhất 20 người. Đây là nhân vật máy của quán, được đánh dấu rõ; họ không thả tim, không tặng quà, không lên bảng xếp hạng và không thắng trò chơi.
 - **Trò chơi nhỏ**: tự mở mỗi 3 phút (đố vui, đoán số, nhanh tay, đua bàn, bình chọn). Đố vui có hơn 130 câu: địa lý, lịch sử, ẩm thực, câu đố mẹo, thành ngữ, khoa học, tính nhanh. Karaoke: tặng quà từ 50 xu để đăng ký hát, từ 180 xu để chen hàng.
 - **Xiếc đường phố**: khoảng 6 phút một lần có một tiết mục (đổi được trong bảng điều khiển).

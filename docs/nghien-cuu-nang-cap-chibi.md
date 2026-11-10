@@ -84,6 +84,10 @@ Các nguồn tìm được chủ yếu là hướng dẫn vẽ chibi 2D. Phần 
 | 6 | **Đồ vật kiểu chibi**: bàn ghế, ly, món ăn to và tròn hơn, đổ bóng toon | Trung bình | Trung bình | Món ăn to hơn giúp người tặng quà thấy món của mình |
 | 7 | Hậu kỳ (bloom, chỉnh màu) | Thấp | Cao về hiệu năng | Để sau cùng, chỉ làm nếu máy Mac mini còn dư sức |
 
+**Tiến độ**
+- Đã làm hạng mục 1, 2, 4. Hạng mục 3 mới làm phần đổ bóng toon cho nhân vật, chưa có viền. Người lái xe máy cũng đã đổi sang chibi.
+- Đo khi quán có 52 nhân vật (khung 540×960, trình duyệt không có GPU): số lệnh vẽ tăng từ 297 lên 395, số tam giác từ khoảng 39 nghìn lên khoảng 122 nghìn. Card đồ hoạ của Mac mini dư sức vẽ chừng này, nhưng hãy xem số khung hình mỗi giây trên máy thật trước khi thêm viền.
+
 **Thứ tự đề xuất**
 1. Hạng mục 1, 2, 4.
 2. Đo hiệu năng.
