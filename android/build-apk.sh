@@ -2,7 +2,9 @@
 # Dựng APK Cậu Cả Live cho Android (arm64). Cần: Node 20+, Android SDK (ANDROID_HOME) có NDK + CMake.
 #   ./android/build-apk.sh            → android/app/build/outputs/apk/debug/app-debug.apk
 #   ./android/build-apk.sh install    → dựng rồi cài lên điện thoại đang cắm USB (adb)
+#   ./android/build-apk.sh release [install] → bản phát hành ký bằng khóa riêng (tạo một lần: android/tao-khoa-ky.command)
 set -euo pipefail
+MODE=debug; [ "${1:-}" = "release" ] && { MODE=release; shift; }
 cd "$(dirname "$0")"
 ANDROID_DIR="$PWD"; ROOT="$(cd .. && pwd)"
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
@@ -31,7 +33,17 @@ mkdir -p app/src/main/assets && rm -f app/src/main/assets/nodejs-project.zip
 (cd "$STAGE" && zip -qr -X "$ANDROID_DIR/app/src/main/assets/nodejs-project.zip" .)
 
 # 3) Dựng APK
-./gradlew --no-daemon -q assembleDebug
-APK=app/build/outputs/apk/debug/app-debug.apk
+if [ "$MODE" = release ]; then
+  export CAUCA_KS_FILE="${CAUCA_KS_FILE:-$HOME/Library/Application Support/CauCaLive/android-release.jks}"
+  [ -f "$CAUCA_KS_FILE" ] || { echo "Chưa có khóa ký – chạy android/tao-khoa-ky.command một lần"; exit 1; }
+  if [ -z "${CAUCA_KS_PASS:-}" ]; then CAUCA_KS_PASS="$(security find-generic-password -s CauCaLive-android-keystore -a android -w)"; fi
+  export CAUCA_KS_PASS
+  ./gradlew --no-daemon -q assembleRelease
+  APK=app/build/outputs/apk/release/app-release.apk
+  "$(ls -d "$ANDROID_HOME"/build-tools/* | tail -1)/apksigner" verify "$APK"   # dừng nếu chữ ký hỏng
+else
+  ./gradlew --no-daemon -q assembleDebug
+  APK=app/build/outputs/apk/debug/app-debug.apk
+fi
 echo "✅ $ANDROID_DIR/$APK ($(du -h "$APK" | cut -f1))"
 if [ "${1:-}" = "install" ]; then adb install -r "$APK" && adb shell monkey -p vn.caucalive.app -c android.intent.category.LAUNCHER 1 >/dev/null; fi

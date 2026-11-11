@@ -23,6 +23,24 @@ android {
     // libnode.so của nodejs-mobile do build-apk.sh chép vào app/libnode/bin/<abi>/
     sourceSets["main"].jniLibs.directories.add("libnode/bin")
 
+    // khóa ký bản phát hành: build-apk.sh lấy đường dẫn + mật khẩu (từ Keychain) qua biến môi trường
+    val ksFile = System.getenv("CAUCA_KS_FILE")
+    val ksPass = System.getenv("CAUCA_KS_PASS")
+    signingConfigs {
+        create("release") {
+            if (ksFile != null && ksPass != null) {
+                storeFile = file(ksFile); storePassword = ksPass; keyPassword = ksPass
+                keyAlias = System.getenv("CAUCA_KS_ALIAS") ?: "caucalive"
+            }
+        }
+    }
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            if (ksFile != null && ksPass != null) signingConfig = signingConfigs.getByName("release")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

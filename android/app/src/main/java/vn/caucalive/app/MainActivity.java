@@ -1,6 +1,12 @@
 package vn.caucalive.app;
 
+import android.Manifest;
 import android.app.Activity;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
@@ -106,6 +112,22 @@ public class MainActivity extends Activity {
             new Thread(this::runNode, "node").start();
         }
         new Thread(this::waitAndLoad, "wait-node").start();
+        keepAlive();
+    }
+
+    // Giữ quán sống khi chuyển sang app TikTok: dịch vụ có thông báo + xin bỏ tối ưu pin (hỏi một lần)
+    @SuppressWarnings("BatteryLife")
+    void keepAlive() {
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1);
+        startForegroundService(new Intent(this, KeepAliveService.class));
+        SharedPreferences p = getSharedPreferences("app", MODE_PRIVATE);
+        PowerManager pm = getSystemService(PowerManager.class);
+        if (!p.getBoolean("askedBattery", false) && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
+            p.edit().putBoolean("askedBattery", true).apply();
+            try { startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getPackageName()))); }
+            catch (Exception ignored) { }
+        }
     }
 
     @Override
