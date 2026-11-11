@@ -46,4 +46,4 @@ else
   APK=app/build/outputs/apk/debug/app-debug.apk
 fi
 echo "✅ $ANDROID_DIR/$APK ($(du -h "$APK" | cut -f1))"
-if [ "${1:-}" = "install" ]; then adb install -r "$APK" && adb shell monkey -p vn.caucalive.app -c android.intent.category.LAUNCHER 1 >/dev/null; fi
+if [ "${1:-}" = "install" ]; then adb install -r "$APK" && adb shell monkey -p vn.caucalive.app -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; fi
