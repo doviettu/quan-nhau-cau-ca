@@ -61,7 +61,11 @@ public class MainActivity extends Activity {
         super.onCreate(saved);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         // vẽ cả vùng camera đục lỗ (không để dải đen ở mép trên); game tự né bằng safe-area
-        if (Build.VERSION.SDK_INT >= 28) getWindow().getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        if (Build.VERSION.SDK_INT >= 28) {
+            WindowManager.LayoutParams lp = getWindow().getAttributes();
+            lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            getWindow().setAttributes(lp);
+        }
 
         if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0) WebView.setWebContentsDebuggingEnabled(true);
         web = new WebView(this);
@@ -127,6 +131,7 @@ public class MainActivity extends Activity {
     @SuppressWarnings("deprecation")
     void hideBars() {
         if (Build.VERSION.SDK_INT >= 30) {
+            getWindow().setDecorFitsSystemWindows(false);   // không chừa chỗ cho vùng camera; game tự né bằng safe-area
             WindowInsetsController c = getWindow().getInsetsController();
             if (c != null) {
                 c.hide(WindowInsets.Type.systemBars());
