@@ -1646,6 +1646,7 @@ function initTTS() {
   pickV(); speechSynthesis.onvoiceschanged = pickV;
 }
 function speak(text) {
+  if (opts.tts && window.CauCaAndroid) return CauCaAndroid.speak(trunc(text, 90));   // app Android: giọng tiếng Việt của máy
   if (!opts.tts || !('speechSynthesis' in window)) return;
   if (speechSynthesis.pending && speechSynthesis.speaking) return; // đừng dồn hàng đợi
   const u = new SpeechSynthesisUtterance(trunc(text, 90)); u.lang = 'vi-VN'; if (ttsVoice) u.voice = ttsVoice; u.rate = 1.05; speechSynthesis.speak(u);
@@ -3699,7 +3700,8 @@ function speakMC(text) {
   Snd.setMusic(opts.music); BGM.setVolume(Math.round(Number(opts.bgmVol ?? 35) * 0.35));
   clearTimeout(G.voiceTimer); G.voiceTimer = setTimeout(() => { Snd.setMusic(opts.music); BGM.setVolume(Number(opts.bgmVol ?? 35)); }, G.voiceUntil - now() + 100);
   const browserSay = () => { if (!('speechSynthesis' in window)) return; if (!ttsVoice) initTTS(); if (speechSynthesis.speaking && speechSynthesis.pending) speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(noEmo(t)); u.lang = 'vi-VN'; if (ttsVoice) u.voice = ttsVoice; u.rate = 1.1; u.pitch = 1.15; speechSynthesis.speak(u); };
-  if (APP && APP.on) fetch('/api/speak', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: t }) }).then(r => r.json()).then(j => { G.voiceErr = j.ok ? '' : j.error; if (!j.ok) browserSay(); }).catch(browserSay);
+  if (window.CauCaAndroid) { G.voiceErr = ''; CauCaAndroid.speak(noEmo(t)); }   // app Android: không có giọng Mac/VieNeu, đọc bằng giọng của máy
+  else if (APP && APP.on) fetch('/api/speak', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: t }) }).then(r => r.json()).then(j => { G.voiceErr = j.ok ? '' : j.error; if (!j.ok) browserSay(); }).catch(browserSay);
   else browserSay();
 }
 function aiExec(name, inp) {
