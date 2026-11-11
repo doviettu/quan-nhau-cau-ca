@@ -78,6 +78,7 @@ function probeTikfinity() {
 // ---- cửa sổ game cho TikTok LIVE Studio (nguồn "Chụp cửa sổ") ----
 const CHROME = '/Applications/Google Chrome.app';
 function openGameWindow() {
+  if (process.env.CAU_CA_ANDROID) return { ok: false, error: 'Trên điện thoại: bấm nút Quay lại để về màn hình game' };
   if (process.platform !== 'darwin') return { ok: false, error: 'Chỉ mở tự động được trên Mac – hãy mở địa chỉ game bằng trình duyệt' };
   const url = gameUrl().replace(/&ws=[^&]*/, '');   // game tự lấy nguồn sự kiện từ app
   if (fs.existsSync(CHROME)) {

@@ -18,7 +18,8 @@ Game 3D tương tác cho live **TikTok**, đọc thêm comment **YouTube Live** 
 | `app/locfilter.cjs` | Bộ lọc từ tục; **bản sao y hệt nằm trong `index.html`** |
 | `bridge/claude-bridge.mjs` | Cầu nối Claude dùng riêng khi không chạy app |
 | `start.command`, `Cau Ca Live.app` | Khởi động app trên Mac |
-| `docs/` | Hướng dẫn live 3 nền tảng, nghiên cứu chibi, cách tăng lượt xem và quà |
+| `android/` | App Android (`vn.caucalive.app`): nodejs-mobile chạy `server.mjs` trong app, game trong WebView, giọng Android TTS, Claude key trong Keystore. Xem `docs/app-android.md` |
+| `docs/` | Hướng dẫn live 3 nền tảng, app Android, nghiên cứu chibi, cách tăng lượt xem và quà |
 
 ## Chạy và kiểm tra
 - Chạy app: `./start.command` (hoặc `npm start`), rồi mở http://127.0.0.1:8686/panel. Cần Node 20+.
@@ -27,6 +28,8 @@ Game 3D tương tác cho live **TikTok**, đọc thêm comment **YouTube Live** 
 - Kiểm tra cú pháp: `node --check app/server.mjs` (và các file `.mjs` đã sửa).
 - Thử game: mở trình duyệt không giao diện (Playwright/Chromium), gọi qua `window.__cc`, ví dụ `__cc.handle('join', { uid: 'demo:An', name: 'An' })`, `__cc.StageFX.demo()`, `__cc.CamTour.start()`. Chụp màn hình khung dọc 540×960.
 - Không đưa ảnh chụp hay script thử vào repo.
+- App Android: `./android/build-apk.sh install` (cần Android SDK + NDK 29 + CMake 3.31.6, điện thoại cắm USB). Bản phát hành: `./android/build-apk.sh release` (khóa tạo một lần bằng `android/tao-khoa-ky.command`, mật khẩu trong Keychain `CauCaLive-android-keystore`; không commit file `.jks`). Gỡ lỗi WebView trên máy: `adb forward tcp:9333 localabstract:webview_devtools_remote_$(adb shell pidof vn.caucalive.app)` rồi dùng CDP tại `http://127.0.0.1:9333/json`; log của Node: `adb logcat -s CAUCA-NODE`.
+- Code chạy trên điện thoại là Node 18: không dùng cú pháp hay API chỉ có từ Node 20 trong `app/`, `bridge/` (thư viện ngoài thì `android/patch-node18.mjs` vá cờ regex `/v`). Trong game, kiểm `window.CauCaAndroid` để biết đang chạy trong app Android.
 
 ## Lưu ý kỹ thuật
 - Khi máy quay chạy theo kịch bản (`StageFX`, `CamTour`): tắt `controls.enabled` và không gọi `controls.update()`, vì giới hạn góc của OrbitControls sẽ kéo máy quay về. Xong thì gọi `fitCamera()` để trả máy quay về.

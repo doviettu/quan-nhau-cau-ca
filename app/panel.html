@@ -223,7 +223,8 @@ button.big{font-size:16px;padding:12px 18px}
     <div class="row"><label><input type="checkbox" id="mgAuto"> Trò chơi nhỏ mỗi</label><input type="number" id="mgEvery" min="1" max="30"><label>phút</label></div>
     <div class="row"><label><input type="checkbox" id="autoOn"> Tự động dẫn live, bốc thăm mỗi</label><input type="number" id="autoLuckyMin" min="2" max="60"><label>phút</label></div>
     <div class="btns"><button class="pri" id="bSaveCfg">💾 Lưu & áp dụng cho game</button></div>
-    <p class="mut">Claude API key được lưu trong <b>Keychain</b> của Mac (hỏi một lần khi mở app). Đổi key: chạy <code>./start.command --reset-key</code>.</p>
+    <p class="mut" id="keyMac">Claude API key được lưu trong <b>Keychain</b> của Mac (hỏi một lần khi mở app). Đổi key: chạy <code>./start.command --reset-key</code>.</p>
+    <p class="mut" id="keyAndroid" hidden><button id="bAndroidKey">🔑 Nhập / đổi Claude API key</button> Key được mã hoá trong <b>Android Keystore</b>, chỉ máy chủ trong app dùng, không đưa vào trang web.</p>
   </section>
 </main>
 <div id="toast"></div>
@@ -350,6 +351,7 @@ $('#bTtStop').onclick = async () => { try { await post('/api/tiktok/disconnect')
 $('#bOpenWin').onclick = async () => { try { const r = await post('/api/window/open'); toast(r.ok ? (r.warning ? '⚠️ ' + r.warning : '🪟 Đã mở cửa sổ game – thêm nguồn “Chụp cửa sổ” trong LIVE Studio') : '❌ ' + r.error, 6000); } catch (e) { toast('❌ ' + e.message); } };
 $('#bReload2').onclick = () => cmd({ type: 'reload' }, '🔄 Đã tải lại game');
 $('#bCopy').onclick = () => navigator.clipboard.writeText($('#gameUrl').textContent).then(() => toast('📋 Đã chép địa chỉ'));
+if (window.CauCaAndroid) { $('#keyMac').hidden = true; $('#keyAndroid').hidden = false; $('#bAndroidKey').onclick = () => CauCaAndroid.askClaudeKey(); }   // app Android: hộp thoại nhập key của app
 document.querySelectorAll('[data-ev]').forEach(b => b.onclick = () => cmd({ type: 'event', name: b.dataset.ev }));
 document.querySelectorAll('[data-mg]').forEach(b => b.onclick = () => cmd({ type: 'mg', name: b.dataset.mg }));
 $('#bSkip').onclick = () => cmd({ type: 'skip' });

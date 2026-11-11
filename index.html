@@ -1322,7 +1322,7 @@ const tableTops = new THREE.InstancedMesh(topGeo, plasticMat, NT * 2);
 const tableLegs = new THREE.InstancedMesh(new THREE.BoxGeometry(0.05, 0.52, 0.05).translate(0, 0.26, 0), plasticMat, NT * 8);
 const stools = new THREE.InstancedMesh(merge([CY(0.16, 0.18, 0.04, '#fff', [0, 0.28, 0], null, 10), CY(0.12, 0.17, 0.26, '#fff', [0, 0.13, 0], null, 8)]), new THREE.MeshLambertMaterial({ vertexColors: true }), NT * SEATS_PER);
 const blobTex = canvasTex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, 'rgba(0,0,0,.55)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); });
-const blobs = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.0, 3.0).rotateX(-Math.PI / 2).translate(0, 0.012, 0), new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false }), NT);
+const blobs = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.0, 3.0).rotateX(-Math.PI / 2).translate(0, 0.012, 0), new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }), NT);   // lệch độ sâu: bóng sát mặt sàn không nháy (z-fighting) trên GPU điện thoại khi máy quay xoay
 {
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), s1 = new THREE.Vector3(1, 1, 1), yAx = new THREE.Vector3(0, 1, 0);
   const RED = new THREE.Color('#d7332f'), BLUE = new THREE.Color('#1f7fd8');
@@ -1646,6 +1646,7 @@ function initTTS() {
   pickV(); speechSynthesis.onvoiceschanged = pickV;
 }
 function speak(text) {
+  if (opts.tts && window.CauCaAndroid) return CauCaAndroid.speak(trunc(text, 90));   // app Android: giọng tiếng Việt của máy
   if (!opts.tts || !('speechSynthesis' in window)) return;
   if (speechSynthesis.pending && speechSynthesis.speaking) return; // đừng dồn hàng đợi
   const u = new SpeechSynthesisUtterance(trunc(text, 90)); u.lang = 'vi-VN'; if (ttsVoice) u.voice = ttsVoice; u.rate = 1.05; speechSynthesis.speak(u);
@@ -3699,7 +3700,8 @@ function speakMC(text) {
   Snd.setMusic(opts.music); BGM.setVolume(Math.round(Number(opts.bgmVol ?? 35) * 0.35));
   clearTimeout(G.voiceTimer); G.voiceTimer = setTimeout(() => { Snd.setMusic(opts.music); BGM.setVolume(Number(opts.bgmVol ?? 35)); }, G.voiceUntil - now() + 100);
   const browserSay = () => { if (!('speechSynthesis' in window)) return; if (!ttsVoice) initTTS(); if (speechSynthesis.speaking && speechSynthesis.pending) speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(noEmo(t)); u.lang = 'vi-VN'; if (ttsVoice) u.voice = ttsVoice; u.rate = 1.1; u.pitch = 1.15; speechSynthesis.speak(u); };
-  if (APP && APP.on) fetch('/api/speak', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: t }) }).then(r => r.json()).then(j => { G.voiceErr = j.ok ? '' : j.error; if (!j.ok) browserSay(); }).catch(browserSay);
+  if (window.CauCaAndroid) { G.voiceErr = ''; CauCaAndroid.speak(noEmo(t)); }   // app Android: không có giọng Mac/VieNeu, đọc bằng giọng của máy
+  else if (APP && APP.on) fetch('/api/speak', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: t }) }).then(r => r.json()).then(j => { G.voiceErr = j.ok ? '' : j.error; if (!j.ok) browserSay(); }).catch(browserSay);
   else browserSay();
 }
 function aiExec(name, inp) {
