@@ -101,7 +101,10 @@ body.mgOn #bgmBox{display:none}
 .menuHead small{font-weight:700;font-size:10px;color:var(--yel2);display:block}
 .menuHead .chev{transition:transform .2s}
 #menuPanel.collapsed .chev{transform:rotate(-90deg)}
-#menuPanel.collapsed #menuList,#menuPanel.collapsed .hint{display:none}
+#menuPanel.collapsed #menuList,#menuPanel.collapsed .hint,#menuPanel.collapsed .menuHead small{display:none}
+/* thu gọn = một nút nhỏ, không che Cậu Cả và sân khấu */
+#menuPanel.collapsed{width:auto;border-radius:999px}
+#menuPanel.collapsed .menuHead{padding:7px 12px}
 #menuList{padding:3px 4px}
 .mrow{display:flex;align-items:center;justify-content:space-between;gap:4px;font-size:11.5px;padding:3px 6px;border-radius:8px;line-height:1.25}
 .mrow:nth-child(odd){background:rgba(255,255,255,.05)}
@@ -254,7 +257,7 @@ kbd{background:rgba(255,255,255,.15);border-radius:5px;padding:0 5px;font-size:1
     <div id="kqPanel" class="hidden"><div class="kqHead">🎤 KARAOKE</div><div id="kqList"></div></div>
   </div>
 
-  <div id="menuPanel" class="pe">
+  <div id="menuPanel" class="pe collapsed">
     <div class="menuHead" id="menuHead"><div>🎁 QUÀ → GỌI MÓN<small>Tặng x2 = món lớn</small></div><span class="chev">▾</span></div>
     <div id="menuList"></div>
     <div class="hint">💬 Comment là <b>vào quán</b> · <b>"bàn 7"</b> chọn bàn · <b>"bàn riêng"</b> · <b>"ghép Tên"</b> ngồi với bạn · <b>"dzô"</b> · <b>"hát + tên bài"</b> + 🎁 karaoke · <b>"xin lên mic"</b> · 🎯 <b>"đố vui"</b> · ❤ đẩy không khí<span id="platNote"></span></div>
@@ -622,6 +625,7 @@ const SAMPLE_GIFTS = [
 const canvas = $('#c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 let dpr = Math.min(devicePixelRatio || 1, isTouch ? 1.75 : 2);
+const dprMax = dpr;
 renderer.setPixelRatio(dpr);
 renderer.setSize(innerWidth, innerHeight);
 const scene = new THREE.Scene();
@@ -777,6 +781,17 @@ const CA = (rad, len, col, p, s) => paint(xf(new THREE.CapsuleGeometry(rad, len,
 const HS = (rad, col, p, s, phS, phL, thS, thL, ws = 14, hs = 5) => paint(xf(new THREE.SphereGeometry(rad, ws, hs, phS, phL, thS, thL), s, null, p), col);
 const toonRamp = (() => { const t = new THREE.DataTexture(new Uint8Array([105, 185, 255]), 3, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
 const toonMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonRamp });
+// viền nhân vật kiểu "inverted hull": vẽ lại lưới, lật mặt, phình theo pháp tuyến.
+// Độ phình nhân với khoảng cách tới máy quay nên viền dày gần như cố định theo pixel (~1,5 px ở khung 960).
+const outlineMat = new THREE.MeshBasicMaterial({ color: 0x2a1712, side: THREE.BackSide });
+outlineMat.onBeforeCompile = (sh) => {
+  sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>',
+    `vec4 mvPosition = modelViewMatrix * vec4( transformed, 1.0 );
+    mvPosition.xyz += normalize( normalMatrix * normal ) * 0.0016 * -mvPosition.z;
+    gl_Position = projectionMatrix * mvPosition;`);
+};
+const noRay = () => {};
+function outlined(mesh) { const h = new THREE.Mesh(mesh.geometry, outlineMat); h.raycast = noRay; mesh.add(h); return mesh; }
 // mảnh mặt: một phần mặt cầu ôm phía trước đầu, dán ảnh mắt/miệng (đổi theo cảm xúc)
 const FACE_PHI = 1.8, FACE_TH = 1.5;
 const faceGeo = new THREE.SphereGeometry(HEAD_R * 1.012, 12, 9, Math.PI / 2 - FACE_PHI / 2, FACE_PHI, Math.PI / 2 - FACE_TH / 2, FACE_TH);
@@ -850,22 +865,22 @@ function buildAvatar(L) {
     default: P.push(cap(1.035, 0.33), back()); break;
   }
   if (L.headphones) P.push(TO(R * 1.12, 0.025, '#111', [0, hy + 0.02, 0], [0, Math.PI / 2, 0]), CY(0.08, 0.08, 0.07, '#222', [-R * 1.08, hy - 0.02, 0], [0, 0, Math.PI / 2], 12), CY(0.08, 0.08, 0.07, '#222', [R * 1.08, hy - 0.02, 0], [0, 0, Math.PI / 2], 12));
-  const body = new THREE.Mesh(merge(P), toonMat);
+  const body = outlined(new THREE.Mesh(merge(P), toonMat));
   const face = new THREE.Mesh(faceGeo, faceMat('idle', L)); face.position.set(0, hy, 0); face.scale.set(...HEAD_S); face.renderOrder = 2;
   const group = new THREE.Group(); group.add(body, face);
   const sleeve = L.singlet ? L.skin : L.shirt;
   const legG = limb('cleg' + L.pants + L.shoe, () => merge([CA(0.07, 0.1, L.pants, [0, -0.11, 0]), SP(0.08, L.shoe, [0, -0.235, 0.03], [0.95, 0.6, 1.35], 8, 5)]));
   const armG = limb('carm' + sleeve + L.skin, () => merge([CA(0.056, 0.08, sleeve, [0, -0.07, 0]), SP(0.062, L.skin, [0, -0.165, 0], null, 8, 5)]));
-  const legL = new THREE.Mesh(legG, toonMat), legR = new THREE.Mesh(legG, toonMat);
+  const legL = outlined(new THREE.Mesh(legG, toonMat)), legR = outlined(new THREE.Mesh(legG, toonMat));
   legL.position.set(0.085, HIP, 0); legR.position.set(-0.085, HIP, 0);
-  const armL = new THREE.Mesh(armG, toonMat), armR = new THREE.Mesh(armG, toonMat);
+  const armL = outlined(new THREE.Mesh(armG, toonMat)), armR = outlined(new THREE.Mesh(armG, toonMat));
   armL.position.set(0.205, HIP + 0.25, 0); armR.position.set(-0.205, HIP + 0.25, 0);
   const mug = new THREE.Mesh(getMugGeo(), vcMat); mug.position.set(0, -0.2, 0.05); mug.scale.setScalar(0.85); mug.visible = false; armR.add(mug);
   const mic = new THREE.Mesh(getMicGeo(), vcMat); mic.position.set(0, -0.19, 0.06); mic.visible = false; armR.add(mic);
   // cặp tay/chân gộp sẵn: dùng khi đứng/ngồi yên để giảm số lệnh vẽ
   const legs2 = new THREE.Mesh(limb('clegs2' + L.pants + L.shoe, () => mergeGeometries([legG.clone().translate(0.085, 0, 0), legG.clone().translate(-0.085, 0, 0)])), toonMat);
-  legs2.position.set(0, HIP, 0);
-  const arms2 = new THREE.Mesh(limb('carms2' + sleeve + L.skin, () => mergeGeometries([armG.clone().translate(0.205, 0, 0), armG.clone().translate(-0.205, 0, 0)])), toonMat);
+  legs2.position.set(0, HIP, 0); outlined(legs2);
+  const arms2 = outlined(new THREE.Mesh(limb('carms2' + sleeve + L.skin, () => mergeGeometries([armG.clone().translate(0.205, 0, 0), armG.clone().translate(-0.205, 0, 0)])), toonMat));
   arms2.position.set(0, HIP + 0.25, 0);
   group.add(legL, legR, armL, armR, legs2, arms2);
   return { group, body, face, legL, legR, armL, armR, mug, mic, legs2, arms2 };
@@ -1307,7 +1322,7 @@ const tableTops = new THREE.InstancedMesh(topGeo, plasticMat, NT * 2);
 const tableLegs = new THREE.InstancedMesh(new THREE.BoxGeometry(0.05, 0.52, 0.05).translate(0, 0.26, 0), plasticMat, NT * 8);
 const stools = new THREE.InstancedMesh(merge([CY(0.16, 0.18, 0.04, '#fff', [0, 0.28, 0], null, 10), CY(0.12, 0.17, 0.26, '#fff', [0, 0.13, 0], null, 8)]), new THREE.MeshLambertMaterial({ vertexColors: true }), NT * SEATS_PER);
 const blobTex = canvasTex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, 'rgba(0,0,0,.55)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); });
-const blobs = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.0, 3.0).rotateX(-Math.PI / 2).translate(0, 0.012, 0), new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false }), NT);
+const blobs = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.0, 3.0).rotateX(-Math.PI / 2).translate(0, 0.012, 0), new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }), NT);   // lệch độ sâu: bóng sát mặt sàn không nháy (z-fighting) trên GPU điện thoại khi máy quay xoay
 {
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), s1 = new THREE.Vector3(1, 1, 1), yAx = new THREE.Vector3(0, 1, 0);
   const RED = new THREE.Color('#d7332f'), BLUE = new THREE.Color('#1f7fd8');
@@ -1631,6 +1646,7 @@ function initTTS() {
   pickV(); speechSynthesis.onvoiceschanged = pickV;
 }
 function speak(text) {
+  if (opts.tts && window.CauCaAndroid) return CauCaAndroid.speak(trunc(text, 90));   // app Android: giọng tiếng Việt của máy
   if (!opts.tts || !('speechSynthesis' in window)) return;
   if (speechSynthesis.pending && speechSynthesis.speaking) return; // đừng dồn hàng đợi
   const u = new SpeechSynthesisUtterance(trunc(text, 90)); u.lang = 'vi-VN'; if (ttsVoice) u.voice = ttsVoice; u.rate = 1.05; speechSynthesis.speak(u);
@@ -2841,10 +2857,17 @@ const menuRows = {};
   });
   const sel = $('#simGift');
   SAMPLE_GIFTS.forEach(s => { const o = document.createElement('option'); o.value = s.name + '|' + s.d; o.textContent = `${giftVi(s.name)} (${s.d} xu) → ${mapGift(s.name, s.d).dish}`; sel.appendChild(o); });
-  $('#menuHead').addEventListener('click', () => $('#menuPanel').classList.toggle('collapsed'));
-  if (innerHeight < 520) $('#menuPanel').classList.add('collapsed');
+  // bấm mở tay thì giữ mở; bấm lại thì thu về nút
+  $('#menuHead').addEventListener('click', () => { menuPinned = !$('#menuPanel').classList.toggle('collapsed'); clearTimeout(menuT); });
 })();
-function flashMenu(id) { const r = menuRows[id]; if (!r) return; r.classList.remove('hit'); void r.offsetWidth; r.classList.add('hit'); }
+// bảng quà mặc định thu thành nút; có quà/gọi món thì mở ra vài giây cho người xem thấy món của mình
+let menuPinned = false, menuT = 0;
+function peekMenu(ms = 8000) {
+  if (menuPinned) return;
+  $('#menuPanel').classList.remove('collapsed'); clearTimeout(menuT);
+  menuT = setTimeout(() => { if (!menuPinned) $('#menuPanel').classList.add('collapsed'); }, ms);
+}
+function flashMenu(id) { const r = menuRows[id]; if (!r) return; peekMenu(); r.classList.remove('hit'); void r.offsetWidth; r.classList.add('hit'); }
 function feed(html, cls = '') {
   const f = $('#feed'); const d = document.createElement('div'); d.className = 'fi ' + cls; d.innerHTML = html; f.appendChild(d);
   const max = innerWidth < 600 ? 5 : innerHeight < 700 ? 5 : 7;
@@ -3677,7 +3700,8 @@ function speakMC(text) {
   Snd.setMusic(opts.music); BGM.setVolume(Math.round(Number(opts.bgmVol ?? 35) * 0.35));
   clearTimeout(G.voiceTimer); G.voiceTimer = setTimeout(() => { Snd.setMusic(opts.music); BGM.setVolume(Number(opts.bgmVol ?? 35)); }, G.voiceUntil - now() + 100);
   const browserSay = () => { if (!('speechSynthesis' in window)) return; if (!ttsVoice) initTTS(); if (speechSynthesis.speaking && speechSynthesis.pending) speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(noEmo(t)); u.lang = 'vi-VN'; if (ttsVoice) u.voice = ttsVoice; u.rate = 1.1; u.pitch = 1.15; speechSynthesis.speak(u); };
-  if (APP && APP.on) fetch('/api/speak', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: t }) }).then(r => r.json()).then(j => { G.voiceErr = j.ok ? '' : j.error; if (!j.ok) browserSay(); }).catch(browserSay);
+  if (window.CauCaAndroid) { G.voiceErr = ''; CauCaAndroid.speak(noEmo(t)); }   // app Android: không có giọng Mac/VieNeu, đọc bằng giọng của máy
+  else if (APP && APP.on) fetch('/api/speak', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: t }) }).then(r => r.json()).then(j => { G.voiceErr = j.ok ? '' : j.error; if (!j.ok) browserSay(); }).catch(browserSay);
   else browserSay();
 }
 function aiExec(name, inp) {
@@ -3953,7 +3977,7 @@ $('#presetLive').onclick = () => { Snd.resume(); applyLivePreset(); };
 /* =====================================================================
    VÒNG LẶP
    ===================================================================== */
-const clock = new THREE.Clock(); let T = 0, hudAcc = 0, ledAcc = 0, slowAcc = 0, perfAcc = 0, perfN = 0, perfT = 0, tipAcc = 0, idleAcc = 0;
+const clock = new THREE.Clock(); let T = 0, hudAcc = 0, ledAcc = 0, slowAcc = 0, perfN = 0, perfT0 = performance.now(), perfLow = 0, perfHigh = 0, tipAcc = 0, idleAcc = 0;
 const TIPS = ['💡 Comment <b>"bàn 7"</b> để chọn bàn', '💡 Comment <b>"bàn riêng"</b> để giữ một bàn cho hội bạn', '💡 Comment <b>"ghép Tên"</b> để ngồi chung bàn với bạn', '💡 Comment <b>"mời Tên"</b> để rủ bạn qua bàn mình', '💡 Comment <b>"tên bàn Hội Bia"</b> để đặt tên bàn', '💡 Comment <b>"hát + tên bài"</b> rồi tặng quà từ 50 xu để đăng ký hát 🎤', '💡 Comment <b>"xin lên mic"</b> để hát cho cả phòng nghe 🎙️', '💡 Comment <b>"oẳn tù tì búa"</b> để thách Cậu Cả', '💡 Comment <b>"xí ngầu"</b> – ra 6 cả bàn uống!', '💡 Comment <b>"cụng ly với Tên"</b> để mời bạn 1 ly', '💡 Say quá? Comment <b>"trà đá"</b> cho tỉnh 😅', '💡 Thả ❤️ để đẩy thanh <b>Không khí</b> lên 100%', '💡 Tặng quà để nhân viên <b>bưng món</b> ra bàn bạn', '💡 Comment <b>"xiếc"</b> để mời đoàn xiếc đường phố (múa lân, phun lửa, tung hứng…)', '💡 Đang có xiếc? Thả tim <b>cổ vũ nghệ sĩ</b> nha!'];
 const OWNER_IDLE = ['Anh em cứ tự nhiên nha!', 'Bia lạnh đây, dzô!', 'Comment "bàn riêng" để giữ bàn nè!', 'Muốn ngồi với bạn thì comment "ghép" tên bạn!', 'Comment "hát" lên hát karaoke đi!', 'Oẳn tù tì với Cậu Cả không?', 'Thả tim cho quán đông vui nào!', 'Không say không về!'];
 function drawLED(t) {
@@ -4198,9 +4222,16 @@ function loop() {
   StageFX.update(dt, T); stageFog.update(dt); stageJet.update(dt);
   if (StageFX.camOn()) StageFX.cam(dt); else if (CamTour.on) CamTour.update(dt); else { CamTour.tick(); controls.update(); }
   renderer.render(scene, camera);
-  // tự giảm độ phân giải nếu máy yếu
-  perfT += dt; perfAcc += dt; perfN++;
-  if (perfT > 3) { const fps = perfN / perfAcc; perfT = perfAcc = perfN = 0; if (fps < 38 && dpr > 1) { dpr = Math.max(1, dpr - 0.25); renderer.setPixelRatio(dpr); } }
+  // tự giảm độ phân giải nếu máy yếu; chậm 2 nhịp liền mới giảm, mượt ~30 giây thì tăng lại
+  // (một lần khựng lúc khách vào dồn dập không được làm mờ hình cả buổi live).
+  // Đo bằng giờ thật vì dt bị kẹp 0,05; dưới 10 FPS là cửa sổ bị che/bóp, không phải máy yếu.
+  perfN++; const pNow = performance.now();
+  if (pNow - perfT0 > 3000) {
+    const fps = perfN * 1000 / (pNow - perfT0); perfT0 = pNow; perfN = 0;
+    if (document.hidden || fps < 10) perfLow = perfHigh = 0;
+    else if (fps < 38) { perfHigh = 0; if (++perfLow >= 2 && dpr > 1) { perfLow = 0; dpr = Math.max(1, dpr - 0.25); renderer.setPixelRatio(dpr); } }
+    else { perfLow = 0; if (fps > 55 && dpr < dprMax) { if (++perfHigh >= 10) { perfHigh = 0; dpr = Math.min(dprMax, dpr + 0.25); renderer.setPixelRatio(dpr); } } else perfHigh = 0; }
+  }
 }
 
 /* =====================================================================

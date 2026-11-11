@@ -18,7 +18,8 @@ Game 3D tương tác cho live **TikTok**, đọc thêm comment **YouTube Live** 
 | `app/locfilter.cjs` | Bộ lọc từ tục; **bản sao y hệt nằm trong `index.html`** |
 | `bridge/claude-bridge.mjs` | Cầu nối Claude dùng riêng khi không chạy app |
 | `start.command`, `Cau Ca Live.app` | Khởi động app trên Mac |
-| `docs/` | Hướng dẫn live 3 nền tảng, nghiên cứu chibi, cách tăng lượt xem và quà |
+| `android/` | App Android (`vn.caucalive.app`): nodejs-mobile chạy `server.mjs` trong app, game trong WebView, giọng Android TTS, Claude key trong Keystore. Xem `docs/app-android.md` |
+| `docs/` | Hướng dẫn live 3 nền tảng, app Android, nghiên cứu chibi, cách tăng lượt xem và quà |
 
 ## Chạy và kiểm tra
 - Chạy app: `./start.command` (hoặc `npm start`), rồi mở http://127.0.0.1:8686/panel. Cần Node 20+.
@@ -27,11 +28,15 @@ Game 3D tương tác cho live **TikTok**, đọc thêm comment **YouTube Live** 
 - Kiểm tra cú pháp: `node --check app/server.mjs` (và các file `.mjs` đã sửa).
 - Thử game: mở trình duyệt không giao diện (Playwright/Chromium), gọi qua `window.__cc`, ví dụ `__cc.handle('join', { uid: 'demo:An', name: 'An' })`, `__cc.StageFX.demo()`, `__cc.CamTour.start()`. Chụp màn hình khung dọc 540×960.
 - Không đưa ảnh chụp hay script thử vào repo.
+- App Android: `./android/build-apk.sh install` (cần Android SDK + NDK 29 + CMake 3.31.6, điện thoại cắm USB). Bản phát hành: `./android/build-apk.sh release` (khóa tạo một lần bằng `android/tao-khoa-ky.command`, mật khẩu trong Keychain `CauCaLive-android-keystore`; không commit file `.jks`). Gỡ lỗi WebView trên máy: `adb forward tcp:9333 localabstract:webview_devtools_remote_$(adb shell pidof vn.caucalive.app)` rồi dùng CDP tại `http://127.0.0.1:9333/json`; log của Node: `adb logcat -s CAUCA-NODE`.
+- Code chạy trên điện thoại là Node 18: không dùng cú pháp hay API chỉ có từ Node 20 trong `app/`, `bridge/` (thư viện ngoài thì `android/patch-node18.mjs` vá cờ regex `/v`). Trong game, kiểm `window.CauCaAndroid` để biết đang chạy trong app Android.
 
 ## Lưu ý kỹ thuật
 - Khi máy quay chạy theo kịch bản (`StageFX`, `CamTour`): tắt `controls.enabled` và không gọi `controls.update()`, vì giới hạn góc của OrbitControls sẽ kéo máy quay về. Xong thì gọi `fitCamera()` để trả máy quay về.
 - Khung dọc dùng `camera.setViewOffset`; phải xoá khi chạy máy quay kịch bản.
 - Vòng lặp chính: `StageFX.camOn()` được ưu tiên hơn `CamTour.on`, rồi mới đến `controls.update()`.
+- Viền nhân vật: `outlined(mesh)` gắn một lưới con dùng chung `outlineMat` (inverted hull). Lưới con tự ẩn hoặc hiện theo lưới cha, nên nếu thêm mảnh nhân vật mới thì bọc mảnh đó bằng `outlined()`.
+- Đo FPS phải dùng cửa sổ đang hiện trên màn hình. Khung trình duyệt của app Claude bị bóp còn 1 FPS khi cửa sổ không hiện, dù `document.hidden` vẫn là `false`. Cách chắc ăn: Playwright headless với `--use-angle=metal` (vẫn dùng GPU M4 thật) và `deviceScaleFactor: 2`.
 - Cấu hình game nằm ở `DEFAULTS.game` trong `server.mjs`, và phải thêm tên khóa vào danh sách của `applyAppConfig` trong `index.html` thì game mới nhận.
 - `config.json` và `.secrets.json` nằm trong `.gitignore`. Không commit chúng.
 
@@ -44,10 +49,9 @@ Game 3D tương tác cho live **TikTok**, đọc thêm comment **YouTube Live** 
 - Không ghi email hay thông tin cá nhân của người dùng vào code, commit hay dịch vụ bên ngoài.
 
 ## Tình trạng (11/2026)
-Đã gộp vào `main`: nhân vật chibi + mặt biểu cảm + toon shading (chưa có viền), YouTube/Facebook Live, kết nối thông minh, danh sách giọng MC, bộ lọc từ tục, nhạc nền từ link YouTube hoặc thư mục trên máy, máy quay xoay 360° định kỳ, hiệu ứng sân khấu karaoke, OBS + bộ chuyển tiếp 3 nền tảng, `cai-obs.command`.
+Đã gộp vào `main`: nhân vật chibi + mặt biểu cảm + toon shading, YouTube/Facebook Live, kết nối thông minh, danh sách giọng MC, bộ lọc từ tục, nhạc nền từ link YouTube hoặc thư mục trên máy, máy quay xoay 360° định kỳ, hiệu ứng sân khấu karaoke, OBS + bộ chuyển tiếp 3 nền tảng, `cai-obs.command`.
 
 Việc còn mở (xem `docs/nghien-cuu-nang-cap-chibi.md` mục D):
-- Đo số khung hình mỗi giây trên Mac mini thật với khoảng 48 khách, trước khi thêm viền nhân vật.
-- Thu gọn bảng quà thành nút.
+- Hạng mục 5 còn phần thống nhất giao diện (bo góc, viền dày, chữ tròn). Bảng quà đã thu thành nút (`peekMenu`).
 - Chạy A/B 2 tuần.
 - Chạy thử `cai-obs.command` trên Mac thật. Chưa chạy lần nào vì môi trường cloud không phải macOS.
